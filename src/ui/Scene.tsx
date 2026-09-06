@@ -12,6 +12,16 @@ import TravelPhoto from './TravelPhoto';
 import CityMap from './CityMap';
 import { useT, weekdayLabel, dayLabel } from '../i18n';
 
+/** step 배열에서 dir 방향으로 가장 가까운 'visit' 스텝의 poiId를 찾는다 (다음 목적지 / 직전 출발지 추론용). */
+function nearestVisitPoiId(steps: Step[], from: number, dir: 1 | -1): string | undefined {
+  for (let i = from; i >= 0 && i < steps.length; i += dir) {
+    const s = steps[i];
+    if (s.t === 'visit') return s.poiId;
+    if (dir === 1 && s.t === 'unlock') break; // 지역 해금을 넘어서까지 앞을 내다보지 않는다
+  }
+  return undefined;
+}
+
 export default function Scene() {
   const t = useT();
   const active = useGame((s) => s.active);
@@ -25,11 +35,15 @@ export default function Scene() {
   const backdrop = step.t === 'visit' ? placePhoto(city.id, step.poiId) : step.t === 'photo' ? photoById(step.photoId) : photoById(city.id);
   const stagePoi = step.t === 'visit' ? city.pois.find((p) => p.id === step.poiId) : undefined;
   const showMap = (step.t === 'visit' && !!stagePoi?.coord) || step.t === 'move';
+  // 'move' 스텝은 보통 바로 다음 'visit' 스텝의 장소로 걸어가는 구간이다. 목적지·직전 장소를 추론해
+  // 지도에 도보 동선(점선)을 그려 "미션도 그에 맞게" 요청을 반영한다.
+  const targetPoiId = step.t === 'visit' ? step.poiId : step.t === 'move' ? step.poiId ?? nearestVisitPoiId(m.steps, active.step + 1, 1) : undefined;
+  const originPoiId = step.t === 'move' ? nearestVisitPoiId(m.steps, active.step - 1, -1) : undefined;
   return (
     <div className="scene mission-scene">
       <div className="scene-landscape">
         {showMap
-          ? <CityMap cityId={city.id} highlightId={step.t === 'visit' ? step.poiId : undefined} readOnly controls={false} />
+          ? <CityMap cityId={city.id} highlightId={targetPoiId} routeFromId={originPoiId} readOnly controls={false} />
           : <TravelPhoto photo={backdrop ?? photoById(city.id)} priority mystery={step.t === 'photo'} />}
       </div>
       <div className="scene-location"><span>CARNET / SUR LE TERRAIN</span><b>{city.names.fr}</b><small>{city.names.ko}{t('에서의 기록')}</small></div>

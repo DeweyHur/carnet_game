@@ -109,7 +109,7 @@ export type Step =
   | { t: 'buy'; foodId: string; guess?: boolean }
   | { t: 'order'; prompt: string; items: string[]; cardId: string } // items = 정답 순서(UI에서 섞음)
   | { t: 'exchange'; from: Currency; to: Currency; hint: string }
-  | { t: 'move'; zone: string; minutes: number } // 도시 내 구역 이동(1회권)
+  | { t: 'move'; zone: string; minutes: number; poiId?: string } // 도시 내 구역 이동(1회권). poiId: 도착지가 명확한 장소일 때 지도 강조용
   | { t: 'article'; baseFee: number }
   | { t: 'letter'; text: string; title: string }
   | { t: 'unlock'; regions: RegionId[]; note: string }

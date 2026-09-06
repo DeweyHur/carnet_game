@@ -81,6 +81,9 @@ a { color: var(--accent-2); }
 .poi-pin.visited .lbl::before { content: '✓ '; }
 .poi-pin.target .dot { width: 16px; height: 16px; background: var(--accent); outline: 3px solid var(--accent); outline-offset: 2px; animation: pulse 1.6s infinite; }
 .poi-pin.target .lbl { font-size: 13px; }
+.poi-pin.origin .dot { background: var(--ink-3); }
+.poi-pin.origin .lbl { opacity: .7; }
+.poi-pin.origin .lbl::before { content: '↳ '; }
 .arr-label { font-family: var(--mono); font-size: 10px; color: var(--ink-3); background: #fffdf6cc; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; pointer-events: none; opacity: .75; }
 
 /* ── 패널(도시 카드) ─────────────────────────────────── */

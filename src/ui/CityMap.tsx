@@ -15,6 +15,8 @@ interface Props {
   cityId: string;
   /** 강조할 장소(현재 미션의 목적지 등). 펄스로 표시된다. */
   highlightId?: string;
+  /** 미션 도보 동선의 출발지(직전에 들른 장소). highlightId와 함께 주면 두 지점을 잇는 점선을 그린다. */
+  routeFromId?: string;
   /** 지도를 접어 보기 전용으로만 쓸 때(핀 클릭 무시) */
   readOnly?: boolean;
   onSelectPoi?: (poiId: string) => void;
@@ -30,7 +32,7 @@ function poiBounds(pois: Poi[], fallback: [number, number]): [[number, number], 
   return [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]];
 }
 
-export default function CityMap({ cityId, highlightId, readOnly, onSelectPoi, controls = true }: Props) {
+export default function CityMap({ cityId, highlightId, routeFromId, readOnly, onSelectPoi, controls = true }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markers = useRef<Record<string, Marker>>({});
@@ -48,12 +50,21 @@ export default function CityMap({ cityId, highlightId, readOnly, onSelectPoi, co
     if (controls) map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
     map.scrollZoom.disable();
     map.dragRotate.disable();
+    const target = highlightId ? city.pois.find((p) => p.id === highlightId) : undefined;
+    const origin = routeFromId ? city.pois.find((p) => p.id === routeFromId) : undefined;
     map.once('load', () => {
-      if (highlightId) {
-        const target = city.pois.find((p) => p.id === highlightId);
-        if (target?.coord) map.jumpTo({ center: target.coord, zoom: 15.5 });
+      if (target?.coord && origin?.coord) {
+        const lons = [target.coord[0], origin.coord[0]];
+        const lats = [target.coord[1], origin.coord[1]];
+        map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 70, maxZoom: 16, duration: 0 });
+      } else if (target?.coord) {
+        map.jumpTo({ center: target.coord, zoom: 15.5 });
       } else {
         map.fitBounds(bounds, { padding: 46, maxZoom: 15, duration: 0 });
+      }
+      if (target?.coord && origin?.coord) {
+        map.addSource('walk-route', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [origin.coord, target.coord] } } });
+        map.addLayer({ id: 'walk-route', type: 'line', source: 'walk-route', paint: { 'line-color': '#b5482f', 'line-width': 2.5, 'line-dasharray': [1, 1.6] } });
       }
     });
 
@@ -72,7 +83,7 @@ export default function CityMap({ cityId, highlightId, readOnly, onSelectPoi, co
       const coord = p.coord ?? city.coord;
       const el = document.createElement('div');
       const visited = visitedPois.includes(`${cityId}:${p.id}`);
-      el.className = `poi-pin${p.id === highlightId ? ' target' : ''}${visited ? ' visited' : ''}`;
+      el.className = `poi-pin${p.id === highlightId ? ' target' : ''}${p.id === routeFromId ? ' origin' : ''}${visited ? ' visited' : ''}`;
       el.innerHTML = `<div class="dot"></div><div class="lbl">${p.name.replace(/\s*\([^)]*\)/g, '')}</div>`;
       if (!readOnly && onSelectPoi) {
         el.style.cursor = 'pointer';
@@ -84,7 +95,7 @@ export default function CityMap({ cityId, highlightId, readOnly, onSelectPoi, co
 
     return () => { Object.values(markers.current).forEach((m) => m.remove()); markers.current = {}; map.remove(); mapRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cityId, highlightId, controls]);
+  }, [cityId, highlightId, routeFromId, controls]);
 
   useEffect(() => {
     for (const p of city.pois) {
