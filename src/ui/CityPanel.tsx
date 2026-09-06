@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { cityById, edgesFrom, REGIONS } from '../data/cities';
 import { missionById, missionsForCity } from '../data/missions';
 import { useGame, WEEKDAYS, weekdayOf, clock } from '../game/store';
@@ -7,6 +7,7 @@ import { Price } from './common';
 import type { Edge } from '../game/types';
 import { photoById, placePhoto } from '../data/photos';
 import TravelPhoto from './TravelPhoto';
+import CityMap from './CityMap';
 import { useT, weekdayLabel } from '../i18n';
 
 const MODE_NAME: Record<Edge['mode'], string> = { metro: '메트로', rer: 'RER', transilien: '트랑실리앙', ter: 'TER', tgv: 'TGV', intercites: 'Intercités', eurostar: '유로스타', bus: '버스' };
@@ -28,6 +29,11 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
   const [msg, setMsg] = useState<string | null>(null);
 
   const edges = here ? edgesFrom(cityId) : edgesFrom(s.cityId).filter((e) => e.to === cityId);
+  const placeRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const jumpToPoi = (poiId: string) => {
+    setTab('places');
+    requestAnimationFrame(() => placeRefs.current[poiId]?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  };
 
   return (
     <div className="panel">
@@ -74,12 +80,17 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
             )}
           </>
         )}
-        {tab === 'places' && <p className="blurb">{t('한 장소씩 걸으며 사진을 모으세요. 방문하면 현장 사진이 앨범에 남아요. 입장료와 30분의 여행 시간이 듭니다.')}</p>}
+        {tab === 'places' && (
+          <>
+            <p className="blurb">{t('지도에서 장소를 짚어 보세요. 핀을 누르면 아래 목록에서 바로 찾아줍니다. 방문하면 현장 사진이 앨범에 남아요.')}</p>
+            <div className="city-map-frame"><CityMap cityId={cityId} onSelectPoi={jumpToPoi} /></div>
+          </>
+        )}
         {tab === 'places' && city.pois.map((p) => {
           const closed = p.closedDays?.includes(wd);
           const visited = s.visitedPois.includes(`${cityId}:${p.id}`);
           return (
-            <div className="place-card" key={p.id}>
+            <div className="place-card" key={p.id} ref={(el) => { placeRefs.current[p.id] = el; }}>
               <TravelPhoto photo={placePhoto(cityId, p.id)} compact className="place-image" />
               <div className="row">
               <div>

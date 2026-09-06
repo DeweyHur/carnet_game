@@ -22,6 +22,8 @@ export interface Poi {
   hours?: string; // 표시용 "09:00-18:00"
   note?: string;
   sourceId?: string;
+  /** [lon, lat] — 도시 내부 지도에서의 실제 위치. 없으면 도시 중심 부근에 표시. */
+  coord?: [number, number];
 }
 
 export type VenueTier = 'market' | 'bistro' | 'restaurant' | 'shop';

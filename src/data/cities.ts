@@ -17,12 +17,12 @@ export const CITIES: City[] = [
     guide: { name: '엘렌', archetype: '박물관 도슨트', color: '#b56b45',
       intro: '시테코의 도슨트. "돈은 숫자가 아니라 이야기예요. 지폐 한 장에 나라 하나가 들어 있죠."' },
     pois: [
-      { id: 'carnet-office', name: '《Carnet》 편집부 (2구, 창작 장소)', type: 'office', feeEur: 0, note: '마고 편집장이 있는 곳. 미션 배정과 원고 송고.' },
-      { id: 'citeco', name: '시테코 Citéco — 경제·화폐 시티 (17구)', type: 'museum', feeEur: 12, closedDays: [1], hours: '14:00-18:00 (주말 10:00-18:00)', note: '1882년 지어진 오텔 가이야르(Hôtel Gaillard) 안, 2019년 개관.', sourceId: 'src:citeco' },
-      { id: 'carnavalet', name: '카르나발레 박물관 — 파리 역사', type: 'museum', feeEur: 0, closedDays: [1], hours: '10:00-18:00', note: '상설 전시 무료.', sourceId: 'src:carnavalet' },
-      { id: 'cluny', name: '클뤼니 박물관 — 중세·루테티아 목욕탕', type: 'museum', feeEur: 12, closedDays: [1], hours: '09:30-18:15', sourceId: 'src:cluny' },
-      { id: 'sainte-chapelle', name: '생트샤펠', type: 'chapel', feeEur: 13, hours: '09:00-19:00', sourceId: 'src:sainte-chapelle' },
-      { id: 'arenes', name: '루테티아 원형경기장', type: 'ruin', feeEur: 0, hours: '08:00-20:30', sourceId: 'src:arenes' },
+      { id: 'carnet-office', name: '《Carnet》 편집부 (2구, 창작 장소)', type: 'office', feeEur: 0, note: '마고 편집장이 있는 곳. 미션 배정과 원고 송고.', coord: [2.3391, 48.8675] },
+      { id: 'citeco', name: '시테코 Citéco — 경제·화폐 시티 (17구)', type: 'museum', feeEur: 12, closedDays: [1], hours: '14:00-18:00 (주말 10:00-18:00)', note: '1882년 지어진 오텔 가이야르(Hôtel Gaillard) 안, 2019년 개관.', sourceId: 'src:citeco', coord: [2.3057, 48.8823] },
+      { id: 'carnavalet', name: '카르나발레 박물관 — 파리 역사', type: 'museum', feeEur: 0, closedDays: [1], hours: '10:00-18:00', note: '상설 전시 무료.', sourceId: 'src:carnavalet', coord: [2.3622, 48.8578] },
+      { id: 'cluny', name: '클뤼니 박물관 — 중세·루테티아 목욕탕', type: 'museum', feeEur: 12, closedDays: [1], hours: '09:30-18:15', sourceId: 'src:cluny', coord: [2.3441, 48.8503] },
+      { id: 'sainte-chapelle', name: '생트샤펠', type: 'chapel', feeEur: 13, hours: '09:00-19:00', sourceId: 'src:sainte-chapelle', coord: [2.345, 48.8554] },
+      { id: 'arenes', name: '루테티아 원형경기장', type: 'ruin', feeEur: 0, hours: '08:00-20:30', sourceId: 'src:arenes', coord: [2.3526, 48.8447] },
     ],
     foods: [
       { id: 'croissant', name: '크루아상', nameLocal: 'Croissant', baseEur: 1.5, venue: 'shop', stamina: 6, origin: '빈의 킵펠(kipferl)에서 유래해 19세기 파리에서 버터 페이스트리로 정착했다.', sourceId: 'src:croissant' },
@@ -42,8 +42,8 @@ export const CITIES: City[] = [
     guide: { name: '카림', archetype: '사서(아카이브 담당)', color: '#4f6d7a',
       intro: '알베르 칸 박물관의 아카이브 담당. "7만 2천 장의 유리판을 하나씩 스캔하다 보면, 세상이 한때 얼마나 조용했는지 알게 돼요."' },
     pois: [
-      { id: 'albert-kahn', name: '알베르 칸 박물관·정원', type: 'museum', feeEur: 8, closedDays: [1], hours: '11:00-19:00', note: '2022년 재개관(건축: 구마 겐고).', sourceId: 'src:albert-kahn-musee' },
-      { id: 'seine-musicale', name: '라 센 뮤지칼 (스갱 섬)', type: 'venue', feeEur: 0, hours: '외부 관람 상시', note: '옛 르노 공장 터, 2017년 개관.', sourceId: 'src:seine-musicale' },
+      { id: 'albert-kahn', name: '알베르 칸 박물관·정원', type: 'museum', feeEur: 8, closedDays: [1], hours: '11:00-19:00', note: '2022년 재개관(건축: 구마 겐고).', sourceId: 'src:albert-kahn-musee', coord: [2.2264, 48.8386] },
+      { id: 'seine-musicale', name: '라 센 뮤지칼 (스갱 섬)', type: 'venue', feeEur: 0, hours: '외부 관람 상시', note: '옛 르노 공장 터, 2017년 개관.', sourceId: 'src:seine-musicale', coord: [2.2404, 48.8299] },
     ],
     foods: [
       { id: 'croissant', name: '크루아상', nameLocal: 'Croissant', baseEur: 1.5, venue: 'shop', stamina: 6, origin: '빈의 킵펠에서 유래한 버터 페이스트리.', sourceId: 'src:croissant' },
@@ -60,8 +60,8 @@ export const CITIES: City[] = [
     guide: { name: '파티마', archetype: '시장 상인', color: '#c0392b',
       intro: '생드니 시장의 향신료 가판대 주인. "왕들은 저기 누워 있고, 우리는 여기서 장사를 하죠. 천 년째."' },
     pois: [
-      { id: 'basilica', name: '생드니 대성당 (왕실 묘역)', type: 'cathedral', feeEur: 11, hours: '10:00-18:15', sourceId: 'src:saint-denis' },
-      { id: 'sd-market', name: '생드니 시장', type: 'market', feeEur: 0, closedDays: [1, 3, 4, 6], hours: '화·금·일 오전', sourceId: 'src:saint-denis-market' },
+      { id: 'basilica', name: '생드니 대성당 (왕실 묘역)', type: 'cathedral', feeEur: 11, hours: '10:00-18:15', sourceId: 'src:saint-denis', coord: [2.3597, 48.9354] },
+      { id: 'sd-market', name: '생드니 시장', type: 'market', feeEur: 0, closedDays: [1, 3, 4, 6], hours: '화·금·일 오전', sourceId: 'src:saint-denis-market', coord: [2.3576, 48.9347] },
     ],
     foods: [
       { id: 'msemen', name: '므세멘 (시장 노점)', nameLocal: 'Msemen', baseEur: 2, venue: 'market', stamina: 12, origin: '마그레브식 팬케이크. 생드니 시장의 다문화 식탁을 대표한다.', sourceId: 'src:saint-denis-market' },
@@ -78,8 +78,8 @@ export const CITIES: City[] = [
     guide: { name: '루이', archetype: '미술 학생', color: '#5b8c5a',
       intro: '파리 미술학교 학생, 주말마다 강가에서 스케치. "모네가 여기서 본 빛은 지금도 같은 각도로 떨어져요."' },
     pois: [
-      { id: 'musee-argenteuil', name: '아르장퇴유 박물관', type: 'museum', feeEur: 0, closedDays: [1, 2], hours: '수–일', sourceId: 'src:musee-argenteuil' },
-      { id: 'seine-bank', name: '센 강변 (모네의 뱃놀이 장소)', type: 'walk', feeEur: 0, hours: '상시', sourceId: 'src:monet-argenteuil' },
+      { id: 'musee-argenteuil', name: '아르장퇴유 박물관', type: 'museum', feeEur: 0, closedDays: [1, 2], hours: '수–일', sourceId: 'src:musee-argenteuil', coord: [2.2467, 48.9478] },
+      { id: 'seine-bank', name: '센 강변 (모네의 뱃놀이 장소)', type: 'walk', feeEur: 0, hours: '상시', sourceId: 'src:monet-argenteuil', coord: [2.25, 48.95] },
     ],
     foods: [
       { id: 'asperge', name: '아르장퇴유 아스파라거스 요리', nameLocal: 'Asperges d’Argenteuil', baseEur: 14, venue: 'bistro', stamina: 30, origin: '19세기 파리 근교 채소 산지의 대표 작물. 지금은 지명이 품종명으로 남았다.', sourceId: 'src:argenteuil-asperge' },
@@ -96,9 +96,9 @@ export const CITIES: City[] = [
     guide: { name: '가스파르', archetype: '농부(담장 정원사)', color: '#8e6c3a',
       intro: '복숭아 담장 보존회의 정원사. "담이 햇빛을 저장했어요. 그래서 파리 북쪽에서 복숭아가 됐죠."' },
     pois: [
-      { id: 'murs', name: '복숭아 담장 (murs à pêches)', type: 'heritage', feeEur: 0, hours: '주말 개방', closedDays: [1, 2, 3, 4, 5], sourceId: 'src:murs-peches' },
-      { id: 'mhv', name: '살아있는 역사 박물관', type: 'museum', feeEur: 0, closedDays: [1, 2], hours: '수–일 14:00-17:30', sourceId: 'src:mhv' },
-      { id: 'melies-site', name: '멜리에스 스튜디오 터', type: 'site', feeEur: 0, hours: '외부', sourceId: 'src:melies' },
+      { id: 'murs', name: '복숭아 담장 (murs à pêches)', type: 'heritage', feeEur: 0, hours: '주말 개방', closedDays: [1, 2, 3, 4, 5], sourceId: 'src:murs-peches', coord: [2.4531, 48.859] },
+      { id: 'mhv', name: '살아있는 역사 박물관', type: 'museum', feeEur: 0, closedDays: [1, 2], hours: '수–일 14:00-17:30', sourceId: 'src:mhv', coord: [2.4407, 48.8608] },
+      { id: 'melies-site', name: '멜리에스 스튜디오 터', type: 'site', feeEur: 0, hours: '외부', sourceId: 'src:melies', coord: [2.4406, 48.8637] },
     ],
     foods: [
       { id: 'peche', name: '몽트뢰유 복숭아 (제철)', nameLocal: 'Pêche de Montreuil', baseEur: 2.5, venue: 'market', stamina: 8, origin: '17~19세기 석회 담장의 축열로 키운 파리 근교 복숭아. 왕실에도 납품됐다.', sourceId: 'src:peche-montreuil' },
@@ -116,8 +116,8 @@ export const CITIES: City[] = [
     guide: { name: '오딜', archetype: '시계공', color: '#6c5b7b',
       intro: '궁전 시계 복원 기술자. "거울의 방 시계는 1919년 6월 28일 오후 3시를 지나갔어요. 그날도 그냥 째깍거렸죠."' },
     pois: [
-      { id: 'chateau', name: '베르사유 궁전 — 거울의 방', type: 'palace', feeEur: 21, closedDays: [1], hours: '09:00-18:30', sourceId: 'src:versailles-chateau' },
-      { id: 'gardens', name: '정원', type: 'garden', feeEur: 0, hours: '08:00-20:30', sourceId: 'src:versailles-chateau' },
+      { id: 'chateau', name: '베르사유 궁전 — 거울의 방', type: 'palace', feeEur: 21, closedDays: [1], hours: '09:00-18:30', sourceId: 'src:versailles-chateau', coord: [2.1204, 48.8049] },
+      { id: 'gardens', name: '정원', type: 'garden', feeEur: 0, hours: '08:00-20:30', sourceId: 'src:versailles-chateau', coord: [2.115, 48.808] },
     ],
     foods: [
       { id: 'cafe', name: '카페', nameLocal: 'Un café', baseEur: 3.5, venue: 'bistro', stamina: 8, origin: '카운터에서 서서 마시면 더 싸다.', sourceId: 'src:jambon-beurre' },
@@ -135,8 +135,8 @@ export const CITIES: City[] = [
     guide: { name: '베르나르', archetype: '사서', color: '#2e5c8a',
       intro: '교구 도서관 사서. "1194년 불이 났을 때 사람들은 절망 대신 더 큰 성당을 지었어요. 30년 만에."' },
     pois: [
-      { id: 'chartres-cath', name: '샤르트르 대성당', type: 'cathedral', feeEur: 0, hours: '08:30-19:30', sourceId: 'src:chartres' },
-      { id: 'chartres-crypt', name: '지하 예배당 투어', type: 'tour', feeEur: 4, hours: '11:00·14:15·16:30', sourceId: 'src:chartres' },
+      { id: 'chartres-cath', name: '샤르트르 대성당', type: 'cathedral', feeEur: 0, hours: '08:30-19:30', sourceId: 'src:chartres', coord: [1.4868, 48.4474] },
+      { id: 'chartres-crypt', name: '지하 예배당 투어', type: 'tour', feeEur: 4, hours: '11:00·14:15·16:30', sourceId: 'src:chartres', coord: [1.4868, 48.4472] },
     ],
     foods: [
       { id: 'pate-chartres', name: '샤르트르 파테', nameLocal: 'Pâté de Chartres', baseEur: 9, venue: 'shop', stamina: 22, origin: '파이 크러스트에 싼 사냥고기 파테. 순례자와 여행자의 휴대식이었다.', sourceId: 'src:pate-chartres' },
@@ -154,11 +154,11 @@ export const CITIES: City[] = [
     guide: { name: '노에미', archetype: '뱃사공', color: '#3a7d7b',
       intro: '오르티요나주(수상정원)의 뱃사공. "대성당 정면은 오후 빛이 좋아요. 배는 아침이 좋고요."' },
     pois: [
-      { id: 'amiens-cath', name: '아미앵 대성당', type: 'cathedral', feeEur: 0, hours: '08:30-18:30', sourceId: 'src:amiens-cath' },
-      { id: 'verne-house', name: '쥘 베른의 집', type: 'museum', feeEur: 9, closedDays: [2], hours: '10:00-12:30, 14:00-18:00', note: '화요일 휴관(비수기).', sourceId: 'src:verne-maison' },
-      { id: 'madeleine', name: '마들렌 묘지', type: 'cemetery', feeEur: 0, hours: '08:00-18:00', sourceId: 'src:madeleine' },
-      { id: 'hortillonnages', name: '오르티요나주 (수상정원) 뱃놀이', type: 'boat', feeEur: 7, hours: '4~10월', sourceId: 'src:hortillonnages' },
-      { id: 'hort-market', name: '수상정원 시장 (토요일)', type: 'market', feeEur: 0, hours: '토 오전', sourceId: 'src:hortillonnages' },
+      { id: 'amiens-cath', name: '아미앵 대성당', type: 'cathedral', feeEur: 0, hours: '08:30-18:30', sourceId: 'src:amiens-cath', coord: [2.3018, 49.8942] },
+      { id: 'verne-house', name: '쥘 베른의 집', type: 'museum', feeEur: 9, closedDays: [2], hours: '10:00-12:30, 14:00-18:00', note: '화요일 휴관(비수기).', sourceId: 'src:verne-maison', coord: [2.2925, 49.8899] },
+      { id: 'madeleine', name: '마들렌 묘지', type: 'cemetery', feeEur: 0, hours: '08:00-18:00', sourceId: 'src:madeleine', coord: [2.286, 49.8875] },
+      { id: 'hortillonnages', name: '오르티요나주 (수상정원) 뱃놀이', type: 'boat', feeEur: 7, hours: '4~10월', sourceId: 'src:hortillonnages', coord: [2.32, 49.8975] },
+      { id: 'hort-market', name: '수상정원 시장 (토요일)', type: 'market', feeEur: 0, hours: '토 오전', sourceId: 'src:hortillonnages', coord: [2.315, 49.895] },
     ],
     foods: [
       { id: 'macaron-amiens', name: '마카롱 다미앵', nameLocal: 'Macaron d’Amiens', baseEur: 2, venue: 'shop', stamina: 8, origin: '아몬드·꿀·달걀로 만드는 납작한 과자. 16세기부터 아미앵의 특산으로 전해진다.', sourceId: 'src:macaron-amiens' },
@@ -177,9 +177,9 @@ export const CITIES: City[] = [
     guide: { name: '셀린', archetype: '양조가', color: '#a67c52',
       intro: '샴페인 메종의 셀러 마스터. "지하 저장고는 로마 시대 채석장이에요. 돌을 파낸 자리에 병을 채웠죠."' },
     pois: [
-      { id: 'reims-cath', name: '랭스 대성당', type: 'cathedral', feeEur: 0, hours: '07:30-19:15', sourceId: 'src:reims-cath' },
-      { id: 'reddition', name: '항복 박물관 (Musée de la Reddition)', type: 'museum', feeEur: 5, closedDays: [2], hours: '10:00-18:00', sourceId: 'src:reddition' },
-      { id: 'caves', name: '샴페인 지하 저장고 투어', type: 'tour', feeEur: 25, hours: '예약제', sourceId: 'src:champagne-unesco' },
+      { id: 'reims-cath', name: '랭스 대성당', type: 'cathedral', feeEur: 0, hours: '07:30-19:15', sourceId: 'src:reims-cath', coord: [4.0347, 49.2531] },
+      { id: 'reddition', name: '항복 박물관 (Musée de la Reddition)', type: 'museum', feeEur: 5, closedDays: [2], hours: '10:00-18:00', sourceId: 'src:reddition', coord: [4.0342, 49.2601] },
+      { id: 'caves', name: '샴페인 지하 저장고 투어', type: 'tour', feeEur: 25, hours: '예약제', sourceId: 'src:champagne-unesco', coord: [4.0435, 49.2379] },
     ],
     foods: [
       { id: 'biscuit-rose', name: '비스퀴 로즈', nameLocal: 'Biscuit rose de Reims', baseEur: 4, venue: 'shop', stamina: 8, origin: '1756년으로 거슬러 올라가는 분홍색 비스킷. 샴페인에 적셔 먹는다.', sourceId: 'src:biscuit-rose' },
@@ -197,10 +197,10 @@ export const CITIES: City[] = [
     guide: { name: '마르셀', archetype: '시계공', color: '#7a5c3e',
       intro: '대시계(Gros-Horloge) 관리인. "1389년부터 돌아가는 기계예요. 바늘은 하나뿐이죠 — 그때는 시(時)면 충분했어요."' },
     pois: [
-      { id: 'historial', name: '잔 다르크 역사관', type: 'museum', feeEur: 11, closedDays: [1], hours: '10:00-19:00', sourceId: 'src:historial' },
-      { id: 'gros-horloge', name: '대시계 (Gros-Horloge)', type: 'monument', feeEur: 8, closedDays: [1], hours: '10:00-13:00, 14:00-19:00', sourceId: 'src:gros-horloge' },
-      { id: 'rouen-cath', name: '루앙 대성당', type: 'cathedral', feeEur: 0, hours: '09:00-19:00', sourceId: 'src:monet-rouen' },
-      { id: 'vieux-marche', name: '비외마르셰 광장', type: 'square', feeEur: 0, hours: '상시', sourceId: 'src:jeanne-rouen' },
+      { id: 'historial', name: '잔 다르크 역사관', type: 'museum', feeEur: 11, closedDays: [1], hours: '10:00-19:00', sourceId: 'src:historial', coord: [1.0964, 49.4408] },
+      { id: 'gros-horloge', name: '대시계 (Gros-Horloge)', type: 'monument', feeEur: 8, closedDays: [1], hours: '10:00-13:00, 14:00-19:00', sourceId: 'src:gros-horloge', coord: [1.0946, 49.4416] },
+      { id: 'rouen-cath', name: '루앙 대성당', type: 'cathedral', feeEur: 0, hours: '09:00-19:00', sourceId: 'src:monet-rouen', coord: [1.0939, 49.4402] },
+      { id: 'vieux-marche', name: '비외마르셰 광장', type: 'square', feeEur: 0, hours: '상시', sourceId: 'src:jeanne-rouen', coord: [1.09, 49.4419] },
     ],
     foods: [
       { id: 'canard', name: '루앙식 오리', nameLocal: 'Canard à la rouennaise', baseEur: 28, venue: 'restaurant', stamina: 45, origin: '피를 넣은 소스로 만드는 루앙의 오리 요리. 19세기 요리사 조합의 의례가 됐다.', sourceId: 'src:canard-rouen' },
@@ -218,9 +218,9 @@ export const CITIES: City[] = [
     guide: { name: '야신', archetype: '택시기사', color: '#2c3e50',
       intro: '릴 토박이 택시기사. "브라드리 주말엔 운전을 못 해요. 길이 전부 홍합 껍데기로 덮이니까."' },
     pois: [
-      { id: 'pba', name: '릴 순수미술관', type: 'museum', feeEur: 7, closedDays: [2], hours: '10:00-18:00', sourceId: 'src:pba-lille' },
-      { id: 'degaulle-house', name: '드골 생가', type: 'museum', feeEur: 6, closedDays: [1, 2], hours: '10:00-17:00', sourceId: 'src:degaulle' },
-      { id: 'vieille-bourse', name: '구 증권거래소', type: 'monument', feeEur: 0, closedDays: [1], hours: '13:00-19:00 (고서 시장)', sourceId: 'src:vieille-bourse' },
+      { id: 'pba', name: '릴 순수미술관', type: 'museum', feeEur: 7, closedDays: [2], hours: '10:00-18:00', sourceId: 'src:pba-lille', coord: [3.0625, 50.6301] },
+      { id: 'degaulle-house', name: '드골 생가', type: 'museum', feeEur: 6, closedDays: [1, 2], hours: '10:00-17:00', sourceId: 'src:degaulle', coord: [3.0611, 50.6367] },
+      { id: 'vieille-bourse', name: '구 증권거래소', type: 'monument', feeEur: 0, closedDays: [1], hours: '13:00-19:00 (고서 시장)', sourceId: 'src:vieille-bourse', coord: [3.0636, 50.6372] },
     ],
     foods: [
       { id: 'carbonnade', name: '카르보나드 플라망드', nameLocal: 'Carbonade flamande', baseEur: 16, venue: 'bistro', stamina: 40, origin: '맥주와 향신료 빵으로 졸인 플랑드르식 소고기 스튜.', sourceId: 'src:carbonnade' },
@@ -238,9 +238,9 @@ export const CITIES: City[] = [
     guide: { name: '클레르', archetype: '역무원', color: '#8a3b5c',
       intro: '오를레앙 역의 역무원. "5월 8일엔 기차가 붐벼요. 6백 년째 같은 날을 축하하러 오니까."' },
     pois: [
-      { id: 'maison-jeanne', name: '잔 다르크의 집', type: 'museum', feeEur: 6, closedDays: [1], hours: '10:00-18:00', sourceId: 'src:siege-orleans' },
-      { id: 'orleans-cath', name: '생트크루아 대성당', type: 'cathedral', feeEur: 0, hours: '09:15-18:00', sourceId: 'src:siege-orleans' },
-      { id: 'loire-quai', name: '루아르 강변', type: 'walk', feeEur: 0, hours: '상시', sourceId: 'src:siege-orleans' },
+      { id: 'maison-jeanne', name: '잔 다르크의 집', type: 'museum', feeEur: 6, closedDays: [1], hours: '10:00-18:00', sourceId: 'src:siege-orleans', coord: [1.9111, 47.9036] },
+      { id: 'orleans-cath', name: '생트크루아 대성당', type: 'cathedral', feeEur: 0, hours: '09:15-18:00', sourceId: 'src:siege-orleans', coord: [1.9057, 47.9016] },
+      { id: 'loire-quai', name: '루아르 강변', type: 'walk', feeEur: 0, hours: '상시', sourceId: 'src:siege-orleans', coord: [1.905, 47.9] },
     ],
     foods: [
       { id: 'cotignac', name: '코티냑 (모과 젤리)', nameLocal: 'Cotignac d’Orléans', baseEur: 3, venue: 'shop', stamina: 6, origin: '작은 나무 상자에 담긴 모과 젤리. 중세부터 이어진 오를레앙 특산으로, 왕에게 헌상됐다는 기록이 있다.', sourceId: 'src:cotignac' },
@@ -259,10 +259,10 @@ export const CITIES: City[] = [
     guide: { name: '올리버', archetype: '박물관 도슨트', color: '#3b5c7a',
       intro: '영란은행 박물관의 자원봉사 안내인. "우리는 1971년에야 십진법 화폐를 썼어요. 그전엔 1파운드가 20실링, 1실링이 12펜스였죠."' },
     pois: [
-      { id: 'st-pancras', name: '세인트 판크라스 인터내셔널', type: 'station', feeEur: 0, hours: '상시', note: '1868년 개통, 2007년 유로스타 국제선 터미널로 재개관.', sourceId: 'src:st-pancras' },
-      { id: 'boe-museum', name: '영란은행 박물관', type: 'museum', feeEur: 0, closedDays: [0, 6], hours: '10:00-17:00', note: '1694년 설립된 영란은행의 역사와 파운드화 변천을 다룬다.', sourceId: 'src:boe-museum' },
-      { id: 'british-museum', name: '대영박물관', type: 'museum', feeEur: 0, hours: '10:00-17:00 (금 20:00까지)', note: '1759년 개관한 세계 최초의 국립 공공박물관.', sourceId: 'src:british-museum' },
-      { id: 'tower-bridge', name: '타워 브리지 전시관', type: 'monument', feeEur: 13, hours: '09:30-18:00', note: '1894년 개통한 배스큘(도개) 교량.', sourceId: 'src:tower-bridge' },
+      { id: 'st-pancras', name: '세인트 판크라스 인터내셔널', type: 'station', feeEur: 0, hours: '상시', note: '1868년 개통, 2007년 유로스타 국제선 터미널로 재개관.', sourceId: 'src:st-pancras', coord: [-0.1262, 51.5308] },
+      { id: 'boe-museum', name: '영란은행 박물관', type: 'museum', feeEur: 0, closedDays: [0, 6], hours: '10:00-17:00', note: '1694년 설립된 영란은행의 역사와 파운드화 변천을 다룬다.', sourceId: 'src:boe-museum', coord: [-0.0886, 51.5142] },
+      { id: 'british-museum', name: '대영박물관', type: 'museum', feeEur: 0, hours: '10:00-17:00 (금 20:00까지)', note: '1759년 개관한 세계 최초의 국립 공공박물관.', sourceId: 'src:british-museum', coord: [-0.1269, 51.5194] },
+      { id: 'tower-bridge', name: '타워 브리지 전시관', type: 'monument', feeEur: 13, hours: '09:30-18:00', note: '1894년 개통한 배스큘(도개) 교량.', sourceId: 'src:tower-bridge', coord: [-0.0754, 51.5055] },
     ],
     foods: [
       { id: 'fish-chips', name: '피시 앤 칩스', nameLocal: 'Fish and chips', baseEur: 8, venue: 'shop', stamina: 30, origin: '19세기 산업 노동자의 금요일 저녁으로 자리 잡았으며, 1860년 런던 이스트엔드에 첫 전문점이 열렸다고 전해진다.', sourceId: 'src:fish-chips' },
@@ -280,9 +280,9 @@ export const CITIES: City[] = [
     guide: { name: '마리케', archetype: '제빵사', color: '#8a6a3a',
       intro: '와플 가판대 주인. "국경이라고 다 환전소가 있는 건 아니에요. 우리는 그냥… 유로예요."' },
     pois: [
-      { id: 'grand-place', name: '그랑플라스', type: 'square', feeEur: 0, hours: '상시', note: '중세 길드홀들이 둘러싼 광장. 1695년 포격 이후 재건됐다.', sourceId: 'src:grand-place' },
-      { id: 'atomium', name: '아토미움', type: 'monument', feeEur: 16, hours: '10:00-18:00', note: '1958년 브뤼셀 만국박람회를 위해 세운, 철 결정 구조를 1650억 배로 확대한 건축물.', sourceId: 'src:atomium' },
-      { id: 'parlamentarium', name: '유럽의회 방문센터 (파를라멘타리움)', type: 'museum', feeEur: 0, closedDays: [1], hours: '09:00-18:00', note: '유럽연합의 역사와 제도, 유로화 도입 과정을 무료로 소개한다.', sourceId: 'src:parlamentarium' },
+      { id: 'grand-place', name: '그랑플라스', type: 'square', feeEur: 0, hours: '상시', note: '중세 길드홀들이 둘러싼 광장. 1695년 포격 이후 재건됐다.', sourceId: 'src:grand-place', coord: [4.3517, 50.8467] },
+      { id: 'atomium', name: '아토미움', type: 'monument', feeEur: 16, hours: '10:00-18:00', note: '1958년 브뤼셀 만국박람회를 위해 세운, 철 결정 구조를 1650억 배로 확대한 건축물.', sourceId: 'src:atomium', coord: [4.3412, 50.8949] },
+      { id: 'parlamentarium', name: '유럽의회 방문센터 (파를라멘타리움)', type: 'museum', feeEur: 0, closedDays: [1], hours: '09:00-18:00', note: '유럽연합의 역사와 제도, 유로화 도입 과정을 무료로 소개한다.', sourceId: 'src:parlamentarium', coord: [4.3665, 50.8378] },
     ],
     foods: [
       { id: 'gaufre', name: '벨기에 와플', nameLocal: 'Gaufre', baseEur: 5.3, venue: 'market', stamina: 20, origin: '리에주식은 진주설탕을 반죽에 섞어 굽고, 브뤼셀식은 더 얇고 바삭하게 굽는다.', sourceId: 'src:gaufre' },
@@ -301,9 +301,9 @@ export const CITIES: City[] = [
     guide: { name: '잉그리트', archetype: '박물관 도슨트', color: '#6a4a3a',
       intro: '초콜릿 박물관 도슨트. "쾰른 사람들에게 쾰쉬는 술이 아니라 정체성이에요. 다른 동네에서 만들면 그건 쾰쉬가 아니거든요."' },
     pois: [
-      { id: 'cologne-cath', name: '쾰른 대성당', type: 'cathedral', feeEur: 0, hours: '06:00-20:00', note: '1248년 착공해 1880년 완공까지 632년이 걸렸다.', sourceId: 'src:cologne-cath' },
-      { id: 'hohenzollern', name: '호엔촐레른 다리', type: 'bridge', feeEur: 0, hours: '상시', note: '2008년 무렵부터 연인들이 사랑의 자물쇠를 채우는 명소가 됐다.', sourceId: 'src:hohenzollern' },
-      { id: 'schokolade', name: '초콜릿 박물관', type: 'museum', feeEur: 14.5, hours: '10:00-18:00', note: '1993년 개관, 카카오나무 온실과 초콜릿 분수가 있다.', sourceId: 'src:schokoladenmuseum' },
+      { id: 'cologne-cath', name: '쾰른 대성당', type: 'cathedral', feeEur: 0, hours: '06:00-20:00', note: '1248년 착공해 1880년 완공까지 632년이 걸렸다.', sourceId: 'src:cologne-cath', coord: [6.9583, 50.9413] },
+      { id: 'hohenzollern', name: '호엔촐레른 다리', type: 'bridge', feeEur: 0, hours: '상시', note: '2008년 무렵부터 연인들이 사랑의 자물쇠를 채우는 명소가 됐다.', sourceId: 'src:hohenzollern', coord: [6.9611, 50.9422] },
+      { id: 'schokolade', name: '초콜릿 박물관', type: 'museum', feeEur: 14.5, hours: '10:00-18:00', note: '1993년 개관, 카카오나무 온실과 초콜릿 분수가 있다.', sourceId: 'src:schokoladenmuseum', coord: [6.966, 50.9295] },
     ],
     foods: [
       { id: 'koelsch', name: '쾰쉬', nameLocal: 'Kölsch', baseEur: 3, venue: 'bistro', stamina: 15, origin: '쾰른에서 양조돼야만 이 이름을 쓸 수 있는 맥주로, 200ml짜리 슈탕에(Stange) 잔에 낸다.', sourceId: 'src:koelsch' },
@@ -320,9 +320,9 @@ export const CITIES: City[] = [
     guide: { name: '앙드레', archetype: '시계공', color: '#5c6b7a',
       intro: '구시가 시계공방의 장인. "우리가 시계를 잘 만드는 건, 국경이 가까워서 언제나 시간을 정확히 맞춰야 했기 때문일지도 몰라요."' },
     pois: [
-      { id: 'jet-deau', name: '제트 도(대분수)', type: 'landmark', feeEur: 0, hours: '상시', note: '레만 호수에서 시속 200km로 140m 높이까지 솟아오르는 분수.', sourceId: 'src:jet-deau' },
-      { id: 'reformation-wall', name: '종교개혁 기념벽', type: 'monument', feeEur: 0, hours: '상시', note: '1909년(칼뱅 탄생 400주년) 제막. 칼뱅 등 종교개혁가 조각상이 늘어서 있다.', sourceId: 'src:reformation-wall' },
-      { id: 'cern', name: 'CERN 사이언스 게이트웨이', type: 'museum', feeEur: 0, closedDays: [1], hours: '09:00-17:30', note: '1954년 설립된 유럽입자물리연구소. 1989년 팀 버너스리가 이곳에서 월드와이드웹을 고안했다.', sourceId: 'src:cern-www' },
+      { id: 'jet-deau', name: '제트 도(대분수)', type: 'landmark', feeEur: 0, hours: '상시', note: '레만 호수에서 시속 200km로 140m 높이까지 솟아오르는 분수.', sourceId: 'src:jet-deau', coord: [6.1533, 46.2074] },
+      { id: 'reformation-wall', name: '종교개혁 기념벽', type: 'monument', feeEur: 0, hours: '상시', note: '1909년(칼뱅 탄생 400주년) 제막. 칼뱅 등 종교개혁가 조각상이 늘어서 있다.', sourceId: 'src:reformation-wall', coord: [6.1467, 46.2003] },
+      { id: 'cern', name: 'CERN 사이언스 게이트웨이', type: 'museum', feeEur: 0, closedDays: [1], hours: '09:00-17:30', note: '1954년 설립된 유럽입자물리연구소. 1989년 팀 버너스리가 이곳에서 월드와이드웹을 고안했다.', sourceId: 'src:cern-www', coord: [6.0547, 46.2331] },
     ],
     foods: [
       { id: 'fondue', name: '치즈 퐁뒤', nameLocal: 'Fondue', baseEur: 14.3, venue: 'restaurant', stamina: 45, origin: '알프스 산간에서 굳은 치즈와 오래된 빵을 함께 먹기 위해 만든 겨울 음식이 스위스의 대표 요리가 됐다.', sourceId: 'src:fondue' },
@@ -340,9 +340,9 @@ export const CITIES: City[] = [
     guide: { name: '로라', archetype: '시장 상인', color: '#c17a2e',
       intro: '보케리아 시장의 하몬 가판대 주인. "여기선 저녁을 9시에 먹어요. 파리보다 두 시간 늦죠 — 그래서 낮잠(siesta)이 필요한 거예요."' },
     pois: [
-      { id: 'sagrada', name: '사그라다 파밀리아', type: 'basilica', feeEur: 26, hours: '09:00-18:00', note: '가우디가 1883년부터 설계·건축을 맡았다. 2026년은 그의 사후 100주년이다.', sourceId: 'src:sagrada' },
-      { id: 'park-guell', name: '구엘 공원', type: 'park', feeEur: 10, hours: '09:30-19:30', note: '1900~1914년 가우디가 설계한 공원. 원래는 주택단지로 기획됐다.', sourceId: 'src:park-guell' },
-      { id: 'boqueria', name: '보케리아 시장', type: 'market', feeEur: 0, closedDays: [0], hours: '08:00-20:30', note: '1217년 기록에 처음 등장하는, 람블라 거리의 시장.', sourceId: 'src:boqueria' },
+      { id: 'sagrada', name: '사그라다 파밀리아', type: 'basilica', feeEur: 26, hours: '09:00-18:00', note: '가우디가 1883년부터 설계·건축을 맡았다. 2026년은 그의 사후 100주년이다.', sourceId: 'src:sagrada', coord: [2.1744, 41.4036] },
+      { id: 'park-guell', name: '구엘 공원', type: 'park', feeEur: 10, hours: '09:30-19:30', note: '1900~1914년 가우디가 설계한 공원. 원래는 주택단지로 기획됐다.', sourceId: 'src:park-guell', coord: [2.1527, 41.4145] },
+      { id: 'boqueria', name: '보케리아 시장', type: 'market', feeEur: 0, closedDays: [0], hours: '08:00-20:30', note: '1217년 기록에 처음 등장하는, 람블라 거리의 시장.', sourceId: 'src:boqueria', coord: [2.1716, 41.3818] },
     ],
     foods: [
       { id: 'pa-tomaquet', name: '판 콘 토마테', nameLocal: 'Pa amb tomàquet', baseEur: 3.5, venue: 'bistro', stamina: 15, origin: '구운 빵에 잘 익은 토마토를 문질러 올리브유·소금을 더한 카탈루냐의 기본 식탁.', sourceId: 'src:pa-tomaquet' },
@@ -360,9 +360,9 @@ export const CITIES: City[] = [
     guide: { name: '레아', archetype: '학생', color: '#4a5a6a',
       intro: '베를린 자유대학 역사학과 학생. "여기선 걷다 보면 바닥에 박힌 동판을 만나요. 장벽이 지나가던 자리를 표시한 거죠."' },
     pois: [
-      { id: 'brandenburg-gate', name: '브란덴부르크 문', type: 'monument', feeEur: 0, hours: '상시', note: '1791년 완공. 냉전기에는 장벽 바로 옆에 있어 분단의 상징이었다.', sourceId: 'src:brandenburg-gate' },
-      { id: 'east-side-gallery', name: '이스트사이드 갤러리', type: 'gallery', feeEur: 0, hours: '상시', note: '남아 있는 장벽 구간에 1990년 세계 각국 예술가들이 그린 벽화. 세계 최장 야외 갤러리.', sourceId: 'src:east-side-gallery' },
-      { id: 'ddr-museum', name: 'DDR 박물관', type: 'museum', feeEur: 12.5, hours: '09:00-21:00', note: '동독(1949~1990) 시절 일상을 직접 만지고 체험하는 박물관.', sourceId: 'src:ddr-museum' },
+      { id: 'brandenburg-gate', name: '브란덴부르크 문', type: 'monument', feeEur: 0, hours: '상시', note: '1791년 완공. 냉전기에는 장벽 바로 옆에 있어 분단의 상징이었다.', sourceId: 'src:brandenburg-gate', coord: [13.3777, 52.5163] },
+      { id: 'east-side-gallery', name: '이스트사이드 갤러리', type: 'gallery', feeEur: 0, hours: '상시', note: '남아 있는 장벽 구간에 1990년 세계 각국 예술가들이 그린 벽화. 세계 최장 야외 갤러리.', sourceId: 'src:east-side-gallery', coord: [13.4399, 52.505] },
+      { id: 'ddr-museum', name: 'DDR 박물관', type: 'museum', feeEur: 12.5, hours: '09:00-21:00', note: '동독(1949~1990) 시절 일상을 직접 만지고 체험하는 박물관.', sourceId: 'src:ddr-museum', coord: [13.4016, 52.5192] },
     ],
     foods: [
       { id: 'currywurst', name: '커리부어스트', nameLocal: 'Currywurst', baseEur: 5.7, venue: 'market', stamina: 25, origin: '1949년 베를린에서 헤르타 호이버가 소시지에 커리 케첩을 뿌려 만들었다고 전해진다.', sourceId: 'src:currywurst' },
@@ -380,9 +380,9 @@ export const CITIES: City[] = [
     guide: { name: '하비에르', archetype: '택시기사', color: '#8a4a2e',
       intro: '마드리드 토박이 택시기사. "관광객들은 다 프라도만 가는데, 진짜는 저녁 9시 이후예요. 그때부터가 마드리드의 시간이죠."' },
     pois: [
-      { id: 'prado', name: '프라도 미술관', type: 'museum', feeEur: 15, hours: '10:00-20:00', note: '1819년 개관. 벨라스케스·고야 등 유럽 회화의 정수를 모았다.', sourceId: 'src:prado' },
-      { id: 'puerta-del-sol', name: '푸에르타 델 솔', type: 'square', feeEur: 0, hours: '상시', note: '스페인 모든 국도의 기점, "0킬로미터" 표지판이 바닥에 있다.', sourceId: 'src:puerta-del-sol' },
-      { id: 'royal-palace', name: '마드리드 왕궁', type: 'palace', feeEur: 13, hours: '10:00-18:00', note: '1734년 알카사르 화재 이후 새로 지어졌다. 지금 왕은 다른 곳에 살지만 국가 행사에 쓰인다.', sourceId: 'src:royal-palace-madrid' },
+      { id: 'prado', name: '프라도 미술관', type: 'museum', feeEur: 15, hours: '10:00-20:00', note: '1819년 개관. 벨라스케스·고야 등 유럽 회화의 정수를 모았다.', sourceId: 'src:prado', coord: [-3.6922, 40.4138] },
+      { id: 'puerta-del-sol', name: '푸에르타 델 솔', type: 'square', feeEur: 0, hours: '상시', note: '스페인 모든 국도의 기점, "0킬로미터" 표지판이 바닥에 있다.', sourceId: 'src:puerta-del-sol', coord: [-3.7038, 40.4169] },
+      { id: 'royal-palace', name: '마드리드 왕궁', type: 'palace', feeEur: 13, hours: '10:00-18:00', note: '1734년 알카사르 화재 이후 새로 지어졌다. 지금 왕은 다른 곳에 살지만 국가 행사에 쓰인다.', sourceId: 'src:royal-palace-madrid', coord: [-3.7141, 40.418] },
     ],
     foods: [
       { id: 'tortilla', name: '토르티야 데 파타타스', nameLocal: 'Tortilla de patatas', baseEur: 7.6, venue: 'bistro', stamina: 30, origin: '감자와 달걀만으로 만드는 스페인식 오믈렛. 어느 바에나 있는 국민 타파스다.', sourceId: 'src:tortilla' },

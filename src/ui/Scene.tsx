@@ -9,6 +9,7 @@ import { cityCurrency, convert, foodPrice, fmt, CURRENCY_META, type Grade } from
 import { priceChoices } from '../game/priceChoices';
 import { photoById, placePhoto } from '../data/photos';
 import TravelPhoto from './TravelPhoto';
+import CityMap from './CityMap';
 import { useT, weekdayLabel, dayLabel } from '../i18n';
 
 export default function Scene() {
@@ -22,9 +23,15 @@ export default function Scene() {
   const city = cityById(m.cityId);
   const pct = Math.round((active.step / m.steps.length) * 100);
   const backdrop = step.t === 'visit' ? placePhoto(city.id, step.poiId) : step.t === 'photo' ? photoById(step.photoId) : photoById(city.id);
+  const stagePoi = step.t === 'visit' ? city.pois.find((p) => p.id === step.poiId) : undefined;
+  const showMap = (step.t === 'visit' && !!stagePoi?.coord) || step.t === 'move';
   return (
     <div className="scene mission-scene">
-      <div className="scene-landscape"><TravelPhoto photo={backdrop ?? photoById(city.id)} priority mystery={step.t === 'photo'} /></div>
+      <div className="scene-landscape">
+        {showMap
+          ? <CityMap cityId={city.id} highlightId={step.t === 'visit' ? step.poiId : undefined} readOnly controls={false} />
+          : <TravelPhoto photo={backdrop ?? photoById(city.id)} priority mystery={step.t === 'photo'} />}
+      </div>
       <div className="scene-location"><span>CARNET / SUR LE TERRAIN</span><b>{city.names.fr}</b><small>{city.names.ko}{t('에서의 기록')}</small></div>
       <div className="scene-box">
         <div className="progress"><i style={{ width: `${pct}%` }} /></div>
