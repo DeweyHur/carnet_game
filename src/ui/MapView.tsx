@@ -24,7 +24,6 @@ export default function MapView({ onSelect, selected }: Props) {
   const unlocked = useGame((s) => s.unlocked);
   const stamps = useGame((s) => s.stamps);
   const travelling = useGame((s) => s.travelling);
-  const arrive = useGame((s) => s.arrive);
 
   // 지도 생성
   useEffect(() => {
@@ -115,11 +114,11 @@ export default function MapView({ onSelect, selected }: Props) {
       const ease = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
       mk.setLngLat([from[0] + (to[0] - from[0]) * ease, from[1] + (to[1] - from[1]) * ease]);
       if (p < 1) raf = requestAnimationFrame(tick);
-      else setTimeout(() => { mk.remove(); route?.setData({ type: 'FeatureCollection', features: [] }); arrive(); }, 400);
+      else mk.remove();
     };
     raf = requestAnimationFrame(tick);
     return () => { cancelAnimationFrame(raf); mk.remove(); };
-  }, [travelling, arrive]);
+  }, [travelling]);
 
   // 해금 지역이 늘거나 도착하면 열린 도시 전체가 보이도록
   const unlockedKey = unlocked.join(',');
@@ -128,7 +127,7 @@ export default function MapView({ onSelect, selected }: Props) {
     if (!map || travelling) return;
     const pts = CITIES.filter((c) => unlocked.includes(c.region)).map((c) => c.coord);
     const lons = pts.map((p) => p[0]); const lats = pts.map((p) => p[1]);
-    map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: { top: 110, bottom: 80, left: 80, right: 80 }, duration: 1200, maxZoom: 10 });
+    map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 45, duration: 1200, maxZoom: 10 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unlockedKey, cityId, travelling]);
 

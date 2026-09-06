@@ -84,8 +84,8 @@ function StepView({ step, guideName, guideRole, guideColor }: { step: Step; guid
     case 'exchange':
       return (
         <>
-          <div className="speaker"><Avatar who="guide" name={guideName} color={guideColor} /><div className="speech"><Who who="guide" name={guideName} role={guideRole} /><div className="txt">{step.hint}</div></div></div>
-          <ExchangeForm defaultFrom={step.from} defaultTo={step.to} />
+          <div className="speaker"><Avatar who="guide" name={guideName} color={guideColor} /><div className="speech"><Who who="guide" name={guideName} role={guideRole} /><div className="txt">{g.home === 'KRW' ? step.hint : g.home === 'EUR' ? '이미 유로를 가지고 있네요. 바로 다음 취재로 가도 좋아요.' : `보유한 ${g.home}를 유로로 바꿔보세요. 환전소마다 실제 받는 금액이 어떻게 다른지 살펴봐요.`}</div></div></div>
+          {g.home !== 'EUR' && <ExchangeForm defaultFrom={g.home} defaultTo={step.to} />}
           <div className="scene-actions"><span className="hint">보유 {fmt(g.wallet.EUR, 'EUR')}</span><button className="btn ghost" disabled={g.wallet.EUR < 20} onClick={next}>유로가 생겼다 ▸</button></div>
         </>
       );
@@ -133,14 +133,14 @@ function StepView({ step, guideName, guideRole, guideColor }: { step: Step; guid
 
 function Quiz({ step }: { step: Extract<Step, { t: 'quiz' }> }) {
   const g = useGame();
-  const [picked, setPicked] = useState<number | null>(null);
+  const [picked, setPicked] = useState<number | null>(g.active?.result?.kind === 'answer' ? g.active.result.picked ?? null : null);
   const done = picked !== null;
   return (
     <>
       <div className="q">❓ {step.q}</div>
       <div className="options">
         {step.options.map((o, i) => (
-          <button key={i} disabled={done} className={done ? (i === step.answer ? 'ok' : i === picked ? 'no' : '') : ''} onClick={() => { setPicked(i); g.answer(i === step.answer); }}>{String.fromCharCode(65 + i)}. {o}</button>
+          <button key={i} disabled={done} className={done ? (i === step.answer ? 'ok' : i === picked ? 'no' : '') : ''} onClick={() => { setPicked(i); g.answer(i === step.answer, i); }}>{String.fromCharCode(65 + i)}. {o}</button>
         ))}
       </div>
       {done && (
@@ -156,7 +156,7 @@ function Quiz({ step }: { step: Extract<Step, { t: 'quiz' }> }) {
 
 function Photo({ step }: { step: Extract<Step, { t: 'photo' }> }) {
   const g = useGame();
-  const [picked, setPicked] = useState<number | null>(null);
+  const [picked, setPicked] = useState<number | null>(g.active?.result?.kind === 'answer' ? g.active.result.picked ?? null : null);
   const done = picked !== null;
   return (
     <>
@@ -165,7 +165,7 @@ function Photo({ step }: { step: Extract<Step, { t: 'photo' }> }) {
       <div className="photo-note">✎ {step.hint}</div>
       <div className="options">
         {step.options.map((o, i) => (
-          <button key={i} disabled={done} className={done ? (i === step.answer ? 'ok' : i === picked ? 'no' : '') : ''} onClick={() => { setPicked(i); g.answer(i === step.answer); }}>{o}</button>
+          <button key={i} disabled={done} className={done ? (i === step.answer ? 'ok' : i === picked ? 'no' : '') : ''} onClick={() => { setPicked(i); g.answer(i === step.answer, i); }}>{o}</button>
         ))}
       </div>
       {done && (
@@ -185,7 +185,7 @@ function Order({ step }: { step: Extract<Step, { t: 'order' }> }) {
   const g = useGame();
   const items = useMemo(() => shuffle(step.items), [step.items]);
   const [seq, setSeq] = useState<string[]>([]);
-  const [result, setResult] = useState<boolean | null>(null);
+  const [result, setResult] = useState<boolean | null>(g.active?.result?.kind === 'answer' ? g.active.result.correct : null);
   const complete = seq.length === step.items.length;
   const check = () => { const ok = seq.every((x, i) => x === step.items[i]); setResult(ok); g.answer(ok); };
   return (
@@ -241,7 +241,7 @@ function Buy({ step }: { step: Extract<Step, { t: 'buy' }> }) {
   const price = foodPrice(food, city);
   const [guess, setGuess] = useState<number | null>(null);
   const choices = useMemo(() => priceChoices(price, `${city.id}:${food.id}`), [price, city.id, food.id]);
-  const [bought, setBought] = useState<number | null>(null);
+  const [bought, setBought] = useState<number | null>(g.active?.result?.kind === 'buy' ? g.active.result.expected ?? -1 : null);
   const home = g.home;
   const doBuy = () => { if (step.guess && guess === null) return; const gv = step.guess ? guess! : undefined; if (g.buyFood(food.id, gv)) setBought(gv ?? -1); };
   const err = bought !== null && bought >= 0 ? Math.abs(bought - price) / price : null;
@@ -283,7 +283,7 @@ function Article({ baseFee }: { baseFee: number }) {
   const g = useGame();
   const m = missionById(g.active!.missionId);
   const [sel, setSel] = useState<string[]>(m.cardIds.filter((c) => g.cards.includes(c)));
-  const [res, setRes] = useState<{ grade: Grade; fee: number } | null>(null);
+  const [res, setRes] = useState<{ grade: Grade; fee: number } | null>(g.active?.result?.kind === 'article' ? g.active.result : null);
   const toggle = (id: string) => setSel(sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
   const have = m.cardIds.filter((c) => g.cards.includes(c)).length;
   return (

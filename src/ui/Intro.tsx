@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useGame } from '../game/store';
 import type { Currency } from '../game/types';
 import { CURRENCY_META, FX_EUR, fmt } from '../game/economy';
+import TravelPhoto from './TravelPhoto';
+import { photoById } from '../data/photos';
+import { MISSIONS } from '../data/missions';
 
 export default function Intro() {
   const newGame = useGame((s) => s.newGame);
@@ -9,10 +12,13 @@ export default function Intro() {
   const [home, setHome] = useState<Currency>('KRW');
   return (
     <div className="intro">
+      <div className="intro-landscape"><TravelPhoto photo={photoById('paris')} priority /><div className="intro-photo-note"><span>01 / PARIS, FRANCE</span><b>길을 잃어도,<br />이야기는 남으니까.</b><small>한 장의 사진에서 시작하는 프랑스 여행</small></div></div>
       <div className="intro-card">
-        <h1>CARNET<small>세계를 걷는 기록 — 프로토타입 v0.1 (일드프랑스 · 프랑스 북부)</small></h1>
-        <p>당신은 파리의 작은 여행·역사 잡지 《Carnet》의 신입 작가다. 실종된 선배 L.이 남긴 사진 상자를 따라 도시를 취재하고, 사실 카드로 기사를 써서 원고료를 받고, 그 돈으로 다음 도시로 떠난다.</p>
-        <p style={{ fontSize: 13 }}>실제 지도 · 실제 열차 시간과 요금(예시) · 실제 환율과 물가 · 실제 역사. 모든 사실 카드에는 출처가 붙는다.</p>
+        <div className="eyebrow">A LITTLE JOURNEY, A THOUSAND STORIES</div>
+        <h1>Carnet<span className="intro-period">.</span><small>세계를 걷는 기록</small></h1>
+        <p className="intro-invitation">기차표 한 장, 카메라 하나.<br />당신만의 여행을 써 내려가세요.</p>
+        <p>파리의 작은 여행 잡지에 도착한 낡은 사진 상자. 사라진 선배 L.의 흔적을 따라 골목을 걷고, 현지 음식을 맛보고, 다음 도시로 향하는 기사를 써보세요.</p>
+        <div className="intro-features"><span><b>12</b>개의 실제 도시</span><span><b>{MISSIONS.length}</b>개의 취재 미션</span><span><b>∞</b>나만의 시선</span></div>
         <label>작가 이름<input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김카르네" /></label>
         <label>출신국 통화 (자국 통화 — 모든 가격에 병기됩니다)
           <select value={home} onChange={(e) => setHome(e.target.value as Currency)}>
@@ -20,10 +26,10 @@ export default function Intro() {
           </select>
         </label>
         <div className="actions">
-          <button className="btn red" onClick={() => newGame(name, home)}>첫 출근 ▸</button>
-          <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>시작: 2026-09-08 화요일 09:00, 파리</span>
+          <button className="btn red" onClick={() => newGame(name.trim(), home)}>여행의 첫 페이지 열기 <span>→</span></button>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>파리, 화요일 아침 09:00 · 자동 저장</span>
         </div>
-        <div className="credit">지도: © OpenStreetMap contributors · OpenFreeMap. 사실: Wikipedia(CC BY-SA)·Wikidata(CC0)·기관 공식 자료. 환율·요금은 예시이며 실서비스에서 ECB·GTFS로 갱신됩니다.</div>
+        <div className="credit">실제 장소의 사진과 출처가 있는 역사 카드. 사진을 누르면 원본과 촬영자를 볼 수 있어요. 환율·가격·교통 시간은 게임용 예시입니다.</div>
       </div>
     </div>
   );

@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import MapView from './ui/MapView';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import Hud from './ui/Hud';
 import CityPanel from './ui/CityPanel';
 import Scene from './ui/Scene';
@@ -7,6 +6,10 @@ import Notebook from './ui/Notebook';
 import Intro from './ui/Intro';
 import { useGame, clock } from './game/store';
 import { cityById } from './data/cities';
+import Journey from './ui/Journey';
+import TravelPhoto from './ui/TravelPhoto';
+import { photoById } from './data/photos';
+const MapView = lazy(() => import('./ui/MapView'));
 
 export default function App() {
   const started = useGame((s) => s.started);
@@ -19,25 +22,35 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>('paris');
   const [notebook, setNotebook] = useState(false);
   const [finalOpen, setFinalOpen] = useState(false);
+  const [mapMode, setMapMode] = useState(false);
 
   // 도착하면 도착 도시 카드 열기
   useEffect(() => { if (!travelling) setSelected(cityId); }, [cityId, travelling]);
   useEffect(() => { if (finalShown && !active) setFinalOpen(true); }, [finalShown, active]);
+  useEffect(() => {
+    if (!travelling) return;
+    const timer = window.setTimeout(() => useGame.getState().arrive(), 4500);
+    return () => window.clearTimeout(timer);
+  }, [travelling]);
 
   if (!started) return <Intro />;
-  const recent = log.slice(-4);
+  const recent = log.slice(-1);
   const last = letters[letters.length - 1];
 
   return (
-    <div className="app">
-      <MapView onSelect={(id) => setSelected(id)} selected={selected} />
+    <div className={`app${mapMode ? ' map-mode' : ''}`}>
+      {mapMode && <Suspense fallback={<div className="map-loading">여행 지도를 펼치는 중…</div>}><MapView onSelect={(id) => setSelected(id)} selected={selected} /></Suspense>}
       <Hud onNotebook={() => setNotebook(true)} onCity={() => setSelected(cityId)} />
+      <Journey key={selected ?? cityId} selected={selected} onSelect={setSelected} onAlbum={() => setNotebook(true)} mapMode={mapMode} onMap={() => setMapMode((m) => !m)} />
       {selected && !travelling && <CityPanel key={selected} cityId={selected} onClose={() => setSelected(null)} initialTab={selected === cityId ? 'missions' : 'transport'} />}
       {travelling && (
         <div className="travel-overlay">
+          <TravelPhoto photo={photoById(travelling.edge.to)} className="train-window" priority />
+          <div className="eyebrow">EN ROUTE / 다음 풍경으로</div>
           <div className="t">{travelling.edge.operator} · {travelling.edge.station} 출발</div>
           <div className="d">{cityById(travelling.edge.from).names.ko} → {cityById(travelling.edge.to).names.ko} · 도착 예정 {clock(travelling.arriveMinute)}</div>
           {travelling.edge.windowFact && <div className="w">🪟 차창 밖: {travelling.edge.windowFact}</div>}
+          <div className="train-progress"><i /></div>
         </div>
       )}
       <div className="log">{recent.map((e) => <div className={`e ${e.kind}`} key={e.id}>{e.text}</div>)}</div>

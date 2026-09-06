@@ -11,6 +11,7 @@ import time
 import urllib.parse
 import urllib.request
 from PIL import Image
+sys.stdout.reconfigure(encoding='utf-8')
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {
@@ -31,21 +32,20 @@ TARGETS = {
     'paris:cluny': ('Musée de Cluny', '클뤼니 박물관'),
     'paris:sainte-chapelle': ('Sainte-Chapelle', '생트샤펠'),
     'paris:arenes': ('Arènes de Lutèce', '루테티아 원형경기장'),
-    'boulogne:seine-musicale': ('La Seine Musicale', '스갱 섬 · 라 센 뮤지칼'),
+    'boulogne:seine-musicale': ('File:La Seine musicale at night.jpg', '스갱 섬 · 라 센 뮤지칼의 밤'),
     'saint-denis:sd-market': ('fr:Marché de Saint-Denis', '생드니 시장'),
-    'argenteuil:monet-house': ('fr:Maison de Claude Monet à Argenteuil', '아르장퇴유 모네의 집'),
-    'montreuil:murs': ('fr:Murs à pêches', '몽트뢰유 복숭아 담장'),
+    'montreuil:murs': ('File:Montreuil.Murs à Peches.jpg', '몽트뢰유 복숭아 담장'),
     'versailles:gardens': ('Gardens of Versailles', '베르사유 정원'),
-    'amiens:verne-house': ('Maison de Jules Verne', '쥘 베른의 집'),
+    'amiens:verne-house': ('File:Amiens Maison Jules Verne 1.jpg', '쥘 베른의 집'),
     'amiens:hortillonnages': ('fr:Hortillonnages d’Amiens', '아미앵 수상정원'),
-    'amiens:madeleine': ('La Madeleine Cemetery, Amiens', '아미앵 마들렌 묘지'),
-    'reims:reddition': ('Musée de la Reddition', '랭스 항복 박물관'),
-    'reims:caves': ('Champagne wine region', '샹파뉴의 포도밭'),
+    'amiens:madeleine': ('File:Amiens allée des passiflores depuis tombe Jules Verne (cimetière de la Madeleine) 19a.jpg', '아미앵 마들렌 묘지'),
+    'reims:reddition': ('File:Musée de la Reddition - entrée.jpg', '랭스 항복 박물관'),
+    'reims:caves': ('File:Champagne vineyard and Church.jpg', '샹파뉴 포도밭 · 저장고 투어의 배경'),
     'rouen:rouen-cath': ('Rouen Cathedral', '루앙 대성당'),
     'rouen:vieux-marche': ('fr:Place du Vieux-Marché', '루앙 비외마르셰 광장'),
     'lille:pba': ('Palais des Beaux-Arts de Lille', '릴 순수미술관'),
     'lille:degaulle-house': ('Birthplace of Charles de Gaulle', '드골 생가'),
-    'orleans:maison-jeanne': ('fr:Maison de Jeanne d’Arc (Orléans)', '오를레앙 잔 다르크의 집'),
+    'orleans:maison-jeanne': ('File:Maison Jeanne Arc - Orléans (FR45) - 2022-07-16 - 1.jpg', '오를레앙 잔 다르크의 집'),
     'food:croissant': ('Croissant', '크루아상'),
     'food:jambon-beurre': ('Jambon-beurre', '잠봉뵈르'),
     'food:cafe': ('Espresso', '에스프레소'),
@@ -54,7 +54,7 @@ TARGETS = {
     'food:paris-brest': ('Paris–Brest', '파리 브레스트'),
     'food:msemen': ('Msemmen', '므세멘'),
     'food:ficelle': ('Ficelle picarde', '피셀 피카르드'),
-    'food:biscuit-rose': ('Pink biscuits of Reims', '랭스의 분홍 비스킷'),
+    'food:biscuit-rose': ('File:3 Biscuit rose de Reims.jpg', '랭스의 분홍 비스킷'),
     'food:carbonnade': ('Carbonade flamande', '카르보나드 플라망드'),
     'food:welsh': ('Welsh rarebit', '웰시'),
     'food:moules': ('Moules-frites', '홍합과 감자튀김'),
@@ -114,13 +114,20 @@ def fetch(asset_id, page, label):
             'changes': 'Resized and converted to WebP; thumbnails resized. Display may crop the image.'}
 
 if __name__ == '__main__':
+    if len(sys.argv) > 2 and sys.argv[1] == '--search':
+        for term in sys.argv[2:]:
+            query = urllib.parse.urlencode({'action': 'query', 'format': 'json', 'list': 'search', 'srnamespace': 6, 'srlimit': 4, 'srsearch': term + ' filetype:bitmap'})
+            result = json.loads(read_url('https://commons.wikimedia.org/w/api.php?' + query))
+            print(term, [p['title'] for p in result['query']['search']], flush=True)
+            time.sleep(1)
+        sys.exit(0)
     manifest_path = ROOT / 'src' / 'data' / 'photoManifest.json'
     manifest = json.loads(manifest_path.read_text(encoding='utf-8')) if manifest_path.exists() else {}
     failed = []
     for asset_id, (page, label) in TARGETS.items():
         if sys.argv[1:] and asset_id not in sys.argv[1:]:
             continue
-        if asset_id in manifest and (ROOT / 'public' / manifest[asset_id]['src'].lstrip('/')).exists():
+        if '--refresh' not in sys.argv and asset_id in manifest and (ROOT / 'public' / manifest[asset_id]['src'].lstrip('/')).exists():
             continue
         try:
             manifest[asset_id] = fetch(asset_id, page, label)

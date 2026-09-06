@@ -17,6 +17,7 @@ export interface ActiveMission {
   step: number;
   wrong: number; // 퀴즈 오답 수
   pendingSleep?: boolean; // 휴관으로 막힘
+  result?: { kind: 'answer'; correct: boolean; picked?: number } | { kind: 'buy'; expected?: number; price: number } | { kind: 'article'; grade: Grade; fee: number };
 }
 
 export interface Article { missionId: string; cityId: string; grade: Grade; fee: number; day: number; cards: string[] }
@@ -72,7 +73,7 @@ export interface GameState {
   startMission: (missionId: string) => void;
   currentStep: () => Step | null;
   nextStep: () => void;
-  answer: (correct: boolean) => void;
+  answer: (correct: boolean, picked?: number) => void;
   submitArticle: (selected: string[]) => { grade: Grade; fee: number } | null;
   abandonMission: () => void;
 }
@@ -165,6 +166,9 @@ export const useGame = create<GameState>()(
         const city = cityById(s.cityId);
         const food = city.foods.find((f) => f.id === foodId);
         if (!food) return null;
+        const missionStep = get().currentStep();
+        const missionPurchase = missionStep?.t === 'buy' && missionStep.foodId === foodId;
+        if (missionPurchase && s.active?.result?.kind === 'buy') return { price: s.active.result.price };
         const price = foodPrice(food, city);
         get().payEur(price, `${food.name} 구매`);
         set((st) => ({
@@ -173,6 +177,7 @@ export const useGame = create<GameState>()(
           tastedFoods: Array.from(new Set([...st.tastedFoods, `${city.id}:${foodId}`])),
         }));
         get().capturePhoto(`food:${foodId}`);
+        if (missionPurchase && get().active) set({ active: { ...get().active!, result: { kind: 'buy', expected: guessEur, price } } });
         return { price };
       },
 
@@ -207,6 +212,7 @@ export const useGame = create<GameState>()(
 
       travel: (edge, advance) => {
         const s = get();
+        if (s.travelling || edge.from !== s.cityId) return { ok: false, reason: '현재 도시에서 출발하는 노선을 골라주세요.' };
         const dest = cityById(edge.to);
         if (!s.unlocked.includes(dest.region)) return { ok: false, reason: '아직 잠긴 지역입니다.' };
         if (s.active) return { ok: false, reason: '진행 중인 미션이 있습니다. 먼저 끝내거나 포기하세요.' };
@@ -309,13 +315,13 @@ export const useGame = create<GameState>()(
             set({ finalShown: true, letters: [...get().letters, { ...FINAL_LETTER, day: get().day }] });
           }
         } else {
-          set({ active: { ...a, step: next } });
+          set({ active: { ...a, step: next, result: undefined } });
         }
       },
 
-      answer: (correct) => {
+      answer: (correct, picked) => {
         const a = get().active;
-        if (!a) return;
+        if (!a || a.result) return;
         const step = missionById(a.missionId).steps[a.step];
         if (step?.t === 'photo') get().capturePhoto(step.photoId);
         const cardId = step && 'cardId' in step ? step.cardId : undefined;
@@ -323,17 +329,23 @@ export const useGame = create<GameState>()(
           set({ cards: [...get().cards, cardId] });
           get().addLog(`사실 카드 수집: ${cardById(cardId).text.slice(0, 40)}…`, 'card');
         }
-        set({ active: { ...a, wrong: a.wrong + (correct ? 0 : 1) }, minute: get().minute + 5 });
+        set({ active: { ...a, wrong: a.wrong + (correct ? 0 : 1), result: { kind: 'answer', correct, picked } }, minute: get().minute + 5 });
       },
 
       submitArticle: (selected) => {
         const s = get();
         const a = s.active;
         if (!a) return null;
+        if (a.result?.kind === 'article') return { grade: a.result.grade, fee: a.result.fee };
+        const previous = s.articles.find((article) => article.missionId === a.missionId);
+        if (previous) {
+          set({ active: { ...a, result: { kind: 'article', grade: previous.grade, fee: previous.fee } } });
+          return { grade: previous.grade, fee: previous.fee };
+        }
         const m = missionById(a.missionId);
         const step = m.steps[a.step];
         if (!step || step.t !== 'article') return null;
-        const valid = selected.filter((c) => m.cardIds.includes(c) && s.cards.includes(c));
+        const valid = [...new Set(selected)].filter((c) => m.cardIds.includes(c) && s.cards.includes(c));
         const g = gradeArticle(valid.length, m.cardIds.length, a.wrong);
         const repMult = 1 + s.reputation * 0.01;
         let fee = Math.round(step.baseFee * g.mult * repMult);
@@ -342,6 +354,7 @@ export const useGame = create<GameState>()(
         const w = { ...s.wallet, EUR: Math.round((s.wallet.EUR + fee) * 100) / 100 };
         const repGain = { S: 4, A: 3, B: 2, C: 1 }[g.grade];
         set({ wallet: w, debt, reputation: s.reputation + repGain, minute: s.minute + 45,
+          active: { ...a, result: { kind: 'article', grade: g.grade, fee } },
           articles: [...s.articles, { missionId: m.id, cityId: m.cityId, grade: g.grade, fee, day: s.day, cards: valid }] });
         get().addLog(`기사 송고 「${m.title}」 — 등급 ${g.grade}, 원고료 €${fee}`, 'money');
         return { grade: g.grade, fee };

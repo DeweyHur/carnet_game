@@ -6,11 +6,14 @@ import { missionById } from '../data/missions';
 import { ExchangeForm, FactCardView } from './common';
 import { CURRENCY_META, fmt, FX_EUR } from '../game/economy';
 import type { Currency } from '../game/types';
+import { PHOTOS, photoById, cityPhotos } from '../data/photos';
+import TravelPhoto from './TravelPhoto';
 
-type Tab = 'cards' | 'wallet' | 'passport' | 'articles' | 'letters';
+type Tab = 'album' | 'cards' | 'wallet' | 'passport' | 'articles' | 'letters';
 
 export default function Notebook({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<Tab>('cards');
+  const [tab, setTab] = useState<Tab>('album');
+  const [albumCity, setAlbumCity] = useState('all');
   const s = useGame();
   const curs = (Object.keys(s.wallet) as Currency[]).filter((c) => s.wallet[c] > 0 || c === 'EUR' || c === s.home);
   const guessErr = s.guesses.length ? s.guesses.reduce((a, g) => a + Math.abs(g.expected - g.actual) / g.actual, 0) / s.guesses.length : null;
@@ -21,14 +24,22 @@ export default function Notebook({ onClose }: { onClose: () => void }) {
       <div className="drawer-head">
         <h2>CARNET · 수첩</h2>
         <button className="hud-btn" style={{ boxShadow: 'none' }} onClick={() => { if (confirm('저장을 지우고 처음부터 시작할까요?')) s.reset(); }}>새 게임</button>
-        <button className="close" style={{ background: 'none', border: 'none', fontSize: 22 }} onClick={onClose}>×</button>
+        <button className="close" aria-label="수첩 닫기" style={{ background: 'none', border: 'none', fontSize: 22 }} onClick={onClose}>×</button>
       </div>
       <div className="tabs">
-        {(['cards', 'wallet', 'passport', 'articles', 'letters'] as Tab[]).map((t) => (
-          <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{{ cards: `사실 카드 ${s.cards.length}`, wallet: '지갑·환전', passport: '여권', articles: `기사 ${s.articles.length}`, letters: `편지 ${s.letters.length}` }[t]}</button>
+        {(['album', 'cards', 'wallet', 'passport', 'articles', 'letters'] as Tab[]).map((t) => (
+          <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{{ album: `사진 ${s.snapshots.length}`, cards: `카드 ${s.cards.length}`, wallet: '지갑', passport: '여권', articles: `기사 ${s.articles.length}`, letters: `편지 ${s.letters.length}` }[t]}</button>
         ))}
       </div>
       <div className="drawer-body">
+        {tab === 'album' && <>
+          <div className="album-intro"><span className="eyebrow">LES SOUVENIRS</span><h3>여행이 남긴 장면들.</h3><p>{s.snapshots.length} / {Object.keys(PHOTOS).length}장의 사진 · {s.visitedPois.length}곳의 산책 · {s.tastedFoods.length}가지의 맛</p></div>
+          <div className="album-filters"><button className={albumCity === 'all' ? 'on' : ''} onClick={() => setAlbumCity('all')}>전체</button>{s.visited.map((id) => <button key={id} className={albumCity === id ? 'on' : ''} onClick={() => setAlbumCity(id)}>{cityById(id).names.ko}</button>)}</div>
+          <div className="album-grid">{s.snapshots.filter((p) => albumCity === 'all' || p.cityId === albumCity).map((snapshot) => <div className="album-polaroid" key={snapshot.photoId}><TravelPhoto photo={photoById(snapshot.photoId)} /><small>{cityById(snapshot.cityId).names.ko} · DAY {String(snapshot.day).padStart(2, '0')}</small></div>)}</div>
+          {s.snapshots.length === 0 && <div className="empty-note"><b>첫 사진을 기다리는 페이지</b><p>도시 화면의 ‘사진 담기’를 누르거나, 사진 산책에서 장소를 방문해보세요.</p><button className="btn" onClick={onClose}>첫 풍경 만나러 가기 →</button></div>}
+          <div className="section-title">앞으로 채워질 여행</div>
+          <div className="album-destinations">{CITIES.map((city) => <div key={city.id}><span>{city.names.ko}</span><small>{s.snapshots.filter((s) => s.cityId === city.id && !s.photoId.startsWith('food:')).length} / {cityPhotos(city.id).length}장의 풍경 {s.visited.includes(city.id) ? '' : '· 미방문'}</small></div>)}</div>
+        </>}
         {tab === 'cards' && (
           <>
             <p className="blurb">모은 사실 카드 {s.cards.length}/{CARDS.length}. 문장마다 출처를 열 수 있습니다 — "실제 역사 기반"이라는 약속의 실체.</p>
@@ -51,7 +62,7 @@ export default function Notebook({ onClose }: { onClose: () => void }) {
             {s.debt > 0 && <div className="wallet-row"><span>편집부 선지급 부채</span><span style={{ color: 'var(--accent)' }}>{fmt(s.debt, 'EUR')}</span></div>}
             <div className="section-title">환율 보드 · 환전</div>
             <ExchangeForm />
-            <div className="section-title">가격 맞히기 기록 (KPI: 물가 체감)</div>
+            <div className="section-title">가격표 맞추기 · 나의 물가 감각</div>
             {guessErr === null ? <p className="blurb">아직 기록 없음.</p> : (
               <p className="blurb">전체 평균 오차 <b>{Math.round(guessErr * 100)}%</b> · 최근 5회 평균 <b>{Math.round((recentErr ?? 0) * 100)}%</b> · 시도 {s.guesses.length}회<br />
                 {s.guesses.slice(-8).reverse().map((g, i) => <span key={i}>{cityById(g.cityId).names.ko} {g.foodId}: 예상 €{g.expected} / 실제 €{g.actual}<br /></span>)}</p>
