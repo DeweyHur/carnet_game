@@ -6,6 +6,9 @@ import { cardById } from '../data/cards';
 import type { Speaker, Step } from '../game/types';
 import { Avatar, ExchangeForm, FactCardView, Price } from './common';
 import { foodPrice, fmt, FX_EUR, type Grade } from '../game/economy';
+import { priceChoices } from '../game/priceChoices';
+import { photoById, placePhoto } from '../data/photos';
+import TravelPhoto from './TravelPhoto';
 
 export default function Scene() {
   const active = useGame((s) => s.active);
@@ -16,11 +19,15 @@ export default function Scene() {
   if (!step) return null;
   const city = cityById(m.cityId);
   const pct = Math.round((active.step / m.steps.length) * 100);
+  const backdrop = step.t === 'visit' ? placePhoto(city.id, step.poiId) : step.t === 'photo' ? photoById(step.photoId) : photoById(city.id);
   return (
-    <div className="scene">
+    <div className="scene mission-scene">
+      <div className="scene-landscape"><TravelPhoto photo={backdrop ?? photoById(city.id)} priority mystery={step.t === 'photo'} /></div>
+      <div className="scene-location"><span>CARNET / SUR LE TERRAIN</span><b>{city.names.fr}</b><small>{city.names.ko}에서의 기록</small></div>
       <div className="scene-box">
         <div className="progress"><i style={{ width: `${pct}%` }} /></div>
         <div className="mission-tag">{city.names.ko} · 「{m.title}」 · {active.step + 1}/{m.steps.length}</div>
+        <button className="pause-scene" onClick={() => useGame.getState().setPaused(true)}>잠시 접기 ×</button>
         <StepView key={`${m.id}-${active.step}`} step={step} guideName={city.guide.name} guideRole={city.guide.archetype} guideColor={city.guide.color} />
       </div>
     </div>
@@ -154,7 +161,8 @@ function Photo({ step }: { step: Extract<Step, { t: 'photo' }> }) {
   return (
     <>
       <div className="q">📷 포토 매칭 — L.의 사진은 지금 어디일까?</div>
-      <div className="photo">{step.hint}</div>
+      <TravelPhoto photo={photoById(step.photoId)} className="clue-photo" mystery={!done} priority />
+      <div className="photo-note">✎ {step.hint}</div>
       <div className="options">
         {step.options.map((o, i) => (
           <button key={i} disabled={done} className={done ? (i === step.answer ? 'ok' : i === picked ? 'no' : '') : ''} onClick={() => { setPicked(i); g.answer(i === step.answer); }}>{o}</button>
@@ -231,22 +239,24 @@ function Buy({ step }: { step: Extract<Step, { t: 'buy' }> }) {
   const city = cityById(g.cityId);
   const food = city.foods.find((f) => f.id === step.foodId)!;
   const price = foodPrice(food, city);
-  const [guess, setGuess] = useState<string>('');
+  const [guess, setGuess] = useState<number | null>(null);
+  const choices = useMemo(() => priceChoices(price, `${city.id}:${food.id}`), [price, city.id, food.id]);
   const [bought, setBought] = useState<number | null>(null);
   const home = g.home;
-  const doBuy = () => { const gv = step.guess ? Number(guess) : undefined; g.buyFood(food.id, gv); setBought(gv ?? -1); };
+  const doBuy = () => { if (step.guess && guess === null) return; const gv = step.guess ? guess! : undefined; if (g.buyFood(food.id, gv)) setBought(gv ?? -1); };
   const err = bought !== null && bought >= 0 ? Math.abs(bought - price) / price : null;
   return (
     <>
       <div className="q">🥐 {food.name} <span className="tag">{food.nameLocal}</span></div>
+      <TravelPhoto photo={photoById(`food:${food.id}`)} className="food-scene-photo" />
       <div className="speech"><div className="txt narr" style={{ fontSize: 14 }}>{food.origin}</div></div>
       {bought === null ? (
         <>
           {step.guess ? (
-            <div className="guess">
-              <span>가격 맞히기 — 여기서는 얼마일까? €</span>
-              <input type="number" step="0.5" value={guess} onChange={(e) => setGuess(e.target.value)} placeholder="예상가" />
-              <button className="btn" disabled={!guess} onClick={doBuy}>이 값에 걸고 사기</button>
+            <div className="price-game">
+              <p>이 도시에서는 얼마일까요? 가격표 하나를 골라보세요.</p>
+              <div className="price-options">{choices.map((value, i) => <button key={value} aria-pressed={guess === value} className={guess === value ? 'selected' : ''} onClick={() => setGuess(value)}><span>{String.fromCharCode(65 + i)}</span><b>{fmt(value, 'EUR')}</b><small>≈ {fmt(value * FX_EUR[home], home)}</small></button>)}</div>
+              <div className="scene-actions"><span className="hint">선택한 값은 예상가예요. 결제는 실제 가격으로 진행돼요.</span><button className="btn" disabled={guess === null} onClick={doBuy}>가격 확인하고 맛보기 →</button></div>
             </div>
           ) : (
             <div className="scene-actions"><Price eur={price} /><button className="btn" onClick={doBuy}>사기</button></div>

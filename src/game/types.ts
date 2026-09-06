@@ -98,7 +98,7 @@ export type Step =
   | { t: 'say'; who: Speaker; text: string; name?: string; fiction?: boolean }
   | { t: 'card'; cardId: string; who?: Speaker; text?: string }
   | { t: 'quiz'; who?: Speaker; q: string; options: string[]; answer: number; cardId: string; explain?: string }
-  | { t: 'photo'; hint: string; options: string[]; answer: number; cardId?: string }
+  | { t: 'photo'; photoId: string; hint: string; options: string[]; answer: number; cardId?: string }
   | { t: 'visit'; poiId: string; minutes: number }
   | { t: 'buy'; foodId: string; guess?: boolean }
   | { t: 'order'; prompt: string; items: string[]; cardId: string } // items = 정답 순서(UI에서 섞음)

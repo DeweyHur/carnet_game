@@ -7,7 +7,7 @@ interface Props { onNotebook: () => void; onCity: () => void }
 export default function Hud({ onNotebook, onCity }: Props) {
   const s = useGame();
   const city = cityById(s.cityId);
-  const eurTotal = s.wallet.EUR + s.wallet[s.home] / FX_EUR[s.home];
+  const eurTotal = s.wallet.EUR + (s.home === 'EUR' ? 0 : s.wallet[s.home] / FX_EUR[s.home]);
   const unread = s.letters.length;
   return (
     <div className="hud">

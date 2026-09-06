@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { Currency, Edge, RegionId, Step } from './types';
 import { CITIES, cityById } from '../data/cities';
 import { cardById } from '../data/cards';
+import { photoById, placePhoto } from '../data/photos';
 import { MISSIONS, missionById, FINAL_LETTER } from '../data/missions';
 import { CARD_FEE, FX_EUR, FX_CHANNELS, foodPrice, gradeArticle, quote, toEur, type FxChannel, type Grade } from './economy';
 
@@ -21,6 +22,7 @@ export interface ActiveMission {
 export interface Article { missionId: string; cityId: string; grade: Grade; fee: number; day: number; cards: string[] }
 export interface Letter { title: string; text: string; day: number }
 export interface Guess { foodId: string; cityId: string; expected: number; actual: number }
+export interface Snapshot { photoId: string; cityId: string; day: number }
 export interface LogEntry { id: number; text: string; kind: 'info' | 'money' | 'card' | 'warn' | 'story' }
 
 export interface GameState {
@@ -49,9 +51,13 @@ export interface GameState {
   finalShown: boolean;
   travelling: { edge: Edge; arriveMinute: number } | null;
   paused: boolean;
+  snapshots: Snapshot[];
+  visitedPois: string[];
+  tastedFoods: string[];
 
   // actions
   setPaused: (p: boolean) => void;
+  capturePhoto: (photoId: string) => void;
   newGame: (name: string, home: Currency) => void;
   reset: () => void;
   addLog: (text: string, kind?: LogEntry['kind']) => void;
@@ -75,7 +81,7 @@ export const weekdayOf = (day: number) => (START_WEEKDAY + day - 1) % 7;
 export const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
 const parseHm = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
 
-type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'payEur' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused';
+type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'payEur' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused' | 'capturePhoto';
 type Data = Omit<GameState, Actions>;
 const fresh = (): Data => ({
   started: false, playerName: '', home: 'KRW', day: 1, minute: 9 * 60, cityId: 'paris',
@@ -83,6 +89,7 @@ const fresh = (): Data => ({
   stamina: 100, reputation: 0, debt: 0,
   unlocked: ['idf'], visited: ['paris'], cards: [], articles: [], stamps: [], collectibles: [], letters: [],
   completed: [], active: null, guesses: [], fxLost: 0, log: [], finalShown: false, travelling: null, paused: false,
+  snapshots: [], visitedPois: [], tastedFoods: [],
 });
 
 let logId = 1;
@@ -99,6 +106,15 @@ export const useGame = create<GameState>()(
         get().addLog('《Carnet》 편집부에 첫 출근. 예산 €2,000 상당 (자국 통화).', 'story');
       },
       reset: () => set({ ...fresh() }),
+
+      capturePhoto: (photoId) => {
+        const s = get();
+        const photo = photoById(photoId);
+        if (!photo || s.travelling || s.snapshots.some((p) => p.photoId === photo.id)) return;
+        if (photo.id !== s.cityId && !photo.id.startsWith(`${s.cityId}:`) && !photo.id.startsWith('food:')) return;
+        set({ snapshots: [...s.snapshots, { photoId: photo.id, cityId: s.cityId, day: s.day }] });
+        get().addLog(`사진 앨범에 붙였어요 · ${photo.title}`, 'card');
+      },
 
       addLog: (text, kind = 'info') => set((s) => ({ log: [...s.log.slice(-40), { id: logId++, text, kind }] })),
 
@@ -154,7 +170,9 @@ export const useGame = create<GameState>()(
         set((st) => ({
           stamina: Math.min(100, st.stamina + food.stamina), minute: st.minute + 15,
           guesses: guessEur !== undefined ? [...st.guesses, { foodId, cityId: city.id, expected: guessEur, actual: price }] : st.guesses,
+          tastedFoods: Array.from(new Set([...st.tastedFoods, `${city.id}:${foodId}`])),
         }));
+        get().capturePhoto(`food:${foodId}`);
         return { price };
       },
 
@@ -169,6 +187,9 @@ export const useGame = create<GameState>()(
         if (s.stamina < 15) return { ok: false, reason: '체력이 바닥났습니다. 뭔가 먹거나 자야 합니다.' };
         if (poi.feeEur > 0) get().payEur(poi.feeEur, `${poi.name} 입장`);
         set({ minute: s.minute + minutes, stamina: Math.max(0, s.stamina - Math.round(minutes / 8)) });
+        set({ visitedPois: Array.from(new Set([...s.visitedPois, `${city.id}:${poiId}`])) });
+        const photo = placePhoto(city.id, poiId);
+        if (photo) get().capturePhoto(photo.id);
         if (!s.visited.includes(city.id)) set({ visited: [...s.visited, city.id] });
         return { ok: true };
       },
@@ -283,7 +304,7 @@ export const useGame = create<GameState>()(
           set({ active: null, completed });
           get().addLog(`미션 완료: 「${m.title}」`, 'story');
           // 프로토타입 엔딩: 북부·중부 전부 완료
-          const remote = MISSIONS.filter((x) => ['nord', 'centre'].includes(cityById(x.cityId).region));
+          const remote = MISSIONS.filter((x) => !x.id.includes('-discovery-') && ['nord', 'centre'].includes(cityById(x.cityId).region));
           if (!get().finalShown && remote.every((x) => completed.includes(x.id))) {
             set({ finalShown: true, letters: [...get().letters, { ...FINAL_LETTER, day: get().day }] });
           }
@@ -296,6 +317,7 @@ export const useGame = create<GameState>()(
         const a = get().active;
         if (!a) return;
         const step = missionById(a.missionId).steps[a.step];
+        if (step?.t === 'photo') get().capturePhoto(step.photoId);
         const cardId = step && 'cardId' in step ? step.cardId : undefined;
         if (cardId && !get().cards.includes(cardId)) {
           set({ cards: [...get().cards, cardId] });

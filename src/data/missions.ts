@@ -1,4 +1,6 @@
 import type { Mission, Step } from '../game/types';
+import { CITIES } from './cities';
+import { CARDS } from './cards';
 
 // 대사 편의 함수
 const M = (text: string): Step => ({ t: 'say', who: 'margot', text });
@@ -49,11 +51,11 @@ export const MISSIONS: Mission[] = [
       { t: 'visit', poiId: 'albert-kahn', minutes: 60 },
       { t: 'card', cardId: 'b-kahn-1', who: 'guide', text: '칸은 은행가였지만 진짜 관심은 "세계를 서로 알게 하면 전쟁이 줄어든다"는 믿음이었어요. 그래서 사진가를 보냈죠.' },
       { t: 'card', cardId: 'b-kahn-2', who: 'guide' },
-      N('L.의 사진 세 장. 모두 오토크롬 복제본이다. 뒷면: 「이 세 장이 지금 어디인지 맞히면, 다음 상자를 열 수 있어」.'),
-      { t: 'photo', hint: '사진 ①: 파스텔빛 하늘 아래 목조 다리와 붉은 단풍. 물 위에 등롱이 비친다. 뒷면 메모: "정원 안, 1910년대".', options: ['알베르 칸 정원의 일본 정원', '스갱 섬 르노 공장', '불로뉴 숲 호수'], answer: 0 },
-      { t: 'photo', hint: '사진 ②: 강 가운데 긴 섬, 굴뚝과 공장 건물이 섬을 가득 채웠다. 뒷면 메모: "1930년대, 여기서 자동차가 나왔다".', options: ['시테 섬', '스갱 섬 (르노 공장, 현 라 센 뮤지칼)', '생루이 섬'], answer: 1, cardId: 'b-seguin' },
-      { t: 'photo', hint: '사진 ③: 유리 지붕 온실 안, 흰 옷의 남자가 화분 사이에 서 있다. 뒷면 메모: "1929, 그가 모든 것을 잃기 전".', options: ['시테코의 은행가 저택', '알베르 칸의 온실 (파산 직전)', '베르사유 오랑주리'], answer: 1, cardId: 'b-kahn-3' },
-      G('세 장 다 맞췄네요. L.이 남긴 봉투가 하나 더 있어요. "세 장을 맞힌 사람에게"라고 적혀 있었어요.'),
+      N('L.의 옛 메모 옆에 현재의 현장 사진 세 장을 펼쳤다. 「풍경은 바뀌어도, 장소가 기억하는 이야기는 남아 있어」.'),
+      { t: 'photo', photoId: 'boulogne', hint: 'L.의 메모: "세계를 한 정원 안에 모으려 했던 은행가. 그의 이름을 찾아봐."', options: ['알베르 칸 박물관의 정원', '스갱 섬 르노 공장', '불로뉴 숲 호수'], answer: 0 },
+      { t: 'photo', photoId: 'boulogne:seine-musicale', hint: 'L.의 메모: "한때 자동차를 만들던 섬. 지금은 음악이 흐른다." 현재 사진에서 옛 장소를 찾아보자.', options: ['시테 섬', '스갱 섬 (르노 공장, 현 라 센 뮤지칼)', '생루이 섬'], answer: 1, cardId: 'b-seguin' },
+      { t: 'photo', photoId: 'boulogne', hint: 'L.의 메모: "1929년 금융 위기로 모든 것을 잃어가던 수집가. 그의 정원과 사진은 우리에게 남았다." 이 장소의 주인은?', options: ['시테코의 은행가 에밀 가이야르', '알베르 칸', '루이 14세'], answer: 1, cardId: 'b-kahn-3' },
+      G('세 장을 모두 살펴봤네요. L.이 남긴 봉투가 하나 더 있어요. "사진을 따라온 사람에게"라고 적혀 있었어요.'),
       { t: 'article', baseFee: 180 },
       { t: 'letter', title: 'L.의 첫 번째 편지', text: '칸은 세계를 사진으로 모으면 사람들이 서로를 덜 미워할 거라고 믿었어. 나는 그게 순진하다고 생각했는데, 유리판을 하나씩 보다 보니 모르겠더라.\n\n북쪽으로 가. 대성당의 도시들. 아미앵에서 시작해. 거기서 세계를 80일에 돌 수 있는지 물어봐.\n\n— L.' },
       { t: 'unlock', regions: ['nord', 'centre'], note: '프랑스 북부(아미앵·루앙·랭스·릴)와 루아르·중부(샤르트르·오를레앙)가 지도에서 열렸다.' },
@@ -194,8 +196,8 @@ export const MISSIONS: Mission[] = [
     steps: [
       // 1막 도착·단서
       N('북역에서 TER로 한 시간 남짓. 역을 나서면 페레 탑 — 1950년대 콘크리트 — 이 먼저 보이고, 그 너머로 대성당이 있다.'),
-      N('L.의 사진: 1900년경 엽서 복제본. 세로로 긴 정면, 세 개의 문, 장미창. 뒷면: 「정면은 오후에. 그리고 배는 아침에」.'),
-      { t: 'photo', hint: '엽서 속 건물: 세 개의 깊은 문, 위에 왕들의 갤러리, 그 위에 거대한 장미창. 두 탑의 높이가 다르다.', options: ['아미앵 대성당 서쪽 정면', '아미앵 시청', '페레 탑'], answer: 0 },
+      N('L.의 엽서 메모 옆에 현재의 사진을 놓았다. 「정면은 오후에. 그리고 배는 아침에」.'),
+      { t: 'photo', photoId: 'amiens', hint: '세 개의 깊은 문, 위에 왕들의 갤러리, 그 위에 거대한 장미창. 두 탑의 높이가 다르다.', options: ['아미앵 대성당 서쪽 정면', '아미앵 시청', '페레 탑'], answer: 0 },
       G('맞아요, 정면. L.이 똑같은 자리에서 찍었죠. 노에미예요. 배는 내일 아침에 태워줄게요. 오늘은 시장부터 — 토요일이면 수상정원 시장이 서요.'),
       { t: 'buy', foodId: 'hort-veg', guess: true },
       { t: 'buy', foodId: 'macaron-amiens', guess: true },
@@ -319,6 +321,41 @@ export const MISSIONS: Mission[] = [
     ],
   },
 ];
+
+// Short optional assignments make every destination playable beyond the main story.
+const lenses: Record<string, string> = {
+  paris: '센 강에서 시작하는 첫 프레임', boulogne: '한 정원 안에 담긴 세계', 'saint-denis': '왕들의 도시, 살아 있는 거리',
+  argenteuil: '모네가 보았던 빛을 찾아', montreuil: '담장 너머의 작은 여행', versailles: '거울 속으로 걷는 오후',
+  chartres: '순례자의 시선으로', amiens: '첨탑 아래, 물길을 따라', reims: '돌에 새겨진 대관식',
+  rouen: '시곗바늘 아래 골목 산책', lille: '플랑드르의 색을 모으다', orleans: '루아르로 보내는 엽서',
+};
+export const DISCOVERY_MISSIONS: Mission[] = CITIES.flatMap((city, index) => {
+  const cards = CARDS.filter((c) => c.cityId === city.id && !c.fiction).slice(0, 2);
+  const names = [city, CITIES[(index + 3) % CITIES.length], CITIES[(index + 7) % CITIES.length]];
+  const answer = index % 3;
+  [names[0], names[answer]] = [names[answer], names[0]];
+  return [{
+    id: `${city.id}-discovery-photo`, cityId: city.id, title: lenses[city.id], type: 'city', minutes: 15,
+    summary: '풍경을 자세히 보고 장소를 추리하세요. 사진 한 장과 사실 카드로 짧은 기사를 완성합니다.',
+    cardIds: cards.map((c) => c.id), steps: [
+      G(`${city.names.ko}에 온 걸 환영해요. 오늘은 서두르지 말고 사진 속 색과 건물부터 살펴봐요.`),
+      { t: 'photo', photoId: city.id, hint: city.blurb, options: names.map((c) => c.names.ko), answer },
+      ...cards.map((c): Step => ({ t: 'card', cardId: c.id })),
+      { t: 'article', baseFee: 45 }, { t: 'collect', item: `${city.names.ko} · 첫 풍경 엽서` },
+    ],
+  }, {
+    id: `${city.id}-discovery-food`, cityId: city.id, title: `${city.names.ko}의 작은 식탁`, type: 'food', minutes: 15,
+    summary: `${city.foods[0].name}와 커피. 두 개의 가격표를 고르고 이 도시의 한 끼를 기억하세요.`,
+    cardIds: [], steps: [
+      G(`오늘의 메뉴는 ${city.foods[0].name}예요. ${city.foods[0].origin}`),
+      { t: 'buy', foodId: city.foods[0].id, guess: true }, { t: 'buy', foodId: 'cafe', guess: true },
+      G('영수증과 풍경이 함께 있으면 여행이 더 오래 기억나죠. 다음 도시의 한 끼와 비교해 봐요.'),
+      { t: 'collect', item: `${city.names.ko} · 미식가의 영수증` },
+    ],
+  }] as Mission[];
+});
+MISSIONS.push(...DISCOVERY_MISSIONS);
+export const missionsForCity = (cityId: string) => MISSIONS.filter((m) => m.cityId === cityId);
 
 export const missionById = (id: string): Mission => {
   const m = MISSIONS.find((x) => x.id === id);
