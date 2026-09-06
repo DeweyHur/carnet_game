@@ -16,6 +16,13 @@ try {
   const { foodPrice } = await server.ssrLoadModule('/src/game/economy.ts');
   const { useGame } = await server.ssrLoadModule('/src/game/store.ts');
   const state = () => useGame.getState();
+  const { routePoint, routeLength } = await server.ssrLoadModule('/src/game/driveRoute.ts');
+  const route = [[2, 48], [2, 48.01], [2, 48.04]];
+  assert.deepEqual(routePoint(route, 0), route[0]);
+  assert.deepEqual(routePoint(route, 1), route[2]);
+  assert.ok(Math.abs(routePoint(route, .5)[1] - 48.02) < .00001, 'Map movement follows distance, not vertex count');
+  assert.deepEqual(routePoint([[2, 48], [2, 48]], .5), [2, 48]);
+  assert.ok(routeLength(route) > 4400 && routeLength(route) < 4500);
   const { createDrive, tickDrive, scoreDrive, driverLevel } = await server.ssrLoadModule('/src/game/driving.ts');
   const upgrades = { handling: 0, boost: 0, bumper: 0 };
   const simulate = (seed, steer) => {

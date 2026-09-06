@@ -2,7 +2,7 @@ import type { DriveState } from '../game/driving';
 
 /** A self-contained arcade road; no remote map or routing request is needed to play. */
 export function drawRoad(ctx: CanvasRenderingContext2D, s: DriveState, width: number, height: number) {
-  const w = width, h = height, horizon = h * .18, carY = Math.min(h * .78, h - 100);
+  const w = width, h = height, horizon = h * .18, carY = Math.min(h * .78, h - (h < 250 ? 65 : 100));
   const sky = ctx.createLinearGradient(0, 0, 0, h);
   sky.addColorStop(0, '#bddbcf'); sky.addColorStop(.3, '#e5e7bc'); sky.addColorStop(1, '#728c69');
   ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);

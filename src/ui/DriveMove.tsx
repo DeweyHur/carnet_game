@@ -6,13 +6,19 @@ import { photoById } from '../data/photos';
 import TravelPhoto from './TravelPhoto';
 import { setEngineIntensity, sfxCard, sfxWrong, startEngine, stopEngine, unlockAudio } from '../audio';
 import { drawRoad } from './driveCanvas';
+import DriveRouteMap from './DriveRouteMap';
 
 interface Props { fromCoord?: [number, number]; toCoord?: [number, number]; toLabel?: string; missionKey?: string; onArrive: () => void; onClose?: () => void }
 
-export default function DriveMove({ toLabel, missionKey, onArrive, onClose }: Props) {
+export default function DriveMove({ fromCoord, toCoord, toLabel, missionKey, onArrive, onClose }: Props) {
   const g = useGame();
   const run = g.driveRun;
   const city = cityById(g.cityId);
+  const [destinationId, setDestinationId] = useState('');
+  const freeTarget = city.pois.find((p) => p.coord && (p.id === destinationId || p.name === run?.label)) ?? city.pois.find((p) => p.coord && (p.coord[0] !== city.coord[0] || p.coord[1] !== city.coord[1]));
+  const destination = toLabel ?? freeTarget?.name ?? city.names.ko;
+  const from = fromCoord ?? city.coord;
+  const to = toCoord ?? freeTarget?.coord ?? city.coord;
   const level = driverLevel(g.driverXp);
   const finish = () => { g.endDrive(); onArrive(); };
   const close = () => { g.endDrive(); (onClose ?? onArrive)(); };
@@ -20,7 +26,7 @@ export default function DriveMove({ toLabel, missionKey, onArrive, onClose }: Pr
     <header className="drive-header"><div><span>CARNET / ROAD TRIP</span><h2>{toLabel ?? `${city.names.ko} 자유 드라이브`}</h2></div><div className="driver-badge">운전 Lv.{level} <span>€{g.wallet.EUR.toFixed(0)}</span></div></header>
     {!run ? <div className="drive-lobby">
       <div className="drive-lobby-photo"><TravelPhoto photo={photoById(city.id)} priority /><div><span>TAKE THE SCENIC ROUTE</span><h3>길 위에서도,<br />당신만의 플레이.</h3><p>차선을 바꿔 교통을 피하고 사진 필름을 모으세요.<br />40~60초의 아케이드 드라이브 · 목표 달성 시 보너스</p></div></div>
-      <div className="drive-briefing"><h3>오늘은 어떤 운전자?</h3><div className="drive-contracts">{CONTRACTS.map((c) => <button key={c.id} onClick={() => { unlockAudio(); g.beginDrive(c.id, toLabel ?? city.names.ko, missionKey); }}><strong>{c.title}<span>목표 +€{c.bonus}</span></strong><small>{c.description}</small><b>{c.goal} →</b></button>)}</div>
+      <div className="drive-briefing"><h3>오늘은 어떤 운전자?</h3>{!missionKey ? <label className="drive-destination">어디로 갈까요?<select value={freeTarget?.id ?? ''} onChange={(e) => setDestinationId(e.target.value)}>{city.pois.filter((p) => p.coord).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label> : <p className="drive-destination">목적지 · {destination}</p>}<div className="drive-contracts">{CONTRACTS.map((c) => <button key={c.id} onClick={() => { unlockAudio(); g.beginDrive(c.id, destination, missionKey); }}><strong>{c.title}<span>목표 +€{c.bonus}</span></strong><small>{c.description}</small><b>{c.goal} →</b></button>)}</div>
         <div className="drive-instructions">← → / A D 차선 변경 · ↑ / W 가속<br />↓ / S 감속 · Space 부스트 · P 일시정지<br /><small>모바일에서는 아래 조작 버튼을 누르세요. 50 표지에서는 감속!</small></div>
         <details className="drive-garage"><summary>차고 · 성장과 업그레이드 <span>{g.driverXp} / {nextDriverXp(g.driverXp)} XP</span></summary><p>운전 보상은 유로 지갑에 들어옵니다. 레벨이 오르면 업그레이드가 열려요.</p>{(['handling', 'boost', 'bumper'] as Upgrade[]).map((part) => {
           const rank = g.carUpgrades[part], price = upgradePrice(rank), required = upgradeUnlock(rank);
@@ -35,11 +41,11 @@ export default function DriveMove({ toLabel, missionKey, onArrive, onClose }: Pr
       <div className="drive-payout"><div>기본·목표·실력 보상 <b>€{run.result.gross}</b></div><div>충돌·과속 공제 <b>−€{run.result.repairs}</b></div><div className="total">지갑에 들어온 돈 <b>+€{run.result.earned}</b></div></div>
       <div className="drive-xp"><b>운전 경험치 +{run.result.xp} · Lv.{level}</b><progress max={nextDriverXp(g.driverXp)} value={g.driverXp} /><small>다음 레벨까지 {Math.max(0, nextDriverXp(g.driverXp) - g.driverXp)} XP · 차고에서 성장한 차량을 확인하세요.</small></div>
       <button className="btn" onClick={finish}>{missionKey ? '목적지에서 취재 계속 →' : '기록 저장하고 지도 돌아가기 →'}</button>
-    </div> : <DrivingSession key={run.id} run={run} onExit={close} />}
+    </div> : <DrivingSession key={run.id} run={run} from={from} to={to} destination={destination} onExit={close} />}
   </div>;
 }
 
-function DrivingSession({ run, onExit }: { run: DriveRun; onExit: () => void }) {
+function DrivingSession({ run, from, to, destination, onExit }: { run: DriveRun; from: [number, number]; to: [number, number]; destination: string; onExit: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const engine = useRef<DriveState>(run.state);
   const input = useRef<DriveInput>({ gas: false, brake: false, boost: false });
@@ -106,12 +112,12 @@ function DrivingSession({ run, onExit }: { run: DriveRun; onExit: () => void }) 
   });
   return <div className="drive-session">
     <div className="drive-scorebar"><span><b>{frame.score.toLocaleString()}</b> SCORE</span><span className="drive-combo">{frame.combo >= 2 ? `${frame.combo} COMBO ×${Math.min(4, 1 + Math.floor(frame.combo / 4))}` : CONTRACTS.find((c) => c.id === run.contract)?.title}</span><button onClick={() => pause(!paused)} aria-label="주행 일시정지">{paused ? '계속 ▶' : '일시정지 Ⅱ'}</button></div>
-    <div className="drive-road"><canvas ref={canvas} aria-label="3차선 도로. 방향키로 교통을 피하고 노란 사진 필름을 수집하세요." /><div className="drive-course"><progress value={frame.distance} max={DRIVE_LENGTH} /><span>{Math.round(frame.distance / DRIVE_LENGTH * 100)}% · {frame.elapsed.toFixed(0)}초</span></div>
+    <div className="drive-travel-stage"><DriveRouteMap cityId={run.cityId} from={from} to={to} destination={destination} progress={frame.distance / DRIVE_LENGTH} /><div className="drive-road"><canvas ref={canvas} aria-label="3차선 도로. 방향키로 교통을 피하고 노란 사진 필름을 수집하세요." /><div className="drive-course"><progress value={frame.distance} max={DRIVE_LENGTH} /><span>{Math.round(frame.distance / DRIVE_LENGTH * 100)}% · {frame.elapsed.toFixed(0)}초</span></div>
       {nearZone && <div className={`drive-zone ${frame.speed > 55 ? 'too-fast' : ''}`}>50 <small>앞쪽 제한 구간 · 감속</small></div>}
       {frame.noticeUntil > frame.elapsed && <div className="drive-feedback" aria-live="polite">{frame.notice}</div>}
       <div className="drive-dashboard"><span><b>{Math.round(frame.speed)}</b> km/h</span><span>차량 {Math.round(frame.integrity)}%<progress max={100} value={frame.integrity} /></span><span>부스트 {Math.round(frame.energy)}%<progress max={100} value={frame.energy} /></span><span>▣ {frame.films}</span></div>
       {paused && <div className="drive-pause"><h3>{exitPrompt ? '이번 주행을 그만둘까요?' : '잠시 쉬어가는 중'}</h3><p>{exitPrompt ? '완주 전에는 돈과 경험치를 받지 않습니다.' : '주행 기록이 저장됐어요. 준비되면 이어가세요.'}</p><button className="btn" onClick={() => { setExitPrompt(false); pause(false); }}>주행 계속 →</button>{exitPrompt ? <button className="btn ghost" onClick={onExit}>보상 없이 나가기</button> : <button className="btn ghost" onClick={() => setExitPrompt(true)}>주행 그만두기</button>}</div>}
-    </div>
+    </div></div>
     <div className="drive-controls"><button onClick={() => changeLane(-1)} disabled={paused} aria-label="왼쪽 차선">←<small>A / ←</small></button><button onClick={() => changeLane(1)} disabled={paused} aria-label="오른쪽 차선">→<small>D / →</small></button><button {...hold('brake')} disabled={paused}>감속<small>S / ↓</small></button><button {...hold('gas')} disabled={paused} className="gas">가속<small>W / ↑</small></button><button {...hold('boost')} disabled={paused} className="boost">부스트<small>SPACE</small></button></div>
   </div>;
 }
