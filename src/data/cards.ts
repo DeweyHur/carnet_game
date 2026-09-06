@@ -88,6 +88,16 @@ export const CARDS: FactCard[] = [
   { id: 'ba-sagrada', cityId: 'barcelona', poiId: 'sagrada', text: '안토니 가우디는 1883년부터 사그라다 파밀리아의 설계와 건축을 맡았지만, 1926년 세상을 떠날 때까지 완공을 보지 못했다.', sourceId: 'src:sagrada' },
   { id: 'ba-guell', cityId: 'barcelona', poiId: 'park-guell', text: '구엘 공원은 1900~1914년 가우디가 설계했으며, 원래는 영국식 전원주택 단지로 기획됐다가 공공 공원이 됐다.', sourceId: 'src:park-guell' },
   { id: 'ba-boqueria', cityId: 'barcelona', poiId: 'boqueria', text: '보케리아 시장은 1217년 기록에 처음 등장할 만큼 오래된, 람블라 거리의 노천 시장에서 시작됐다.', sourceId: 'src:boqueria' },
+  // ── 베를린
+  { id: 'be-gate', cityId: 'berlin', poiId: 'brandenburg-gate', text: '브란덴부르크 문은 1791년 완공됐으며, 냉전기에는 베를린 장벽 바로 옆에 있어 도시 분단의 상징이 되었다.', sourceId: 'src:brandenburg-gate' },
+  { id: 'be-wall', cityId: 'berlin', poiId: 'east-side-gallery', text: '이스트사이드 갤러리는 1990년 세계 각국 예술가들이 남아 있는 베를린 장벽 구간에 그린, 세계에서 가장 긴 야외 갤러리다.', sourceId: 'src:east-side-gallery' },
+  { id: 'be-ddr', cityId: 'berlin', poiId: 'ddr-museum', text: 'DDR 박물관은 1949년부터 1990년까지 존재한 동독(독일민주공화국) 시절의 일상 생활을 직접 만져보며 체험할 수 있게 꾸며졌다.', sourceId: 'src:ddr-museum' },
+  { id: 'be-curry', cityId: 'berlin', text: '커리부어스트는 1949년 베를린에서 헤르타 호이버가 소시지에 커리 가루를 뿌린 케첩을 얹어 만들었다고 전해진다.', sourceId: 'src:currywurst' },
+  // ── 마드리드
+  { id: 'ma-prado', cityId: 'madrid', poiId: 'prado', text: '프라도 미술관은 1819년 개관했으며, 벨라스케스와 고야 등 스페인·유럽 회화의 대표작을 소장하고 있다.', sourceId: 'src:prado' },
+  { id: 'ma-sol', cityId: 'madrid', poiId: 'puerta-del-sol', text: '푸에르타 델 솔 광장 바닥의 "0킬로미터" 표지판은 스페인 국도망 여섯 개 노선이 시작되는 기준점이다.', sourceId: 'src:puerta-del-sol' },
+  { id: 'ma-palace', cityId: 'madrid', poiId: 'royal-palace', text: '마드리드 왕궁은 1734년 옛 알카사르 궁전이 화재로 소실된 뒤 새로 지어졌으며, 지금도 국가 행사에 쓰인다.', sourceId: 'src:royal-palace-madrid' },
+  { id: 'ma-churros', cityId: 'madrid', text: '추로스를 걸쭉한 핫초콜릿에 찍어 먹는 습관은 마드리드에서 밤을 새운 뒤 먹는 새벽 해장 문화로 자리 잡았다.', sourceId: 'src:churros' },
 ];
 
 export const cardById = (id: string): FactCard => {

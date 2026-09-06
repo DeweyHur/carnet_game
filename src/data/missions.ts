@@ -440,6 +440,54 @@ export const MISSIONS: Mission[] = [
       { t: 'stamp' },
     ],
   },
+  // ─────────────────────────────────────────────────────────────── 베를린
+  {
+    id: 'berlin-wall', cityId: 'berlin', type: 'city', minutes: 40,
+    title: '장벽, 문, 그리고 벽화',
+    summary: '분단의 상징이던 문과 무너진 장벽 위에 남은 그림들. 같은 유로, 전혀 다른 물가.',
+    cardIds: ['be-gate', 'be-wall', 'be-ddr', 'be-curry'],
+    requires: ['boulogne-archives'],
+    steps: [
+      N('쾰른 중앙역에서 ICE로 네 시간 반. 통일 전이었다면 이 노선 자체가 없었을 거다 — 동독과 서독을 가르는 국경이 가로막고 있었으니까.'),
+      G('레아예요. 역사학과 학생. 프랑스 기자 한 명이 벌써 다녀갔어요 — 사진만 잔뜩 찍고 서둘러 다음 도시로 가던데요.'),
+      { t: 'visit', poiId: 'brandenburg-gate', minutes: 30 },
+      { t: 'quiz', q: '브란덴부르크 문이 냉전기에 상징하게 된 것은?', options: ['독일의 통일', '베를린의 분단', '나폴레옹의 승리'], answer: 1, cardId: 'be-gate', explain: '1791년 완공된 문 바로 옆으로 베를린 장벽이 지나가면서, 문은 갈 수 없는 저편을 보여주는 창이 됐다.' },
+      { t: 'visit', poiId: 'east-side-gallery', minutes: 40 },
+      { t: 'card', cardId: 'be-wall', who: 'guide', text: '1990년, 장벽이 무너지자마자 전 세계 예술가들이 여기 남은 구간에 그림을 그렸어요. 지금도 새로 덧그려지고 있죠.' },
+      { t: 'visit', poiId: 'ddr-museum', minutes: 60 },
+      { t: 'quiz', q: 'DDR(독일민주공화국, 동독)이 존재했던 기간은?', options: ['1945~1961', '1949~1990', '1961~1989'], answer: 1, cardId: 'be-ddr', explain: '1949년 건국, 1990년 서독에 흡수 통일됐다.' },
+      { t: 'buy', foodId: 'currywurst', guess: true },
+      { t: 'card', cardId: 'be-curry', who: 'guide' },
+      { t: 'buy', foodId: 'doner', guess: true },
+      N('같은 유로인데 되너 케밥 한 개 값이 파리의 절반이다. 물가지수 0.88 — 숫자로 보던 것을 지갑으로 느낀다.'),
+      { t: 'article', baseFee: 210 },
+      { t: 'stamp' },
+      { t: 'collect', item: '엽서: 이스트사이드 갤러리 벽화' },
+    ],
+  },
+  // ─────────────────────────────────────────────────────────────── 마드리드
+  {
+    id: 'madrid-kilometre-zero', cityId: 'madrid', type: 'city', minutes: 40,
+    title: '0킬로미터에서',
+    summary: '스페인 모든 길이 시작되는 광장, 200년 된 미술관, 그리고 밤 9시에 시작되는 저녁.',
+    cardIds: ['ma-sol', 'ma-prado', 'ma-palace', 'ma-churros'],
+    requires: ['boulogne-archives'],
+    steps: [
+      N('바르셀로나 산츠역에서 AVE로 두 시간 반. 고원 지대라 도착하면 공기가 확실히 마르고 가볍다.'),
+      G('하비에르예요. 택시기사. 오늘 아침에도 프랑스 기자를 태웠어요. 조식만 먹고 벌써 다음 역으로 가던데 — 마드리드는 저녁부터인데 말이죠.'),
+      { t: 'visit', poiId: 'puerta-del-sol', minutes: 20 },
+      { t: 'card', cardId: 'ma-sol', who: 'guide', text: '바닥의 저 표지판 보이세요? "0킬로미터". 스페인 국도 여섯 개가 전부 저기서 시작돼요.' },
+      { t: 'visit', poiId: 'prado', minutes: 90 },
+      { t: 'quiz', q: '프라도 미술관이 개관한 해는?', options: ['1701년', '1819년', '1900년'], answer: 1, cardId: 'ma-prado', explain: '벨라스케스·고야 등 스페인 회화의 정수를 모은, 유럽에서 손꼽히는 미술관이다.' },
+      { t: 'visit', poiId: 'royal-palace', minutes: 60 },
+      { t: 'quiz', q: '지금의 마드리드 왕궁이 새로 지어진 계기는?', options: ['1734년 옛 알카사르 화재', '나폴레옹 전쟁의 파괴', '스페인 내전의 폭격'], answer: 0, cardId: 'ma-palace' },
+      { t: 'buy', foodId: 'tortilla', guess: true },
+      { t: 'buy', foodId: 'churros', guess: true },
+      { t: 'card', cardId: 'ma-churros', who: 'guide', text: '추로스는 원래 밤새 놀고 새벽에 먹는 해장 음식이었어요. 관광객들은 아침에 먹지만요.' },
+      { t: 'article', baseFee: 200 },
+      { t: 'stamp' },
+    ],
+  },
 ];
 
 // Short optional assignments make every destination playable beyond the main story.
@@ -450,6 +498,7 @@ const lenses: Record<string, string> = {
   rouen: '시곗바늘 아래 골목 산책', lille: '플랑드르의 색을 모으다', orleans: '루아르로 보내는 엽서',
   london: '파운드로 다시 배우는 셈', brussels: '국경인데 지갑은 그대로', cologne: '라인 강, 632년의 탑',
   geneva: '유로가 끝나는 자리에서', barcelona: '늦은 저녁의 도시',
+  berlin: '지워진 선을 따라 걷다', madrid: '0킬로미터의 시선',
 };
 export const DISCOVERY_MISSIONS: Mission[] = CITIES.flatMap((city, index) => {
   const cards = CARDS.filter((c) => c.cityId === city.id && !c.fiction).slice(0, 2);

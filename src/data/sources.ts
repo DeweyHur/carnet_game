@@ -105,6 +105,22 @@ export const SOURCES: Source[] = [
   { id: 'src:jamon', title: 'Jamón ibérico', url: 'https://en.wikipedia.org/wiki/Jam%C3%B3n_ib%C3%A9rico', license: 'CC BY-SA' },
   { id: 'src:crema-catalana', title: 'Crema catalana', url: 'https://en.wikipedia.org/wiki/Crema_catalana', license: 'CC BY-SA' },
   { id: 'src:lgv-perpignan', title: 'Perpignan–Figueres high-speed rail line', url: 'https://en.wikipedia.org/wiki/Perpignan%E2%80%93Figueres_high-speed_rail_line', license: 'CC BY-SA' },
+  // ── 베를린
+  { id: 'src:brandenburg-gate', title: 'Brandenburg Gate', url: 'https://en.wikipedia.org/wiki/Brandenburg_Gate', license: 'CC BY-SA' },
+  { id: 'src:east-side-gallery', title: 'East Side Gallery', url: 'https://en.wikipedia.org/wiki/East_Side_Gallery', license: 'CC BY-SA' },
+  { id: 'src:ddr-museum', title: 'DDR Museum', url: 'https://en.wikipedia.org/wiki/DDR_Museum', license: 'CC BY-SA' },
+  { id: 'src:currywurst', title: 'Currywurst', url: 'https://en.wikipedia.org/wiki/Currywurst', license: 'CC BY-SA' },
+  { id: 'src:berliner', title: 'Berliner (pastry)', url: 'https://en.wikipedia.org/wiki/Berliner_(pastry)', license: 'CC BY-SA' },
+  { id: 'src:doner', title: 'Döner kebab', url: 'https://en.wikipedia.org/wiki/D%C3%B6ner_kebab', license: 'CC BY-SA' },
+  { id: 'src:ice-db', title: 'InterCityExpress (ICE)', url: 'https://en.wikipedia.org/wiki/InterCityExpress', license: 'CC BY-SA' },
+  // ── 마드리드
+  { id: 'src:prado', title: 'Museo del Prado', url: 'https://en.wikipedia.org/wiki/Museo_del_Prado', license: 'CC BY-SA' },
+  { id: 'src:puerta-del-sol', title: 'Puerta del Sol', url: 'https://en.wikipedia.org/wiki/Puerta_del_Sol', license: 'CC BY-SA' },
+  { id: 'src:royal-palace-madrid', title: 'Royal Palace of Madrid', url: 'https://en.wikipedia.org/wiki/Royal_Palace_of_Madrid', license: 'CC BY-SA' },
+  { id: 'src:tortilla', title: 'Tortilla de patatas', url: 'https://en.wikipedia.org/wiki/Tortilla_de_patatas', license: 'CC BY-SA' },
+  { id: 'src:cocido', title: 'Cocido madrileño', url: 'https://en.wikipedia.org/wiki/Cocido_madrile%C3%B1o', license: 'CC BY-SA' },
+  { id: 'src:churros', title: 'Churro', url: 'https://en.wikipedia.org/wiki/Churro', license: 'CC BY-SA' },
+  { id: 'src:ave', title: 'AVE (Renfe high-speed rail)', url: 'https://en.wikipedia.org/wiki/Alta_Velocidad_Espa%C3%B1ola', license: 'CC BY-SA' },
 ];
 
 export const sourceById = (id: string) => SOURCES.find((s) => s.id === id);

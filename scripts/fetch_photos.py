@@ -84,6 +84,19 @@ TARGETS = {
     'food:pa-tomaquet': ('Pa amb tomàquet', '판 콘 토마테'),
     'food:jamon': ('Jamón ibérico', '이베리코 하몬'),
     'food:crema-catalana': ('Crema catalana', '크레마 카탈라나'),
+    # ── 국경 너머: 베를린·마드리드
+    'berlin': ('Brandenburg Gate', '브란덴부르크 문'),
+    'berlin:east-side-gallery': ('East Side Gallery', '이스트사이드 갤러리'),
+    'berlin:ddr-museum': ('DDR Museum', 'DDR 박물관'),
+    'madrid': ('Museo del Prado', '프라도 미술관'),
+    'madrid:puerta-del-sol': ('Puerta del Sol', '푸에르타 델 솔'),
+    'madrid:royal-palace': ('Royal Palace, Madrid', '마드리드 왕궁'),
+    'food:currywurst': ('Currywurst', '커리부어스트'),
+    'food:berliner': ('Berliner (pastry)', '베를리너 도넛'),
+    'food:doner': ('Döner kebab', '되너 케밥'),
+    'food:tortilla': ('Tortilla de patatas', '스페인식 감자 오믈렛'),
+    'food:cocido': ('Cocido madrileño', '코시도 마드릴레뇨'),
+    'food:churros': ('Churro', '추로스'),
 }
 HEADERS = {'User-Agent': 'CarnetGame/0.2 (educational travel game; Commons photo attribution downloader)'}
 

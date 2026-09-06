@@ -352,6 +352,46 @@ export const CITIES: City[] = [
     ],
     missionIds: ['barcelona-gaudi'],
   },
+  {
+    id: 'berlin', tier: 'A', region: 'border', country: 'DE',
+    names: { ko: '베를린', fr: 'Berlin', en: 'Berlin' },
+    coord: [13.405, 52.52], population: 3850000, priceIndex: 0.88, hostelEur: 25, transitFareEur: 3.0,
+    blurb: '냉전이 도시 한복판에 벽을 세웠다가 다시 허문 곳. 유로를 쓰지만 물가는 서유럽 수도 중 눈에 띄게 낮다.',
+    guide: { name: '레아', archetype: '학생', color: '#4a5a6a',
+      intro: '베를린 자유대학 역사학과 학생. "여기선 걷다 보면 바닥에 박힌 동판을 만나요. 장벽이 지나가던 자리를 표시한 거죠."' },
+    pois: [
+      { id: 'brandenburg-gate', name: '브란덴부르크 문', type: 'monument', feeEur: 0, hours: '상시', note: '1791년 완공. 냉전기에는 장벽 바로 옆에 있어 분단의 상징이었다.', sourceId: 'src:brandenburg-gate' },
+      { id: 'east-side-gallery', name: '이스트사이드 갤러리', type: 'gallery', feeEur: 0, hours: '상시', note: '남아 있는 장벽 구간에 1990년 세계 각국 예술가들이 그린 벽화. 세계 최장 야외 갤러리.', sourceId: 'src:east-side-gallery' },
+      { id: 'ddr-museum', name: 'DDR 박물관', type: 'museum', feeEur: 12.5, hours: '09:00-21:00', note: '동독(1949~1990) 시절 일상을 직접 만지고 체험하는 박물관.', sourceId: 'src:ddr-museum' },
+    ],
+    foods: [
+      { id: 'currywurst', name: '커리부어스트', nameLocal: 'Currywurst', baseEur: 5.7, venue: 'market', stamina: 25, origin: '1949년 베를린에서 헤르타 호이버가 소시지에 커리 케첩을 뿌려 만들었다고 전해진다.', sourceId: 'src:currywurst' },
+      { id: 'berliner', name: '베를리너 도넛', nameLocal: 'Berliner', baseEur: 2.3, venue: 'shop', stamina: 12, origin: '잼을 채운 튀김 도넛. 정작 베를린에서는 흔히 "판쿠헨"이라 부른다.', sourceId: 'src:berliner' },
+      { id: 'doner', name: '되너 케밥', nameLocal: 'Döner Kebab', baseEur: 5.7, venue: 'shop', stamina: 30, origin: '1970~80년대 베를린의 튀르키예 이민자 공동체에서 오늘날의 되너 케밥 형태가 자리 잡았다는 설이 유력하다.', sourceId: 'src:doner' },
+      { id: 'cafe', name: '카페', nameLocal: 'Kaffee', baseEur: 3.5, venue: 'bistro', stamina: 8, origin: '베를린의 카페들은 자정 넘어서까지 여는 곳이 흔하다.', sourceId: 'src:kaffee-kuchen' },
+    ],
+    missionIds: ['berlin-wall'],
+  },
+  {
+    id: 'madrid', tier: 'A', region: 'border', country: 'ES',
+    names: { ko: '마드리드', fr: 'Madrid', en: 'Madrid' },
+    coord: [-3.7038, 40.4168], population: 3330000, priceIndex: 0.85, hostelEur: 24, transitFareEur: 1.7,
+    blurb: '스페인의 모든 길이 시작되는 광장과 5세기에 걸친 왕실 컬렉션이 있는 고원 위의 수도.',
+    guide: { name: '하비에르', archetype: '택시기사', color: '#8a4a2e',
+      intro: '마드리드 토박이 택시기사. "관광객들은 다 프라도만 가는데, 진짜는 저녁 9시 이후예요. 그때부터가 마드리드의 시간이죠."' },
+    pois: [
+      { id: 'prado', name: '프라도 미술관', type: 'museum', feeEur: 15, hours: '10:00-20:00', note: '1819년 개관. 벨라스케스·고야 등 유럽 회화의 정수를 모았다.', sourceId: 'src:prado' },
+      { id: 'puerta-del-sol', name: '푸에르타 델 솔', type: 'square', feeEur: 0, hours: '상시', note: '스페인 모든 국도의 기점, "0킬로미터" 표지판이 바닥에 있다.', sourceId: 'src:puerta-del-sol' },
+      { id: 'royal-palace', name: '마드리드 왕궁', type: 'palace', feeEur: 13, hours: '10:00-18:00', note: '1734년 알카사르 화재 이후 새로 지어졌다. 지금 왕은 다른 곳에 살지만 국가 행사에 쓰인다.', sourceId: 'src:royal-palace-madrid' },
+    ],
+    foods: [
+      { id: 'tortilla', name: '토르티야 데 파타타스', nameLocal: 'Tortilla de patatas', baseEur: 7.6, venue: 'bistro', stamina: 30, origin: '감자와 달걀만으로 만드는 스페인식 오믈렛. 어느 바에나 있는 국민 타파스다.', sourceId: 'src:tortilla' },
+      { id: 'cocido', name: '코시도 마드릴레뇨', nameLocal: 'Cocido madrileño', baseEur: 20, venue: 'restaurant', stamina: 45, origin: '병아리콩·고기·채소를 오래 끓인 마드리드의 겨울 스튜로, 세 가지 코스로 나눠 낸다.', sourceId: 'src:cocido' },
+      { id: 'churros', name: '추로스 콘 초콜라테', nameLocal: 'Churros con chocolate', baseEur: 5.3, venue: 'shop', stamina: 20, origin: '걸쭉한 핫초콜릿에 찍어 먹는 튀긴 반죽. 마드리드 사람들의 새벽 해장 겸 아침 식사.', sourceId: 'src:churros' },
+      { id: 'cafe', name: '카페 콘 레체', nameLocal: 'Café con leche', baseEur: 3.5, venue: 'bistro', stamina: 8, origin: '에스프레소에 따뜻한 우유를 섞어 아침에 마시는 스페인식 커피.', sourceId: 'src:jambon-beurre' },
+    ],
+    missionIds: ['madrid-kilometre-zero'],
+  },
 ];
 
 export const cityById = (id: string): City => {
@@ -404,6 +444,11 @@ export const EDGES: Edge[] = [
     'TGV 리리아는 SNCF와 스위스 국철(SBB/CFF/FFS)의 합작 노선이다. 국경을 넘으면 유로존을 벗어나 스위스 프랑을 쓴다.', 'src:tgv-lyria'),
   E('paris', 'barcelona', 'tgv', 'TGV inOui · Renfe', '리옹역', 390, [59, 150], 1, '08:25', '08:25',
     '페르피냥–피게레스 국경 터널(2010 개통)을 지나는 프랑스-스페인 직결 고속선.', 'src:lgv-perpignan'),
+  // 국경 지역 내 횡단 노선(파리를 거치지 않고 바로 이동)
+  E('cologne', 'berlin', 'tgv', 'DB ICE', '쾰른 중앙역', 270, [39, 99], 6, '06:30', '20:30',
+    'ICE(고속열차)는 옛 서독과 동독을 잇는 구간을 지난다. 통일 이전엔 이런 직통열차가 없었다.', 'src:ice-db'),
+  E('barcelona', 'madrid', 'tgv', 'Renfe AVE', '바르셀로나 산츠역', 150, [30, 90], 20, '06:00', '21:30',
+    'AVE(스페인 고속철)는 2008년 바르셀로나-마드리드 구간을 개통하며 항공 수요를 크게 대체했다.', 'src:ave'),
 ];
 
 /** 양방향 조회 */
