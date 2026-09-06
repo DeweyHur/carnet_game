@@ -6,6 +6,7 @@ import { cardById } from '../data/cards';
 import { photoById, placePhoto } from '../data/photos';
 import { MISSIONS, missionById, FINAL_LETTER, EPILOGUE_LETTER } from '../data/missions';
 import { CARD_FEE, FX_EUR, FX_CHANNELS, cityCurrency, convert, foodPrice, fmt, gradeArticle, quote, toEur, type FxChannel, type Grade } from './economy';
+import { theoArrivalDay } from './rival';
 
 export const START_WEEKDAY = 2; // 2026-09-08 화요일
 export const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -25,6 +26,7 @@ export interface Letter { title: string; text: string; day: number }
 export interface Guess { foodId: string; cityId: string; expected: number; actual: number }
 export interface Snapshot { photoId: string; cityId: string; day: number }
 export interface LogEntry { id: number; text: string; kind: 'info' | 'money' | 'card' | 'warn' | 'story' }
+export interface RaceResult { cityId: string; won: boolean; day: number }
 
 export type Locale = 'ko' | 'en';
 
@@ -59,6 +61,9 @@ export interface GameState {
   snapshots: Snapshot[];
   visitedPois: string[];
   tastedFoods: string[];
+  /** 불로뉴 메인 미션에서 국경 너머가 해금된 날. 테오의 국경 경주 시작점. */
+  theoStartDay: number | null;
+  theoRace: RaceResult[];
 
   // actions
   setPaused: (p: boolean) => void;
@@ -95,7 +100,7 @@ const fresh = (): Data => ({
   stamina: 100, reputation: 0, debt: 0,
   unlocked: ['idf'], visited: ['paris'], cards: [], articles: [], stamps: [], collectibles: [], letters: [],
   completed: [], active: null, guesses: [], fxLost: 0, log: [], finalShown: false, voyageShown: false, travelling: null, paused: false,
-  snapshots: [], visitedPois: [], tastedFoods: [],
+  snapshots: [], visitedPois: [], tastedFoods: [], theoStartDay: null, theoRace: [],
 });
 
 let logId = 1;
@@ -292,13 +297,31 @@ export const useGame = create<GameState>()(
             case 'letter': set({ letters: [...s.letters, { ...step, day: s.day }] }); break;
             case 'unlock': {
               const u = Array.from(new Set([...s.unlocked, ...step.regions]));
-              set({ unlocked: u });
+              const patch: Partial<Data> = { unlocked: u };
+              if (step.regions.includes('border') && s.theoStartDay === null) patch.theoStartDay = s.day;
+              set(patch);
               get().addLog(step.note, 'story');
               break;
             }
             case 'collect': set({ collectibles: [...s.collectibles, step.item] }); get().addLog(`수집품: ${step.item}`, 'card'); break;
             case 'stamp': {
-              if (!s.stamps.some((x) => x.cityId === m.cityId)) set({ stamps: [...s.stamps, { cityId: m.cityId, day: s.day }] });
+              if (!s.stamps.some((x) => x.cityId === m.cityId)) {
+                const city = cityById(m.cityId);
+                set({ stamps: [...s.stamps, { cityId: m.cityId, day: s.day }] });
+                if (city.region === 'border' && !s.theoRace.some((r) => r.cityId === m.cityId)) {
+                  const arrival = theoArrivalDay(m.cityId, s.theoStartDay);
+                  const won = arrival !== null && s.day <= arrival;
+                  set((st) => ({
+                    theoRace: [...st.theoRace, { cityId: m.cityId, won, day: st.day }],
+                    reputation: won ? st.reputation + 2 : st.reputation,
+                    wallet: won ? { ...st.wallet, EUR: Math.round((st.wallet.EUR + 20) * 100) / 100 } : st.wallet,
+                  }));
+                  get().addLog(
+                    won ? `테오보다 먼저 ${city.names.ko}에 도착! 특종 보너스 +€20, 평판 +2.` : `${city.names.ko}엔 테오가 먼저 다녀갔다. 이번엔 특종 보너스 없음 — 그래도 기록은 기록.`,
+                    won ? 'money' : 'warn',
+                  );
+                }
+              }
               break;
             }
             case 'move': {

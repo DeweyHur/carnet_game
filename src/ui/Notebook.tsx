@@ -3,6 +3,7 @@ import { useGame } from '../game/store';
 import { CARDS, cardById } from '../data/cards';
 import { CITIES, cityById } from '../data/cities';
 import { missionById } from '../data/missions';
+import { THEO_ROUTE, theoArrivalDay } from '../game/rival';
 import { ExchangeForm, FactCardView } from './common';
 import { CURRENCY_META, fmt, FX_EUR } from '../game/economy';
 import type { Currency } from '../game/types';
@@ -80,6 +81,28 @@ export default function Notebook({ onClose }: { onClose: () => void }) {
             <p className="blurb">{s.visited.map((v) => cityById(v).names.ko).join(' · ')}</p>
             <div className="section-title">{t('수집품')}</div>
             {s.collectibles.length === 0 ? <p className="blurb">{t('엽서·옛 화폐·오토크롬 복제본이 여기 모입니다.')}</p> : s.collectibles.map((c, i) => <div className="row" key={i}><div className="n">🎞 {c}</div></div>)}
+            <div className="section-title">{t('테오의 경주')}</div>
+            {s.theoStartDay === null ? (
+              <p className="blurb">{t('불로뉴 메인 미션을 마치면 국경 너머에서 테오와의 경주가 시작됩니다.')}</p>
+            ) : THEO_ROUTE.map((leg) => {
+              const city = cityById(leg.cityId);
+              const result = s.theoRace.find((r) => r.cityId === leg.cityId);
+              const arrival = theoArrivalDay(leg.cityId, s.theoStartDay);
+              const arrived = arrival !== null && s.day > arrival;
+              return (
+                <div className="row" key={leg.cityId}>
+                  <div>
+                    <div className="n">{city.names.ko}</div>
+                    <div className="s">
+                      {result
+                        ? (result.won ? t('먼저 도착해 특종을 냈다.') : t('테오가 먼저 도착해 특종은 없었다.'))
+                        : (arrived ? t('테오가 이미 도착했다 — 지금 가면 특종을 놓친다.') : `${t('테오 도착 예정: ')}${dayLabel(s.lang, arrival!)}`)}
+                    </div>
+                  </div>
+                  <span className="tag">{result ? (result.won ? '🏆' : '📰') : (arrived ? '🏃' : '⏳')}</span>
+                </div>
+              );
+            })}
           </>
         )}
         {tab === 'articles' && (

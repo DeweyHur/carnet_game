@@ -8,6 +8,7 @@ import type { Edge } from '../game/types';
 import { photoById, placePhoto } from '../data/photos';
 import TravelPhoto from './TravelPhoto';
 import CityMap from './CityMap';
+import { theoArrivalDay } from '../game/rival';
 import { useT, weekdayLabel } from '../i18n';
 
 const MODE_NAME: Record<Edge['mode'], string> = { metro: '메트로', rer: 'RER', transilien: '트랑실리앙', ter: 'TER', tgv: 'TGV', intercites: 'Intercités', eurostar: '유로스타', bus: '버스' };
@@ -27,6 +28,9 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
   const wd = weekdayOf(s.day);
   const locked = !s.unlocked.includes(city.region);
   const [msg, setMsg] = useState<string | null>(null);
+  const theoResult = s.theoRace.find((r) => r.cityId === cityId);
+  const theoArrival = city.region === 'border' ? theoArrivalDay(cityId, s.theoStartDay) : null;
+  const theoDaysLeft = theoArrival !== null ? theoArrival - s.day : null;
 
   const edges = here ? edgesFrom(cityId) : edgesFrom(s.cityId).filter((e) => e.to === cityId);
   const placeRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -39,7 +43,10 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
     <div className="panel">
       <div className="panel-head">
         <h2><span className="tier">{city.tier}</span>{city.names.ko}<small>{city.names.fr}</small></h2>
-        <div className="meta">{t(REGIONS[city.region].name)} · {t('인구')} {city.population.toLocaleString()} · {t('물가지수')} {city.priceIndex.toFixed(2)} {t('(파리=1)')} · ☕ {t('내 커피 지표')} ×{coffeeIndex(city).toFixed(1)}{locked ? ` · 🔒 ${t('잠김')}` : ''}{here ? ` · ${t('현재 위치')}` : ''}</div>
+        <div className="meta">{t(REGIONS[city.region].name)} · {t('인구')} {city.population.toLocaleString()} · {t('물가지수')} {city.priceIndex.toFixed(2)} {t('(파리=1)')} · ☕ {t('내 커피 지표')} ×{coffeeIndex(city).toFixed(1)}{locked ? ` · 🔒 ${t('잠김')}` : ''}{here ? ` · ${t('현재 위치')}` : ''}
+          {theoResult && (theoResult.won ? ` · 🏆 ${t('테오보다 먼저 특종')}` : ` · 📰 ${t('테오가 먼저 다녀감')}`)}
+          {!theoResult && theoDaysLeft !== null && (theoDaysLeft >= 0 ? ` · ⏳ ${t('테오보다 D-')}${theoDaysLeft}` : ` · 🏃 ${t('테오가 이미 도착 — 서두르세요')}`)}
+        </div>
         <button className="close" onClick={onClose} aria-label={t('도시 정보 닫기')}>×</button>
       </div>
       <div className="tabs">
