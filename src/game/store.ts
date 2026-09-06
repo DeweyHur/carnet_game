@@ -26,8 +26,11 @@ export interface Guess { foodId: string; cityId: string; expected: number; actua
 export interface Snapshot { photoId: string; cityId: string; day: number }
 export interface LogEntry { id: number; text: string; kind: 'info' | 'money' | 'card' | 'warn' | 'story' }
 
+export type Locale = 'ko' | 'en';
+
 export interface GameState {
   started: boolean;
+  lang: Locale;
   playerName: string;
   home: Currency;
   day: number;
@@ -59,6 +62,7 @@ export interface GameState {
 
   // actions
   setPaused: (p: boolean) => void;
+  setLang: (l: Locale) => void;
   capturePhoto: (photoId: string) => void;
   newGame: (name: string, home: Currency) => void;
   reset: () => void;
@@ -83,10 +87,10 @@ export const weekdayOf = (day: number) => (START_WEEKDAY + day - 1) % 7;
 export const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
 const parseHm = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
 
-type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'pay' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused' | 'capturePhoto';
+type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'pay' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused' | 'setLang' | 'capturePhoto';
 type Data = Omit<GameState, Actions>;
 const fresh = (): Data => ({
-  started: false, playerName: '', home: 'KRW', day: 1, minute: 9 * 60, cityId: 'paris',
+  started: false, lang: 'ko', playerName: '', home: 'KRW', day: 1, minute: 9 * 60, cityId: 'paris',
   wallet: { EUR: 0, KRW: 3_000_000, GBP: 0, CHF: 0 },
   stamina: 100, reputation: 0, debt: 0,
   unlocked: ['idf'], visited: ['paris'], cards: [], articles: [], stamps: [], collectibles: [], letters: [],
@@ -103,11 +107,11 @@ export const useGame = create<GameState>()(
 
       newGame: (name, home) => {
         const base = fresh();
-        set({ ...base, started: true, playerName: name || '신입 작가', home,
+        set({ ...base, lang: get().lang, started: true, playerName: name || '신입 작가', home,
           wallet: { EUR: 0, KRW: 0, GBP: 0, CHF: 0, [home]: Math.round(2000 * FX_EUR[home]) } as Record<Currency, number> });
         get().addLog('《Carnet》 편집부에 첫 출근. 예산 €2,000 상당 (자국 통화).', 'story');
       },
-      reset: () => set({ ...fresh() }),
+      reset: () => set({ ...fresh(), lang: get().lang }),
 
       capturePhoto: (photoId) => {
         const s = get();
@@ -370,6 +374,7 @@ export const useGame = create<GameState>()(
 
       abandonMission: () => set({ active: null, paused: false }),
       setPaused: (p) => set({ paused: p }),
+      setLang: (l) => set({ lang: l }),
     }),
     { name: 'carnet-save-v1', partialize: (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => typeof v !== 'function')) as GameState },
   ),

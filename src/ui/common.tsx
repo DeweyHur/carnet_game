@@ -4,13 +4,15 @@ import { sourceById } from '../data/sources';
 import { CURRENCY_META, FX_CHANNELS, FX_EUR, FX_DATE, convert, fmt, quote, type FxChannel } from '../game/economy';
 import { useGame } from '../game/store';
 import { cityById } from '../data/cities';
+import { useT } from '../i18n';
 
 export function FactCardView({ card }: { card: FactCard }) {
+  const t = useT();
   const src = sourceById(card.sourceId);
   return (
     <div className="factcard">
       <div className="t">{card.text}</div>
-      <div className="src">출처: {src ? <a href={src.url} target="_blank" rel="noreferrer">{src.title}</a> : card.sourceId} · {src?.license}</div>
+      <div className="src">{t('출처: ')}{src ? <a href={src.url} target="_blank" rel="noreferrer">{src.title}</a> : card.sourceId} · {src?.license}</div>
     </div>
   );
 }
@@ -41,6 +43,7 @@ export function Price({ amount, currency = 'EUR' }: { amount: number; currency?:
 }
 
 export function ExchangeForm({ defaultFrom, defaultTo, onDone }: { defaultFrom?: Currency; defaultTo?: Currency; onDone?: () => void }) {
+  const t = useT();
   const wallet = useGame((s) => s.wallet);
   const home = useGame((s) => s.home);
   const exchange = useGame((s) => s.exchange);
@@ -54,14 +57,14 @@ export function ExchangeForm({ defaultFrom, defaultTo, onDone }: { defaultFrom?:
   return (
     <div>
       <div className="fxboard">
-        <div className="l h"><span>ECB 기준환율 (EUR=1)</span><span>{FX_DATE}</span></div>
+        <div className="l h"><span>{t('ECB 기준환율 (EUR=1)')}</span><span>{FX_DATE.replace('(예시)', t('(예시)'))}</span></div>
         {curs.filter((c) => c !== 'EUR').map((c) => (
           <div className="l" key={c}><span>1 EUR = {FX_EUR[c].toLocaleString()} {c}</span><span>1 {c} = {(1 / FX_EUR[c]).toFixed(c === 'KRW' ? 5 : 3)} EUR</span></div>
         ))}
       </div>
       <div className="fx-form">
-        <select value={from} onChange={(e) => setFrom(e.target.value as Currency)}>{curs.map((c) => <option key={c} value={c}>{c} {CURRENCY_META[c].name} (보유 {fmt(wallet[c], c)})</option>)}</select>
-        <select value={to} onChange={(e) => setTo(e.target.value as Currency)}>{curs.map((c) => <option key={c} value={c}>→ {c} {CURRENCY_META[c].name}</option>)}</select>
+        <select value={from} onChange={(e) => setFrom(e.target.value as Currency)}>{curs.map((c) => <option key={c} value={c}>{c} {t(CURRENCY_META[c].name)} ({t('보유')} {fmt(wallet[c], c)})</option>)}</select>
+        <select value={to} onChange={(e) => setTo(e.target.value as Currency)}>{curs.map((c) => <option key={c} value={c}>→ {c} {t(CURRENCY_META[c].name)}</option>)}</select>
         <input className="full" type="number" value={amount} min={0} onChange={(e) => setAmount(Number(e.target.value))} />
       </div>
       {(Object.keys(FX_CHANNELS) as FxChannel[]).map((k) => {
@@ -69,14 +72,14 @@ export function ExchangeForm({ defaultFrom, defaultTo, onDone }: { defaultFrom?:
         const qq = quote(amount, from, to, k);
         return (
           <div className="channel" key={k} style={{ borderColor: ch === k ? 'var(--ink)' : undefined }} onClick={() => setCh(k)}>
-            <div><div className="cn">{ch === k ? '● ' : '○ '}{c.name} <span className="tag">{k === 'atm' ? `€${c.fixedEur} + ${(c.spread * 100).toFixed(1)}%` : `${(c.spread * 100).toFixed(1)}%`}</span></div><div className="ct">{c.tip}</div></div>
-            <div className="cr">{fmt(qq.receive, to)}<small>−{fmt(qq.lost, to)} 손실</small></div>
+            <div><div className="cn">{ch === k ? '● ' : '○ '}{t(c.name)} <span className="tag">{k === 'atm' ? `€${c.fixedEur} + ${(c.spread * 100).toFixed(1)}%` : `${(c.spread * 100).toFixed(1)}%`}</span></div><div className="ct">{t(c.tip)}</div></div>
+            <div className="cr">{fmt(qq.receive, to)}<small>−{fmt(qq.lost, to)} {t('손실')}</small></div>
           </div>
         );
       })}
       <div className="scene-actions">
-        <span className="hint">기준환율이면 {fmt(q.mid, to)} — 스프레드로 {fmt(q.lost, to)}이 사라진다.</span>
-        <button className="btn" disabled={!ok} onClick={() => { exchange(amount, from, to, ch); onDone?.(); }}>환전하기</button>
+        <span className="hint">{t('기준환율이면')} {fmt(q.mid, to)} — {fmt(q.lost, to)}{t('이 사라진다.')}</span>
+        <button className="btn" disabled={!ok} onClick={() => { exchange(amount, from, to, ch); onDone?.(); }}>{t('환전하기')}</button>
       </div>
     </div>
   );

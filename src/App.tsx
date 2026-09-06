@@ -9,9 +9,11 @@ import { cityById } from './data/cities';
 import Journey from './ui/Journey';
 import TravelPhoto from './ui/TravelPhoto';
 import { photoById } from './data/photos';
+import { useT } from './i18n';
 const MapView = lazy(() => import('./ui/MapView'));
 
 export default function App() {
+  const t = useT();
   const started = useGame((s) => s.started);
   const cityId = useGame((s) => s.cityId);
   const travelling = useGame((s) => s.travelling);
@@ -41,7 +43,7 @@ export default function App() {
 
   return (
     <div className={`app${mapMode ? ' map-mode' : ''}`}>
-      {mapMode && <Suspense fallback={<div className="map-loading">여행 지도를 펼치는 중…</div>}><MapView onSelect={(id) => setSelected(id)} selected={selected} /></Suspense>}
+      {mapMode && <Suspense fallback={<div className="map-loading">{t('여행 지도를 펼치는 중…')}</div>}><MapView onSelect={(id) => setSelected(id)} selected={selected} /></Suspense>}
       <Hud onNotebook={() => setNotebook(true)} onCity={() => setSelected(cityId)} />
       <Journey key={`journey-${selected ?? cityId}`} selected={selected} onSelect={setSelected} onAlbum={() => setNotebook(true)} mapMode={mapMode} onMap={() => setMapMode((m) => !m)} />
       {selected && !travelling && <CityPanel key={`panel-${selected}`} cityId={selected} onClose={() => setSelected(null)} initialTab={selected === cityId ? 'missions' : 'transport'} />}
@@ -61,9 +63,9 @@ export default function App() {
       {finalOpen && last && (
         <div className="scene" onClick={() => setFinalOpen(false)}>
           <div className="scene-box" onClick={(e) => e.stopPropagation()}>
-            <div className="mission-tag">지역 완주 · L.의 편지</div>
+            <div className="mission-tag">{t('지역 완주 · L.의 편지')}</div>
             <div className="letter"><h3>✉ {last.title}</h3>{last.text}</div>
-            <div className="scene-actions"><button className="btn" onClick={() => setFinalOpen(false)}>닫기</button></div>
+            <div className="scene-actions"><button className="btn" onClick={() => setFinalOpen(false)}>{t('닫기')}</button></div>
           </div>
         </div>
       )}

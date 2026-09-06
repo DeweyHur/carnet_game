@@ -333,7 +333,7 @@ export const MISSIONS: Mission[] = [
     requires: ['boulogne-archives'],
     steps: [
       N('해저 터널을 빠져나오자 표지판이 바뀐다. 세인트 판크라스, 붉은 벽돌과 유리 지붕. 여기서부터 파운드다.'),
-      G('올리버예요. 영란은행 박물관에서 자원봉사를 해요. 방금 전에도 프랑스 기자가 한 명 다녀갔어요 — 테오라고 했나. 뭘 그리 서두르던지.'),
+      G('올리버예요. 영란은행 박물관에서 자원봉사를 해요. 여긴 관광객보다 화폐 수집가가 더 자주 와요 — 폐지된 지폐 한 장 들고 와서 사연을 묻는 사람도 있죠.'),
       { t: 'exchange', from: 'EUR', to: 'GBP', hint: '지갑의 유로를 파운드로 바꿔보세요. 여기서부터는 파운드로 셈해야 해요.' },
       { t: 'visit', poiId: 'boe-museum', minutes: 45 },
       { t: 'card', cardId: 'ln-boe', who: 'guide', text: '1694년, 프랑스와의 전쟁 자금을 대려고 세운 은행이에요. 화폐도 결국 전쟁과 국경에서 태어나요.' },
@@ -359,13 +359,14 @@ export const MISSIONS: Mission[] = [
     requires: ['boulogne-archives'],
     steps: [
       N('북역에서 1시간 22분. 창밖 표지판이 프랑스어에서 프랑스어·네덜란드어 병기로 바뀐다. 나라가 바뀌었다.'),
-      G('마리케예요. 와플 가판대를 해요. 지갑을 다시 열 필요는 없어요 — 여기도 유로거든요. 어제 프랑스 기자가 그걸 몰라서 환전소를 한참 찾아다니던데요.'),
+      G('마리케예요. 와플 가판대를 해요. 지갑을 다시 열 필요는 없어요 — 여기도 유로거든요.'),
       { t: 'visit', poiId: 'grand-place', minutes: 30 },
       { t: 'quiz', q: '그랑플라스가 지금의 모습으로 다시 지어진 계기는?', options: ['1695년 프랑스군의 포격', '1830년 벨기에 독립', '제2차 세계대전 폭격'], answer: 0, cardId: 'br-grandplace', explain: '루이 14세의 군대가 포격한 지 4년 만에 길드들이 재건했다.' },
       { t: 'visit', poiId: 'atomium', minutes: 50 },
       { t: 'quiz', q: '아토미움은 무엇을 1650억 배로 확대한 모형인가?', options: ['DNA 이중나선', '철의 결정 구조', '태양계'], answer: 1, cardId: 'br-atomium', explain: '1958년 브뤼셀 만국박람회를 위해 세워졌다.' },
       { t: 'visit', poiId: 'parlamentarium', minutes: 40 },
       { t: 'card', cardId: 'br-euro', who: 'guide', text: '유로는 1999년에 은행 사이에서 먼저 쓰였고, 지폐·동전은 2002년에야 나왔어요. 그래서 국경을 넘어도 지갑은 그대로예요.' },
+      G('그런데 지난달에 프랑스에서 왔다는 기자 한 명은 그걸 몰랐는지 환전소부터 찾아다니더라고요. 와플이 다 식을 때까지.'),
       { t: 'buy', foodId: 'gaufre', guess: true },
       { t: 'buy', foodId: 'praline', guess: true },
       { t: 'card', cardId: 'br-praline', who: 'guide' },
@@ -382,7 +383,7 @@ export const MISSIONS: Mission[] = [
     requires: ['boulogne-archives'],
     steps: [
       N('북역에서 국제선으로 세 시간 남짓. 라인 강이 보이기 시작하면 대성당의 두 첨탑이 도시 어디서나 눈에 띈다.'),
-      G('잉그리트예요. 초콜릿 박물관 도슨트. 지난주에도 특종을 찾는다는 프랑스 기자가 왔었어요 — 사흘 만에 다섯 나라를 돈다고 자랑하던데.'),
+      G('잉그리트예요. 초콜릿 박물관 도슨트. 관광객은 대부분 대성당만 보고 가는데, 정작 쾰른 사람들은 초콜릿 분수 앞에서 더 오래 서 있어요.'),
       { t: 'visit', poiId: 'cologne-cath', minutes: 60 },
       { t: 'quiz', q: '쾰른 대성당이 착공부터 완공까지 걸린 기간은?', options: ['약 100년', '약 300년', '약 630년'], answer: 2, cardId: 'co-cath', explain: '1248년 착공, 공사가 오래 중단됐다가 1880년 완공됐다.' },
       { t: 'visit', poiId: 'hohenzollern', minutes: 25 },
@@ -403,7 +404,7 @@ export const MISSIONS: Mission[] = [
     requires: ['boulogne-archives'],
     steps: [
       N('리옹역에서 TGV 리리아로 세 시간. 국경을 넘는 순간 안내 방송이 바뀐다 — 이제부터는 스위스 프랑이다.'),
-      G('앙드레예요. 시계공방을 해요. 최근에 프랑스 기자 한 명이 환전도 안 하고 카드만 긁다가 수수료로 꽤 잃었다는 소문이 있던데 — 테오였을 거예요, 아마.'),
+      G('앙드레예요. 시계공방을 해요. 여기선 흥정도, 팁도 필요 없어요 — 가격표에 적힌 게 그대로 값이에요. 그것만으로도 다른 나라 여행자들은 한참을 헤매죠.'),
       { t: 'exchange', from: 'EUR', to: 'CHF', hint: '스위스는 유로존이 아니에요. 유로를 스위스 프랑으로 바꿔보세요.' },
       { t: 'card', cardId: 'ge-chf', who: 'guide', text: '스위스는 유럽연합 회원국도 아니에요. 국경 하나를 넘었을 뿐인데 화폐도, 관세동맹도 다 달라져요.' },
       { t: 'visit', poiId: 'reformation-wall', minutes: 30 },
@@ -426,7 +427,7 @@ export const MISSIONS: Mission[] = [
     requires: ['boulogne-archives'],
     steps: [
       N('리옹역에서 국경 터널을 지나 여섯 시간 반. 도착하면 해가 아직 높다 — 이곳의 저녁은 훨씬 늦게 시작된다.'),
-      G('로라예요. 보케리아 시장에서 하몬을 팔아요. 프랑스 기자 한 명이 여기서도 스쳐 지나갔어요. 사진만 찍고 시식은 하나도 안 하던데 — 아까운 일이죠.'),
+      G('로라예요. 보케리아 시장에서 하몬을 팔아요. 사진만 찍고 맛은 안 보고 가는 사람들이 제일 아까워요 — 시식은 공짜인데.'),
       { t: 'visit', poiId: 'sagrada', minutes: 70 },
       { t: 'quiz', q: '사그라다 파밀리아가 아직도 미완성인 이유와 가장 관련 깊은 사실은?', options: ['가우디 사후에도 그의 설계·모형을 바탕으로 공사가 이어지고 있다', '스페인 내전 때 전소되어 처음부터 다시 지었다', '유네스코가 완공을 금지했다'], answer: 0, cardId: 'ba-sagrada', explain: '가우디는 1926년 세상을 떠났다 — 2026년은 그의 사후 100주년이다.' },
       { t: 'visit', poiId: 'park-guell', minutes: 50 },
@@ -449,7 +450,7 @@ export const MISSIONS: Mission[] = [
     requires: ['boulogne-archives'],
     steps: [
       N('쾰른 중앙역에서 ICE로 네 시간 반. 통일 전이었다면 이 노선 자체가 없었을 거다 — 동독과 서독을 가르는 국경이 가로막고 있었으니까.'),
-      G('레아예요. 역사학과 학생. 프랑스 기자 한 명이 벌써 다녀갔어요 — 사진만 잔뜩 찍고 서둘러 다음 도시로 가던데요.'),
+      G('레아예요. 베를린 자유대학 역사학과 학생. 여기 서 보세요 — 방금 동베를린과 서베를린의 경계를 넘었어요. 표시가 없으면 아무도 모를걸요.'),
       { t: 'visit', poiId: 'brandenburg-gate', minutes: 30 },
       { t: 'quiz', q: '브란덴부르크 문이 냉전기에 상징하게 된 것은?', options: ['독일의 통일', '베를린의 분단', '나폴레옹의 승리'], answer: 1, cardId: 'be-gate', explain: '1791년 완공된 문 바로 옆으로 베를린 장벽이 지나가면서, 문은 갈 수 없는 저편을 보여주는 창이 됐다.' },
       { t: 'visit', poiId: 'east-side-gallery', minutes: 40 },
@@ -474,7 +475,7 @@ export const MISSIONS: Mission[] = [
     requires: ['boulogne-archives'],
     steps: [
       N('바르셀로나 산츠역에서 AVE로 두 시간 반. 고원 지대라 도착하면 공기가 확실히 마르고 가볍다.'),
-      G('하비에르예요. 택시기사. 오늘 아침에도 프랑스 기자를 태웠어요. 조식만 먹고 벌써 다음 역으로 가던데 — 마드리드는 저녁부터인데 말이죠.'),
+      G('하비에르예요. 마드리드 토박이 택시기사. 실은 오늘 아침에 파리에서 왔다는 기자 한 명을 공항까지 태워다 줬어요. 조식만 먹고 다음 취재로 가겠다고 서두르던데 — 마드리드를 그렇게 떠나는 건 반칙이죠, 저녁부터가 진짜인데.'),
       { t: 'visit', poiId: 'puerta-del-sol', minutes: 20 },
       { t: 'card', cardId: 'ma-sol', who: 'guide', text: '바닥의 저 표지판 보이세요? "0킬로미터". 스페인 국도 여섯 개가 전부 저기서 시작돼요.' },
       { t: 'visit', poiId: 'prado', minutes: 90 },

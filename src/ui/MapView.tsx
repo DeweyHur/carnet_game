@@ -9,6 +9,7 @@ import { CITIES, cityById, edgesFrom, REGIONS } from '../data/cities';
 import { useGame } from '../game/store';
 import { FALLBACK_STYLE } from '../data/fallbackMap';
 import type { RegionId } from '../game/types';
+import { useT } from '../i18n';
 
 // 기획서 §3.1: MapLibre GL JS + 벡터 타일. 프로토타입은 무료 공개 스타일을 쓰고,
 // 실서비스에서는 PMTiles(OpenMapTiles/Protomaps) 자체 호스팅으로 교체한다.
@@ -32,6 +33,7 @@ const TIER_LABEL: Record<string, string> = { S: '메인 무대(S)', A: '거점 �
 interface Props { onSelect: (cityId: string) => void; selected: string | null }
 
 export default function MapView({ onSelect, selected }: Props) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markers = useRef<Record<string, Marker>>({});
@@ -174,12 +176,12 @@ export default function MapView({ onSelect, selected }: Props) {
     <div className="map-wrap">
       <div className="map" ref={ref} />
       <div className="map-legend">
-        <div className="map-legend-head"><span className="eyebrow">CARNET · 세계지도</span><b>{stampedCount} / {CITIES.length} 도시 취재 완료</b></div>
+        <div className="map-legend-head"><span className="eyebrow">CARNET · 세계지도</span><b>{stampedCount} / {CITIES.length} {t('도시 취재 완료')}</b></div>
         <div className="map-legend-tiers">
-          <span><i className="dot tier-S" />{TIER_LABEL.S}</span>
-          <span><i className="dot tier-A" />{TIER_LABEL.A}</span>
-          <span><i className="dot tier-H" />{TIER_LABEL.H}</span>
-          <span><i className="dot locked" />안개 · 잠긴 지역</span>
+          <span><i className="dot tier-S" />{t(TIER_LABEL.S)}</span>
+          <span><i className="dot tier-A" />{t(TIER_LABEL.A)}</span>
+          <span><i className="dot tier-H" />{t(TIER_LABEL.H)}</span>
+          <span><i className="dot locked" />{t('안개 · 잠긴 지역')}</span>
         </div>
         <div className="map-legend-regions">
           {(Object.keys(REGIONS) as RegionId[]).map((id) => {
@@ -187,7 +189,7 @@ export default function MapView({ onSelect, selected }: Props) {
             const count = CITIES.filter((c) => c.region === id).length;
             return (
               <button key={id} className={`map-region${open ? '' : ' locked'}`} disabled={!open} onClick={() => flyToRegion(id)}>
-                <span>{open ? '' : '🔒 '}{REGIONS[id].name}</span><small>{count}개 도시</small>
+                <span>{open ? '' : '🔒 '}{t(REGIONS[id].name)}</span><small>{count}{t('개 도시')}</small>
               </button>
             );
           })}
