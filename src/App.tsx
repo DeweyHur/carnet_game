@@ -43,8 +43,8 @@ export default function App() {
     <div className={`app${mapMode ? ' map-mode' : ''}`}>
       {mapMode && <Suspense fallback={<div className="map-loading">여행 지도를 펼치는 중…</div>}><MapView onSelect={(id) => setSelected(id)} selected={selected} /></Suspense>}
       <Hud onNotebook={() => setNotebook(true)} onCity={() => setSelected(cityId)} />
-      <Journey key={selected ?? cityId} selected={selected} onSelect={setSelected} onAlbum={() => setNotebook(true)} mapMode={mapMode} onMap={() => setMapMode((m) => !m)} />
-      {selected && !travelling && <CityPanel key={selected} cityId={selected} onClose={() => setSelected(null)} initialTab={selected === cityId ? 'missions' : 'transport'} />}
+      <Journey key={`journey-${selected ?? cityId}`} selected={selected} onSelect={setSelected} onAlbum={() => setNotebook(true)} mapMode={mapMode} onMap={() => setMapMode((m) => !m)} />
+      {selected && !travelling && <CityPanel key={`panel-${selected}`} cityId={selected} onClose={() => setSelected(null)} initialTab={selected === cityId ? 'missions' : 'transport'} />}
       {travelling && (
         <div className="travel-overlay">
           <TravelPhoto photo={photoById(travelling.edge.to)} className="train-window" priority />
