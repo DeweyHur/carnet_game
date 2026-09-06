@@ -1,202 +1,117 @@
-import { useEffect, useRef, useState } from 'react';
-import * as maplibregl from 'maplibre-gl';
-import type { Map as MLMap, Marker } from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
-maplibregl.setWorkerUrl(workerUrl);
-import { setEngineIntensity, sfxArrive, startEngine, stopEngine } from '../audio';
-import { useT } from '../i18n';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useGame } from '../game/store';
+import { CONTRACTS, DRIVE_LENGTH, driverLevel, nextDriverXp, tickDrive, upgradePrice, upgradeUnlock, type DriveInput, type DriveRun, type DriveState, type Upgrade } from '../game/driving';
+import { cityById } from '../data/cities';
+import { photoById } from '../data/photos';
+import TravelPhoto from './TravelPhoto';
+import { setEngineIntensity, sfxCard, sfxWrong, startEngine, stopEngine, unlockAudio } from '../audio';
+import { drawRoad } from './driveCanvas';
 
-const STYLE_PRIMARY = 'https://tiles.openfreemap.org/styles/positron';
-// 공개 데모 라우팅 서버 — 실제 도로망을 따르는 경로를 계산해준다. 실서비스에서는
-// 자체 호스팅 OSRM/Valhalla로 교체해야 한다(속도 제한·가용성이 데모용이라 낮다).
-const OSRM = 'https://router.project-osrm.org/route/v1/driving';
-// 실제 거리와 무관하게 한 구간의 운전이 대략 이 시간(초) 안에 끝나도록 "게임 속도"를 역산한다 —
-// 실제 축척의 이동 시뮬레이션이 아니라 미션 템포에 맞춘 짧은 아케이드 구간이기 때문.
-// 계기판에는 이 값을 그대로 보여주지 않고 20~80km/h 사이 그럴듯한 숫자로 따로 환산한다.
-const TARGET_SECONDS = 10;
-const MIN_GAME_SPEED = 8; // m/s
-const DISPLAY_MIN_KMH = 18;
-const DISPLAY_MAX_KMH = 82;
+interface Props { fromCoord?: [number, number]; toCoord?: [number, number]; toLabel?: string; missionKey?: string; onArrive: () => void; onClose?: () => void }
 
-function haversine([lon1, lat1]: [number, number], [lon2, lat2]: [number, number]): number {
-  const R = 6371000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
+export default function DriveMove({ toLabel, missionKey, onArrive, onClose }: Props) {
+  const g = useGame();
+  const run = g.driveRun;
+  const city = cityById(g.cityId);
+  const level = driverLevel(g.driverXp);
+  const finish = () => { g.endDrive(); onArrive(); };
+  const close = () => { g.endDrive(); (onClose ?? onArrive)(); };
+  return <div className="drive-game" role="dialog" aria-modal="true" aria-label="도시 드라이브">
+    <header className="drive-header"><div><span>CARNET / ROAD TRIP</span><h2>{toLabel ?? `${city.names.ko} 자유 드라이브`}</h2></div><div className="driver-badge">운전 Lv.{level} <span>€{g.wallet.EUR.toFixed(0)}</span></div></header>
+    {!run ? <div className="drive-lobby">
+      <div className="drive-lobby-photo"><TravelPhoto photo={photoById(city.id)} priority /><div><span>TAKE THE SCENIC ROUTE</span><h3>길 위에서도,<br />당신만의 플레이.</h3><p>차선을 바꿔 교통을 피하고 사진 필름을 모으세요.<br />40~60초의 아케이드 드라이브 · 목표 달성 시 보너스</p></div></div>
+      <div className="drive-briefing"><h3>오늘은 어떤 운전자?</h3><div className="drive-contracts">{CONTRACTS.map((c) => <button key={c.id} onClick={() => { unlockAudio(); g.beginDrive(c.id, toLabel ?? city.names.ko, missionKey); }}><strong>{c.title}<span>목표 +€{c.bonus}</span></strong><small>{c.description}</small><b>{c.goal} →</b></button>)}</div>
+        <div className="drive-instructions">← → / A D 차선 변경 · ↑ / W 가속<br />↓ / S 감속 · Space 부스트 · P 일시정지<br /><small>모바일에서는 아래 조작 버튼을 누르세요. 50 표지에서는 감속!</small></div>
+        <details className="drive-garage"><summary>차고 · 성장과 업그레이드 <span>{g.driverXp} / {nextDriverXp(g.driverXp)} XP</span></summary><p>운전 보상은 유로 지갑에 들어옵니다. 레벨이 오르면 업그레이드가 열려요.</p>{(['handling', 'boost', 'bumper'] as Upgrade[]).map((part) => {
+          const rank = g.carUpgrades[part], price = upgradePrice(rank), required = upgradeUnlock(rank);
+          return <div key={part}><span><b>{{ handling: '반응 빠른 핸들', boost: '부스트 효율', bumper: '튼튼한 범퍼' }[part]} {rank}/3</b><small>{{ handling: '차선 이동 속도 증가', boost: '부스트 에너지 소모 감소', bumper: '충돌 피해 감소' }[part]}</small></span><button disabled={rank >= 3 || level < required || g.wallet.EUR < price} onClick={() => g.upgradeCar(part)}>{rank >= 3 ? 'MAX' : level < required ? `Lv.${required} 해금` : `€${price} 업그레이드`}</button></div>;
+        })}</details>
+        <button className="drive-exit" onClick={close}>{missionKey ? '일반 이동으로 건너뛰기 · 운전 보상 없음' : '지도 돌아가기'}</button>
+      </div>
+    </div> : run.result ? <div className="drive-results">
+      <span className="eyebrow">DRIVE COMPLETE</span><div className="drive-grade">{run.result.grade}</div><h3>{run.result.arrived ? '도착! 오늘의 운전 기록' : '잠깐 쉬어가는 것도 여행'}</h3>
+      <p>{run.result.goal ? '목표 달성! 보너스가 정산되었습니다.' : run.result.arrived ? '다음에는 목표 보너스에도 도전해보세요.' : '차량 상태 또는 제한 시간으로 주행을 마쳤어요. 금전 손실은 없습니다.'}</p>
+      <div className="drive-result-stats"><span><b>{run.result.score.toLocaleString()}</b>점수</span><span><b>{run.result.elapsed}초</b>주행 시간</span><span><b>{run.result.films}개</b>사진 필름</span><span><b>{run.result.bestCombo}</b>최고 콤보</span></div>
+      <div className="drive-payout"><div>기본·목표·실력 보상 <b>€{run.result.gross}</b></div><div>충돌·과속 공제 <b>−€{run.result.repairs}</b></div><div className="total">지갑에 들어온 돈 <b>+€{run.result.earned}</b></div></div>
+      <div className="drive-xp"><b>운전 경험치 +{run.result.xp} · Lv.{level}</b><progress max={nextDriverXp(g.driverXp)} value={g.driverXp} /><small>다음 레벨까지 {Math.max(0, nextDriverXp(g.driverXp) - g.driverXp)} XP · 차고에서 성장한 차량을 확인하세요.</small></div>
+      <button className="btn" onClick={finish}>{missionKey ? '목적지에서 취재 계속 →' : '기록 저장하고 지도 돌아가기 →'}</button>
+    </div> : <DrivingSession key={run.id} run={run} onExit={close} />}
+  </div>;
 }
 
-interface RouteMeta { coords: [number, number][]; cum: number[]; total: number }
-
-function buildMeta(coords: [number, number][]): RouteMeta {
-  const cum: number[] = [0];
-  for (let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + haversine(coords[i - 1], coords[i]));
-  return { coords, cum, total: cum[cum.length - 1] || 1 };
-}
-
-function pointAt(meta: RouteMeta, dist: number): { pos: [number, number]; bearing: number } {
-  const d = Math.max(0, Math.min(dist, meta.total));
-  let i = 1;
-  while (i < meta.cum.length - 1 && meta.cum[i] < d) i++;
-  const segStart = meta.cum[i - 1];
-  const segEnd = meta.cum[i];
-  const t = segEnd > segStart ? (d - segStart) / (segEnd - segStart) : 0;
-  const [lon1, lat1] = meta.coords[i - 1];
-  const [lon2, lat2] = meta.coords[i];
-  const pos: [number, number] = [lon1 + (lon2 - lon1) * t, lat1 + (lat2 - lat1) * t];
-  const bearing = (Math.atan2(lon2 - lon1, lat2 - lat1) * 180) / Math.PI;
-  return { pos, bearing };
-}
-
-interface Props {
-  fromCoord: [number, number];
-  toCoord: [number, number];
-  toLabel?: string;
-  onArrive: () => void;
-}
-
-export default function DriveMove({ fromCoord, toCoord, toLabel, onArrive }: Props) {
-  const t = useT();
-  const ref = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<MLMap | null>(null);
-  const carRef = useRef<Marker | null>(null);
-  const metaRef = useRef<RouteMeta | null>(null);
-  const distRef = useRef(0);
-  const speedRef = useRef(0);
-  const maxSpeedRef = useRef(MIN_GAME_SPEED);
-  const accelRef = useRef(false);
-  const arrivedRef = useRef(false);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'fallback'>('loading');
-  const [progressPct, setProgressPct] = useState(0);
-  const [speedKmh, setSpeedKmh] = useState(0);
-
-  // 경로 계산 (실패하면 직선 도로로 대체)
+function DrivingSession({ run, onExit }: { run: DriveRun; onExit: () => void }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const engine = useRef<DriveState>(run.state);
+  const input = useRef<DriveInput>({ gas: false, brake: false, boost: false });
+  const [frame, setFrame] = useState(run.state);
+  const [paused, setPaused] = useState(run.state.elapsed > 0);
+  const pausedRef = useRef(paused);
+  const [exitPrompt, setExitPrompt] = useState(false);
+  const changeLane = (dir: number) => { if (!pausedRef.current) engine.current.lane = Math.max(0, Math.min(2, engine.current.lane + dir)); };
+  const pause = useCallback((value: boolean) => {
+    pausedRef.current = value; setPaused(value); input.current = { gas: false, brake: false, boost: false };
+    useGame.getState().saveDrive(run.id, engine.current);
+    if (value) stopEngine(); else { unlockAudio(); startEngine(); }
+  }, [run.id]);
   useEffect(() => {
-    let cancelled = false;
-    arrivedRef.current = false;
-    distRef.current = 0; speedRef.current = 0;
-    (async () => {
-      try {
-        const url = `${OSRM}/${fromCoord[0]},${fromCoord[1]};${toCoord[0]},${toCoord[1]}?overview=full&geometries=geojson`;
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeout));
-        if (!res.ok) throw new Error('osrm-http');
-        const data = await res.json();
-        const coords: [number, number][] | undefined = data.routes?.[0]?.geometry?.coordinates;
-        if (!coords || coords.length < 2) throw new Error('no-route');
-        if (cancelled) return;
-        metaRef.current = buildMeta(coords);
-        maxSpeedRef.current = Math.max(MIN_GAME_SPEED, metaRef.current.total / TARGET_SECONDS);
-        setStatus('ready');
-      } catch {
-        if (cancelled) return;
-        metaRef.current = buildMeta([fromCoord, toCoord]);
-        maxSpeedRef.current = Math.max(MIN_GAME_SPEED, metaRef.current.total / TARGET_SECONDS);
-        setStatus('fallback');
-      }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromCoord[0], fromCoord[1], toCoord[0], toCoord[1]]);
-
-  // 지도 초기화 (경로가 준비된 뒤 1회)
-  useEffect(() => {
-    if (!ref.current || status === 'loading' || mapRef.current) return;
-    const meta = metaRef.current!;
-    const map = new maplibregl.Map({ container: ref.current, style: STYLE_PRIMARY, center: fromCoord, zoom: 16, attributionControl: { compact: true } });
-    mapRef.current = map;
-    map.scrollZoom.disable();
-    map.dragRotate.disable();
-    map.dragPan.disable();
-    map.doubleClickZoom.disable();
-    map.once('load', () => {
-      map.addSource('drive-route', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: meta.coords } } });
-      map.addLayer({ id: 'drive-route-casing', type: 'line', source: 'drive-route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2b241c', 'line-width': 7 } });
-      map.addLayer({ id: 'drive-route-fill', type: 'line', source: 'drive-route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#f2c14e', 'line-width': 3, 'line-dasharray': [2, 2] } });
-      const destEl = document.createElement('div');
-      destEl.className = 'poi-pin target';
-      destEl.innerHTML = `<div class="dot"></div><div class="lbl">${toLabel ?? ''}</div>`;
-      new maplibregl.Marker({ element: destEl, anchor: 'bottom' }).setLngLat(toCoord).addTo(map);
-      const carEl = document.createElement('div');
-      carEl.className = 'drive-car';
-      carEl.textContent = '🚗';
-      carRef.current = new maplibregl.Marker({ element: carEl, anchor: 'center' }).setLngLat(fromCoord).addTo(map);
-      const bounds = meta.coords.reduce(
-        (b, c) => [[Math.min(b[0][0], c[0]), Math.min(b[0][1], c[1])], [Math.max(b[1][0], c[0]), Math.max(b[1][1], c[1])]] as [[number, number], [number, number]],
-        [fromCoord, fromCoord] as [[number, number], [number, number]],
-      );
-      map.fitBounds(bounds, { padding: 60, maxZoom: 17, duration: 0 });
-    });
-    startEngine();
-    return () => { map.remove(); mapRef.current = null; stopEngine(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
-
-  // 물리 루프
-  useEffect(() => {
-    let raf = 0; let last = performance.now();
+    if (engine.current.finished) { useGame.getState().settleDrive(run.id); return; }
+    let raf = 0, last = performance.now(), checkpoint = 0, lastRender = 0;
+    if (!pausedRef.current) startEngine();
     const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000); last = now;
-      const meta = metaRef.current;
-      if (meta && !arrivedRef.current && mapRef.current) {
-        const maxSpeed = maxSpeedRef.current;
-        const accel = maxSpeed / 1.3;
-        const decel = maxSpeed / 0.9;
-        speedRef.current = accelRef.current
-          ? Math.min(maxSpeed, speedRef.current + accel * dt)
-          : Math.max(0, speedRef.current - decel * dt);
-        distRef.current = Math.min(meta.total, distRef.current + speedRef.current * dt);
-        const { pos, bearing } = pointAt(meta, distRef.current);
-        carRef.current?.setLngLat(pos);
-        const el = carRef.current?.getElement();
-        if (el) el.style.setProperty('--heading', `${bearing}deg`);
-        mapRef.current.setCenter(pos);
-        const speedFrac = speedRef.current / maxSpeed;
-        setEngineIntensity(speedFrac);
-        setProgressPct(Math.min(100, Math.round((distRef.current / meta.total) * 100)));
-        setSpeedKmh(speedFrac < 0.02 ? 0 : Math.round(DISPLAY_MIN_KMH + speedFrac * (DISPLAY_MAX_KMH - DISPLAY_MIN_KMH)));
-        if (distRef.current >= meta.total) {
-          arrivedRef.current = true;
-          stopEngine();
-          sfxArrive();
-          setTimeout(onArrive, 500);
+      const seconds = Math.min(.05, (now - last) / 1000); last = now;
+      if (!pausedRef.current && !engine.current.finished) {
+        const previous = engine.current;
+        engine.current = tickDrive(previous, input.current, seconds, run.upgrades);
+        if (engine.current.films > previous.films) sfxCard();
+        if (engine.current.collisions > previous.collisions || engine.current.speeding > previous.speeding) sfxWrong();
+        setEngineIntensity(engine.current.speed / 112);
+        if (now - checkpoint > 1000 || engine.current.finished) {
+          useGame.getState().saveDrive(run.id, engine.current); checkpoint = now;
+          if (engine.current.finished) { stopEngine(); useGame.getState().settleDrive(run.id); }
         }
       }
+      const node = canvas.current, ctx = node?.getContext('2d');
+      if (node && ctx) {
+        const width = node.clientWidth, height = node.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
+        if (node.width !== Math.round(width * dpr) || node.height !== Math.round(height * dpr)) { node.width = Math.round(width * dpr); node.height = Math.round(height * dpr); }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawRoad(ctx, engine.current, width, height);
+      }
+      if (now - lastRender > 70) { setFrame({ ...engine.current }); lastRender = now; }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
-
-  // 키보드 조작(데스크톱)
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => { if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') accelRef.current = true; };
-    const up = (e: KeyboardEvent) => { if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') accelRef.current = false; };
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
-    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
-  }, []);
-
-  return (
-    <div className="drive-wrap">
-      <div className="drive-map" ref={ref} />
-      {status === 'loading' && <div className="drive-note">{t('경로를 찾는 중…')}</div>}
-      {status === 'fallback' && <div className="drive-note">{t('실시간 경로를 불러오지 못해 직선 도로로 대신합니다.')}</div>}
-      <div className="drive-hud">
-        <div className="drive-progress"><i style={{ width: `${progressPct}%` }} /></div>
-        <div className="drive-speed">{speedKmh} km/h</div>
-      </div>
-      <button
-        className="drive-pedal"
-        onPointerDown={(e) => { e.preventDefault(); accelRef.current = true; }}
-        onPointerUp={() => { accelRef.current = false; }}
-        onPointerLeave={() => { accelRef.current = false; }}
-        onPointerCancel={() => { accelRef.current = false; }}
-      >{t('가속 ▲')}</button>
+    const blur = () => pause(true);
+    const hide = () => { if (document.hidden) pause(true); };
+    window.addEventListener('blur', blur); document.addEventListener('visibilitychange', hide);
+    const keyDown = (e: KeyboardEvent) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
+      const key = e.key.toLowerCase();
+      if ((key === 'p' || key === 'escape') && !e.repeat) { pause(!pausedRef.current); return; }
+      if (pausedRef.current) return;
+      if (!e.repeat && (key === 'arrowleft' || key === 'a')) changeLane(-1);
+      if (!e.repeat && (key === 'arrowright' || key === 'd')) changeLane(1);
+      if (key === 'arrowup' || key === 'w') input.current.gas = true;
+      if (key === 'arrowdown' || key === 's') input.current.brake = true;
+      if (key === ' ') input.current.boost = true;
+    };
+    const keyUp = (e: KeyboardEvent) => { const key = e.key.toLowerCase(); if (key === 'arrowup' || key === 'w') input.current.gas = false; if (key === 'arrowdown' || key === 's') input.current.brake = false; if (key === ' ') input.current.boost = false; };
+    window.addEventListener('keydown', keyDown); window.addEventListener('keyup', keyUp);
+    return () => { cancelAnimationFrame(raf); stopEngine(); useGame.getState().saveDrive(run.id, engine.current); window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', hide); window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp); };
+  }, [run.id, run.upgrades, pause]);
+  const zone = frame.objects.find((o) => o.kind === 'zone' && !o.resolved);
+  const nearZone = zone && zone.distance - frame.distance < 230;
+  const hold = (key: keyof DriveInput) => ({
+    onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => { e.preventDefault(); if (pausedRef.current) return; e.currentTarget.setPointerCapture(e.pointerId); input.current[key] = true; },
+    onPointerUp: () => { input.current[key] = false; }, onPointerCancel: () => { input.current[key] = false; }, onLostPointerCapture: () => { input.current[key] = false; },
+  });
+  return <div className="drive-session">
+    <div className="drive-scorebar"><span><b>{frame.score.toLocaleString()}</b> SCORE</span><span className="drive-combo">{frame.combo >= 2 ? `${frame.combo} COMBO ×${Math.min(4, 1 + Math.floor(frame.combo / 4))}` : CONTRACTS.find((c) => c.id === run.contract)?.title}</span><button onClick={() => pause(!paused)} aria-label="주행 일시정지">{paused ? '계속 ▶' : '일시정지 Ⅱ'}</button></div>
+    <div className="drive-road"><canvas ref={canvas} aria-label="3차선 도로. 방향키로 교통을 피하고 노란 사진 필름을 수집하세요." /><div className="drive-course"><progress value={frame.distance} max={DRIVE_LENGTH} /><span>{Math.round(frame.distance / DRIVE_LENGTH * 100)}% · {frame.elapsed.toFixed(0)}초</span></div>
+      {nearZone && <div className={`drive-zone ${frame.speed > 55 ? 'too-fast' : ''}`}>50 <small>앞쪽 제한 구간 · 감속</small></div>}
+      {frame.noticeUntil > frame.elapsed && <div className="drive-feedback" aria-live="polite">{frame.notice}</div>}
+      <div className="drive-dashboard"><span><b>{Math.round(frame.speed)}</b> km/h</span><span>차량 {Math.round(frame.integrity)}%<progress max={100} value={frame.integrity} /></span><span>부스트 {Math.round(frame.energy)}%<progress max={100} value={frame.energy} /></span><span>▣ {frame.films}</span></div>
+      {paused && <div className="drive-pause"><h3>{exitPrompt ? '이번 주행을 그만둘까요?' : '잠시 쉬어가는 중'}</h3><p>{exitPrompt ? '완주 전에는 돈과 경험치를 받지 않습니다.' : '주행 기록이 저장됐어요. 준비되면 이어가세요.'}</p><button className="btn" onClick={() => { setExitPrompt(false); pause(false); }}>주행 계속 →</button>{exitPrompt ? <button className="btn ghost" onClick={onExit}>보상 없이 나가기</button> : <button className="btn ghost" onClick={() => setExitPrompt(true)}>주행 그만두기</button>}</div>}
     </div>
-  );
+    <div className="drive-controls"><button onClick={() => changeLane(-1)} disabled={paused} aria-label="왼쪽 차선">←<small>A / ←</small></button><button onClick={() => changeLane(1)} disabled={paused} aria-label="오른쪽 차선">→<small>D / →</small></button><button {...hold('brake')} disabled={paused}>감속<small>S / ↓</small></button><button {...hold('gas')} disabled={paused} className="gas">가속<small>W / ↑</small></button><button {...hold('boost')} disabled={paused} className="boost">부스트<small>SPACE</small></button></div>
+  </div>;
 }

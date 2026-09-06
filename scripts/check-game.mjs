@@ -16,6 +16,53 @@ try {
   const { foodPrice } = await server.ssrLoadModule('/src/game/economy.ts');
   const { useGame } = await server.ssrLoadModule('/src/game/store.ts');
   const state = () => useGame.getState();
+  const { createDrive, tickDrive, scoreDrive, driverLevel } = await server.ssrLoadModule('/src/game/driving.ts');
+  const upgrades = { handling: 0, boost: 0, bumper: 0 };
+  const simulate = (seed, steer) => {
+    let s = createDrive(seed);
+    while (!s.finished) {
+      const next = s.objects.find((o) => !o.resolved);
+      const zone = next?.kind === 'zone';
+      if (steer && next && !zone) {
+        const film = s.objects.find((o) => !o.resolved && o.kind === 'film' && o.distance === next.distance);
+        s = { ...s, lane: film?.lane ?? (next.lane + 1) % 3 };
+      }
+      s = tickDrive(s, { gas: true, brake: !!(steer && zone && next.distance - s.distance < 65 && s.speed > 49), boost: false }, .05, upgrades);
+    }
+    return s;
+  };
+  let clean;
+  for (let seed = 1; seed <= 20; seed++) {
+    clean = simulate(seed, true);
+    const passive = simulate(seed, false);
+    assert.equal(clean.collisions, 0, 'Readable course always has a safe lane');
+    assert.equal(clean.speeding, 0, 'Braking can clear every speed zone');
+    assert.ok(clean.films >= 6);
+    assert.ok(clean.score > passive.score, 'Steering and collecting outperform holding gas');
+    assert.equal(scoreDrive(clean, 'careful', 1).grade, 'S');
+  }
+  state().newGame('운전 검증', 'EUR');
+  assert.equal(state().upgradeCar('handling'), false, 'Upgrades require a driver level');
+  state().beginDrive('careful', '테스트');
+  const runId = state().driveRun.id, initialWallet = state().wallet.EUR;
+  state().settleDrive(runId);
+  assert.equal(state().wallet.EUR, initialWallet, 'Unfinished run pays nothing');
+  state().saveDrive(runId, clean);
+  await useGame.persist.rehydrate();
+  assert.equal(state().driveRun.state.finished, true, 'Finished checkpoint survives reload');
+  state().settleDrive(runId);
+  const rewardWallet = state().wallet.EUR, rewardXp = state().driverXp;
+  assert.ok(rewardWallet > initialWallet && driverLevel(rewardXp) >= 2);
+  state().settleDrive(runId); state().saveDrive(runId, createDrive(1));
+  assert.equal(state().wallet.EUR, rewardWallet, 'Settlement is idempotent');
+  assert.equal(state().driverXp, rewardXp);
+  assert.ok(state().driveRun.result);
+  state().endDrive();
+  assert.equal(state().upgradeCar('handling'), true);
+  assert.equal(state().wallet.EUR, rewardWallet - 35);
+  assert.equal(state().carUpgrades.handling, 1);
+  await useGame.persist.rehydrate();
+  assert.equal(state().carUpgrades.handling, 1, 'Purchased upgrade survives reload');
   assert.equal(DISCOVERY_MISSIONS.length, CITIES.length * 2);
   assert.equal(new Set(MISSIONS.map((m) => m.id)).size, MISSIONS.length);
   const positions = new Set();
@@ -85,11 +132,16 @@ try {
   // Backward compatibility with v1 saves that predate the album fields.
   const old = JSON.parse(saved.get('carnet-save-v1'));
   delete old.state.snapshots; delete old.state.visitedPois; delete old.state.tastedFoods;
+  delete old.state.driverXp; delete old.state.carUpgrades; delete old.state.driveRun;
   state().reset();
   saved.set('carnet-save-v1', JSON.stringify(old));
   await useGame.persist.rehydrate();
   assert.equal(state().cityId, 'boulogne');
   assert.deepEqual(state().snapshots, []);
   assert.deepEqual(state().visitedPois, []);
+  assert.equal(state().driverXp, 0);
+  assert.equal(state().driveRun, null);
+  assert.deepEqual(state().carUpgrades, upgrades);
+  console.log('PASS: 20 driving courses, skilled versus passive controls, rewards, upgrades, resume and legacy saves.');
   console.log(`PASS: ${CITIES.length} cities, ${MISSIONS.length} missions, ${Object.keys(PHOTOS).length} local photos; price choices, travel, collection, persistence and duplicate rewards.`);
 } finally { await server.close(); }

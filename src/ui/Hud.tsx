@@ -3,6 +3,7 @@ import { toEur, fmt } from '../game/economy';
 import { cityById, REGIONS } from '../data/cities';
 import type { Currency } from '../game/types';
 import { useT, weekdayLabel, dayLabel } from '../i18n';
+import { driverLevel } from '../game/driving';
 
 interface Props { onNotebook: () => void; onCity: () => void }
 
@@ -23,7 +24,7 @@ export default function Hud({ onNotebook, onCity }: Props) {
         {s.debt > 0 && <div className="k" style={{ color: 'var(--accent)' }}>{t('부채')} €{s.debt.toFixed(0)}</div>}
       </div>
       <div className="chip"><div className="k">{t('체력')}</div><div className={`bar${s.stamina < 30 ? ' low' : ''}`}><i style={{ width: `${s.stamina}%` }} /></div></div>
-      <div className="chip"><div className="k">{t('작가 평판')}</div><div className="v">Lv {Math.floor(s.reputation / 5) + 1}<small>{s.reputation}p · {s.lang === 'en' ? 'cards' : '카드'} {s.cards.length}</small></div></div>
+      <div className="chip"><div className="k">{s.lang === 'en' ? 'Driver' : '운전 레벨'}</div><div className="v">Lv {driverLevel(s.driverXp)}<small>{s.driverXp} XP</small></div></div>
       <div className="hud-spacer" />
       <button className="hud-btn icon" aria-label={s.muted ? t('소리 켜기') : t('소리 끄기')} onClick={() => s.setMuted(!s.muted)}>{s.muted ? '🔇' : '🔊'}</button>
       <button className="hud-btn badge" data-n={unread || ''} onClick={onNotebook}>{t('수첩 · 여권 · 지갑')}</button>

@@ -11,6 +11,7 @@ import TravelPhoto from './ui/TravelPhoto';
 import { photoById } from './data/photos';
 import { useT } from './i18n';
 import { requestAmbient, sfxPage, stopAmbient, unlockAudio } from './audio';
+import DriveMove from './ui/DriveMove';
 const MapView = lazy(() => import('./ui/MapView'));
 
 export default function App() {
@@ -28,6 +29,8 @@ export default function App() {
   const [notebook, setNotebook] = useState(false);
   const [finalOpen, setFinalOpen] = useState(false);
   const [mapMode, setMapMode] = useState(true);
+  const [driveOpen, setDriveOpen] = useState(false);
+  const driveRun = useGame((s) => s.driveRun);
 
   // 브라우저 자동재생 정책: 첫 사용자 제스처에서 오디오 컨텍스트를 깨운다
   useEffect(() => {
@@ -57,7 +60,7 @@ export default function App() {
       {mapMode && <Suspense fallback={<div className="map-loading">{t('여행 지도를 펼치는 중…')}</div>}><MapView onSelect={(id) => setSelected(id)} selected={selected} /></Suspense>}
       <Hud onNotebook={() => { sfxPage(); setNotebook(true); }} onCity={() => setSelected(cityId)} />
       <Journey key={`journey-${selected ?? cityId}`} selected={selected} onSelect={setSelected} onAlbum={() => { sfxPage(); setNotebook(true); }} mapMode={mapMode} onMap={() => setMapMode((m) => !m)} />
-      {selected && !travelling && <CityPanel key={`panel-${selected}`} cityId={selected} onClose={() => setSelected(null)} initialTab={selected === cityId ? 'missions' : 'transport'} />}
+      {selected && !travelling && <CityPanel key={`panel-${selected}`} cityId={selected} onClose={() => setSelected(null)} onDrive={() => setDriveOpen(true)} initialTab={selected === cityId ? 'missions' : 'transport'} />}
       {travelling && (
         <div className="travel-overlay">
           <TravelPhoto photo={photoById(travelling.edge.to)} className="train-window" priority />
@@ -71,6 +74,7 @@ export default function App() {
       <div className="log">{recent.map((e) => <div className={`e ${e.kind}`} key={e.id}>{e.text}</div>)}</div>
       {notebook && <Notebook onClose={() => { sfxPage(); setNotebook(false); }} />}
       <Scene />
+      {(driveOpen || (driveRun && !driveRun.missionKey)) && <DriveMove onArrive={() => setDriveOpen(false)} onClose={() => setDriveOpen(false)} />}
       {finalOpen && last && (
         <div className="scene" onClick={() => setFinalOpen(false)}>
           <div className="scene-box" onClick={(e) => e.stopPropagation()}>

@@ -14,10 +14,10 @@ import { useT, weekdayLabel } from '../i18n';
 const MODE_NAME: Record<Edge['mode'], string> = { metro: '메트로', rer: 'RER', transilien: '트랑실리앙', ter: 'TER', tgv: 'TGV', intercites: 'Intercités', eurostar: '유로스타', bus: '버스' };
 const MISSION_TYPE: Record<string, string> = { main: '메인', city: '도시 이야기', echo: '인물(메아리)', food: '미식', transport: '이동', tutorial: '튜토리얼' };
 
-interface Props { cityId: string; onClose: () => void; initialTab?: Tab }
+interface Props { cityId: string; onClose: () => void; onDrive?: () => void; initialTab?: Tab }
 type Tab = 'places' | 'transport' | 'food' | 'missions';
 
-export default function CityPanel({ cityId, onClose, initialTab }: Props) {
+export default function CityPanel({ cityId, onClose, onDrive, initialTab }: Props) {
   const t = useT();
   const [tab, setTab] = useState<Tab>(initialTab ?? 'missions');
   const s = useGame();
@@ -43,7 +43,7 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
     <div className="panel">
       <div className="panel-head">
         <h2><span className="tier">{city.tier}</span>{city.names.ko}<small>{city.names.fr}</small></h2>
-        <div className="meta">{t(REGIONS[city.region].name)} · {t('인구')} {city.population.toLocaleString()} · {t('물가지수')} {city.priceIndex.toFixed(2)} {t('(파리=1)')} · ☕ {t('내 커피 지표')} ×{coffeeIndex(city).toFixed(1)}{locked ? ` · 🔒 ${t('잠김')}` : ''}{here ? ` · ${t('현재 위치')}` : ''}
+        <div className="meta">{t(REGIONS[city.region].name)}{locked ? ` · 🔒 ${t('잠김')}` : ''}{here ? ` · ${t('현재 위치')}` : ''}
           {theoResult && (theoResult.won ? ` · 🏆 ${t('테오보다 먼저 특종')}` : ` · 📰 ${t('테오가 먼저 다녀감')}`)}
           {!theoResult && theoDaysLeft !== null && (theoDaysLeft >= 0 ? ` · ⏳ ${t('테오보다 D-')}${theoDaysLeft}` : ` · 🏃 ${t('테오가 이미 도착 — 서두르세요')}`)}
         </div>
@@ -58,9 +58,8 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
         {msg && <div className="closed-notice" onClick={() => setMsg(null)}>{msg}</div>}
         {tab === 'missions' && (
           <>
-            <p className="blurb">{city.blurb}</p>
-            {city.heritage?.map((h) => <div key={h} className="tag">{h}</div>)}
-            <div className="guide-note"><span>✎ {city.guide.name}의 한마디</span>{city.guide.intro}</div>
+            {here && onDrive && <button className="city-drive-launch" disabled={!!s.active || !!s.travelling} onClick={onDrive}><span>🚗 도시 드라이브</span><small>직접 달리고 · 돈 벌고 · 차량 성장 →</small></button>}
+            <details className="city-details"><summary>{s.lang === 'en' ? 'About this city' : '도시 이야기와 여행 정보'}</summary><p className="blurb">{city.blurb}</p>{city.heritage?.map((h) => <div key={h} className="tag">{h}</div>)}<div className="guide-note"><span>✎ {city.guide.name}의 한마디</span>{city.guide.intro}</div><p className="blurb">{t('인구')} {city.population.toLocaleString()} · {t('물가지수')} {city.priceIndex.toFixed(2)} · ☕ ×{coffeeIndex(city).toFixed(1)}</p></details>
             {missionsForCity(cityId).map((m) => {
               const id = m.id;
               const done = s.completed.includes(id);
@@ -70,7 +69,7 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
                 <div className={`row mission-row${done ? ' mission-done' : ''}`} key={id}>
                   <div>
                     <div className="n">{done ? '✓ ' : ''}「{m.title}」 <span className="tag">{t(MISSION_TYPE[m.type])}</span> <span className="tag">~{m.minutes}{t('분')}</span></div>
-                    <div className="s">{m.summary}</div>
+                    <details className="mission-details"><summary>{s.lang === 'en' ? 'Briefing' : '취재 내용'}</summary><div className="s">{m.summary}</div></details>
                     {!reqOk && <div className="s closed">{t('선행: ')}{m.requires!.map((r) => `「${missionById(r).title}」`).join(', ')}</div>}
                   </div>
                   {here && !done && (active
