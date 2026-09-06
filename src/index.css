@@ -99,10 +99,10 @@ a { color: var(--accent-2); }
 .ticket { border: 1px solid var(--line); border-radius: 6px; margin: 8px 0; background: var(--paper-2); padding: 10px 12px; position: relative; }
 .ticket::before, .ticket::after { content: ''; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: var(--paper); top: 50%; transform: translateY(-50%); }
 .ticket::before { left: -8px; } .ticket::after { right: -8px; }
-.ticket .top { display: flex; justify-content: space-between; align-items: baseline; }
-.ticket .mode { font-family: var(--mono); font-size: 12px; color: var(--ink-2); letter-spacing: .05em; }
-.ticket .dest { font-family: var(--serif); font-size: 17px; font-weight: 700; }
-.ticket .dur { font-family: var(--serif); font-size: 15px; }
+.ticket .top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; }
+.ticket .mode { display: block; font-family: var(--mono); font-size: 12px; color: var(--ink-2); letter-spacing: .05em; margin-top: 2px; }
+.ticket .dest { font-family: var(--serif); font-size: 17px; font-weight: 700; min-width: 0; }
+.ticket .dur { font-family: var(--serif); font-size: 15px; flex: none; white-space: nowrap; }
 .ticket .sub { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
 .ticket .fares { display: flex; gap: 8px; margin-top: 8px; }
 .ticket .fares button { flex: 1; text-align: left; background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
@@ -298,10 +298,10 @@ button { color: inherit; }
 .hero-location p { margin: 0; font-size: 14px; }
 .hero-location p span { margin-left: 16px; opacity: .7; font-size: 11px; }
 .hero-bottom { position: absolute; bottom: 0; left: 30px; right: 30px; min-height: 74px; border-top: 1px solid #ffffff4d; display: flex; justify-content: space-between; gap: 10px; align-items: center; color: white; }
-.hero-bottom > span { font-size: 11px; }
-.hero-bottom small { display: block; font-size: 8px; letter-spacing: .18em; color: #d5e5db; margin-top: 6px; }
-.hero-controls { display: flex; gap: 6px; }
-.hero-controls button { border: 1px solid #ffffff70; color: white; background: #ffffff16; border-radius: 5px; height: 33px; min-width: 33px; font-size: 12px; }
+.hero-bottom > span { font-size: 11px; min-width: 0; flex: 1 1 auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hero-bottom small { display: block; font-size: 8px; letter-spacing: .18em; color: #d5e5db; margin-top: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hero-controls { display: flex; gap: 6px; flex: none; flex-wrap: nowrap; }
+.hero-controls button { border: 1px solid #ffffff70; color: white; background: #ffffff16; border-radius: 5px; height: 33px; min-width: 33px; font-size: 12px; flex: none; white-space: nowrap; }
 .hero-controls .capture { padding: 0 12px; background: #fcfaf0; border-color: #fcfaf0; color: var(--ink); font-size: 10px; margin-left: 4px; }
 .hero-controls .capture:disabled { background: #ffffff22; color: #f1f5e7; border-color: #ffffff33; cursor: default; }
 .journey-notes { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; flex: none; }
