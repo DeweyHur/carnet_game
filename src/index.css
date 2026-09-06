@@ -63,6 +63,12 @@ a { color: var(--accent-2); }
 .pin .stamp { position: absolute; top: -18px; left: 50%; transform: translateX(-50%) rotate(-12deg); font-size: 9px; color: var(--accent); border: 1.5px solid var(--accent); border-radius: 3px; padding: 0 3px; font-family: var(--mono); background: rgba(244,236,216,.8); }
 @keyframes pulse { 0% { outline-color: var(--accent); } 50% { outline-color: transparent; } 100% { outline-color: var(--accent); } }
 .traveller { width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: var(--paper); font-size: 13px; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+/* 지도 줌 단계(기획서 §3.1: Z0~3 세계 / Z4~6 국가 / Z7+ 도시) — 세계 줌에서는 핵심(S) 도시만 이름을 보여 번잡함을 줄인다 */
+.map[data-zoom-tier="world"] .pin.tier-A .lbl, .map[data-zoom-tier="world"] .pin.tier-H .lbl { display: none; }
+.map[data-zoom-tier="world"] .pin.tier-A .dot, .map[data-zoom-tier="world"] .pin.tier-H .dot { width: 8px; height: 8px; }
+.map[data-zoom-tier="world"] .pin.tier-S .dot { width: 16px; height: 16px; }
+.map[data-zoom-tier="world"] .pin.here .lbl, .map[data-zoom-tier="world"] .pin.sel .lbl { display: block !important; }
+.map[data-zoom-tier="country"] .pin .lbl { font-size: 11px; }
 
 /* ── 패널(도시 카드) ─────────────────────────────────── */
 .panel { position: absolute; left: 12px; bottom: 12px; width: 400px; max-width: calc(100% - 24px); max-height: calc(100% - 110px); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); display: flex; flex-direction: column; z-index: 6; overflow: hidden; }
@@ -401,6 +407,7 @@ button { color: inherit; }
 .map-legend-tiers .dot.tier-S { width: 13px; height: 13px; background: var(--accent); }
 .map-legend-tiers .dot.tier-H { background: var(--gold); border-radius: 2px; transform: rotate(45deg); }
 .map-legend-tiers .dot.locked { background: none; border: 1.5px dashed var(--ink-3); }
+.map-legend-hint { font-size: 10px; color: var(--ink-3); margin: -4px 0 10px; font-style: italic; }
 .map-legend-regions { display: grid; gap: 5px; }
 .map-region { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--paper-2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 11px; text-align: left; color: var(--ink); }
 .map-region:not(:disabled):hover { border-color: var(--ink); }

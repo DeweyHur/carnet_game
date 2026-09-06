@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import type { Map as MLMap, Marker, GeoJSONSource } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -32,8 +32,11 @@ const TIER_LABEL: Record<string, string> = { S: '메인 무대(S)', A: '거점 �
 
 interface Props { onSelect: (cityId: string) => void; selected: string | null }
 
+type ZoomTier = 'world' | 'country' | 'city';
+
 export default function MapView({ onSelect, selected }: Props) {
   const t = useT();
+  const [zoomTier, setZoomTier] = useState<ZoomTier>('city');
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markers = useRef<Record<string, Marker>>({});
@@ -60,6 +63,15 @@ export default function MapView({ onSelect, selected }: Props) {
     const t = setTimeout(() => { if (!map.isStyleLoaded()) fallback(); }, 7000);
     map.once('load', () => clearTimeout(t));
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+    // 기획서 §3.1: Z0~3 세계(핵심 도시만) → Z4~6 국가(전체 핀) → Z7+ 도시(전체 상세)
+    const updateZoomTier = () => {
+      const z = map.getZoom();
+      const tier: ZoomTier = z < 6 ? 'world' : z < 8.5 ? 'country' : 'city';
+      ref.current?.setAttribute('data-zoom-tier', tier);
+      setZoomTier((prev) => (prev === tier ? prev : tier));
+    };
+    map.on('zoom', updateZoomTier);
+    updateZoomTier();
     // 스타일 로드(또는 폴백으로 교체)마다 게임 레이어를 다시 얹는다
     map.on('style.load', () => {
       if (!map.getSource('fog')) {
@@ -183,6 +195,7 @@ export default function MapView({ onSelect, selected }: Props) {
           <span><i className="dot tier-H" />{t(TIER_LABEL.H)}</span>
           <span><i className="dot locked" />{t('안개 · 잠긴 지역')}</span>
         </div>
+        {zoomTier === 'world' && <div className="map-legend-hint">{t('확대하면 거점·유산 도시 이름도 보여요.')}</div>}
         <div className="map-legend-regions">
           {(Object.keys(REGIONS) as RegionId[]).map((id) => {
             const open = unlocked.includes(id);

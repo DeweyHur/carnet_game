@@ -270,6 +270,7 @@ const DICT: Record<string, string> = {
   '프랑스 북부': 'Northern France',
   '루아르·중부': 'Loire · Central France',
   '국경 너머': 'Beyond the Border',
+  '확대하면 거점·유산 도시 이름도 보여요.': 'Zoom in to see hub and heritage city names too.',
 };
 
 export function useT() {
