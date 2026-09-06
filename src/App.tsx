@@ -10,6 +10,7 @@ import Journey from './ui/Journey';
 import TravelPhoto from './ui/TravelPhoto';
 import { photoById } from './data/photos';
 import { useT } from './i18n';
+import { requestAmbient, sfxPage, stopAmbient, unlockAudio } from './audio';
 const MapView = lazy(() => import('./ui/MapView'));
 
 export default function App() {
@@ -22,11 +23,21 @@ export default function App() {
   const finalShown = useGame((s) => s.finalShown);
   const voyageShown = useGame((s) => s.voyageShown);
   const active = useGame((s) => s.active);
+  const muted = useGame((s) => s.muted);
   const [selected, setSelected] = useState<string | null>('paris');
   const [notebook, setNotebook] = useState(false);
   const [finalOpen, setFinalOpen] = useState(false);
   const [mapMode, setMapMode] = useState(true);
 
+  // 브라우저 자동재생 정책: 첫 사용자 제스처에서 오디오 컨텍스트를 깨운다
+  useEffect(() => {
+    const unlock = () => unlockAudio();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => { window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
+  }, []);
+  // 여행 중에는 은은한 배경음, 음소거 시 정지
+  useEffect(() => { if (started && !muted) requestAmbient(); else stopAmbient(); }, [started, muted]);
   // 도착하면 도착 도시 카드 열기
   useEffect(() => { if (!travelling) setSelected(cityId); }, [cityId, travelling]);
   useEffect(() => { if (finalShown && !active) setFinalOpen(true); }, [finalShown, active]);
@@ -44,8 +55,8 @@ export default function App() {
   return (
     <div className={`app${mapMode ? ' map-mode' : ''}`}>
       {mapMode && <Suspense fallback={<div className="map-loading">{t('여행 지도를 펼치는 중…')}</div>}><MapView onSelect={(id) => setSelected(id)} selected={selected} /></Suspense>}
-      <Hud onNotebook={() => setNotebook(true)} onCity={() => setSelected(cityId)} />
-      <Journey key={`journey-${selected ?? cityId}`} selected={selected} onSelect={setSelected} onAlbum={() => setNotebook(true)} mapMode={mapMode} onMap={() => setMapMode((m) => !m)} />
+      <Hud onNotebook={() => { sfxPage(); setNotebook(true); }} onCity={() => setSelected(cityId)} />
+      <Journey key={`journey-${selected ?? cityId}`} selected={selected} onSelect={setSelected} onAlbum={() => { sfxPage(); setNotebook(true); }} mapMode={mapMode} onMap={() => setMapMode((m) => !m)} />
       {selected && !travelling && <CityPanel key={`panel-${selected}`} cityId={selected} onClose={() => setSelected(null)} initialTab={selected === cityId ? 'missions' : 'transport'} />}
       {travelling && (
         <div className="travel-overlay">
@@ -58,7 +69,7 @@ export default function App() {
         </div>
       )}
       <div className="log">{recent.map((e) => <div className={`e ${e.kind}`} key={e.id}>{e.text}</div>)}</div>
-      {notebook && <Notebook onClose={() => setNotebook(false)} />}
+      {notebook && <Notebook onClose={() => { sfxPage(); setNotebook(false); }} />}
       <Scene />
       {finalOpen && last && (
         <div className="scene" onClick={() => setFinalOpen(false)}>

@@ -10,6 +10,7 @@ import { priceChoices } from '../game/priceChoices';
 import { photoById, placePhoto } from '../data/photos';
 import TravelPhoto from './TravelPhoto';
 import CityMap from './CityMap';
+import DriveMove from './DriveMove';
 import { useT, weekdayLabel, dayLabel } from '../i18n';
 
 /** step 배열에서 dir 방향으로 가장 가까운 'visit' 스텝의 poiId를 찾는다 (다음 목적지 / 직전 출발지 추론용). */
@@ -39,19 +40,26 @@ export default function Scene() {
   // 지도에 도보 동선(점선)을 그려 "미션도 그에 맞게" 요청을 반영한다.
   const targetPoiId = step.t === 'visit' ? step.poiId : step.t === 'move' ? step.poiId ?? nearestVisitPoiId(m.steps, active.step + 1, 1) : undefined;
   const originPoiId = step.t === 'move' ? nearestVisitPoiId(m.steps, active.step - 1, -1) : undefined;
+  const targetPoi = targetPoiId ? city.pois.find((p) => p.id === targetPoiId) : undefined;
+  const originPoi = originPoiId ? city.pois.find((p) => p.id === originPoiId) : undefined;
+  // 'move' 스텝은 버튼 한 번으로 끝나는 이동이 아니라, 실제 파리 도로망(OSRM)을 따라 목적지까지
+  // 직접 운전하는 미니게임으로 진행된다. 목적지 좌표가 없는 예외적인 경우에만 기존 지도 배경으로 대체.
+  const driving = step.t === 'move' && !!targetPoi?.coord;
   return (
     <div className="scene mission-scene">
       <div className="scene-landscape">
-        {showMap
-          ? <CityMap cityId={city.id} highlightId={targetPoiId} routeFromId={originPoiId} readOnly controls={false} />
-          : <TravelPhoto photo={backdrop ?? photoById(city.id)} priority mystery={step.t === 'photo'} />}
+        {driving
+          ? <DriveMove fromCoord={originPoi?.coord ?? city.coord} toCoord={targetPoi!.coord!} toLabel={targetPoi!.name} onArrive={() => useGame.getState().nextStep()} />
+          : showMap
+            ? <CityMap cityId={city.id} highlightId={targetPoiId} routeFromId={originPoiId} readOnly controls={false} />
+            : <TravelPhoto photo={backdrop ?? photoById(city.id)} priority mystery={step.t === 'photo'} />}
       </div>
       <div className="scene-location"><span>CARNET / SUR LE TERRAIN</span><b>{city.names.fr}</b><small>{city.names.ko}{t('에서의 기록')}</small></div>
       <div className="scene-box">
         <div className="progress"><i style={{ width: `${pct}%` }} /></div>
         <div className="mission-tag">{city.names.ko} · 「{m.title}」 · {active.step + 1}/{m.steps.length}</div>
         <button className="pause-scene" onClick={() => useGame.getState().setPaused(true)}>{t('잠시 접기 ×')}</button>
-        <StepView key={`${m.id}-${active.step}`} step={step} guideName={city.guide.name} guideRole={city.guide.archetype} guideColor={city.guide.color} />
+        <StepView key={`${m.id}-${active.step}`} step={step} guideName={city.guide.name} guideRole={city.guide.archetype} guideColor={city.guide.color} driving={driving} />
       </div>
     </div>
   );
@@ -64,7 +72,7 @@ function Who({ who, name, role }: { who: Speaker; name?: string; role?: string }
   return <div className="who">{label[who]}<span className="role">{roleTxt[who]}</span></div>;
 }
 
-function StepView({ step, guideName, guideRole, guideColor }: { step: Step; guideName: string; guideRole: string; guideColor: string }) {
+function StepView({ step, guideName, guideRole, guideColor, driving }: { step: Step; guideName: string; guideRole: string; guideColor: string; driving?: boolean }) {
   const g = useGame();
   const t = useT();
   const next = g.nextStep;
@@ -120,8 +128,12 @@ function StepView({ step, guideName, guideRole, guideColor }: { step: Step; guid
       const moveFare = city.transitFareEur ?? 2.5;
       return (
         <>
-          <div className="speech"><div className="txt narr">{t('도시 안 이동')}: <b>{step.zone}</b>. {fmt(moveFare, moveCur)}, {t('관람 약 ')}{step.minutes}{t('분 · 지금 ')}{clock(g.minute)})</div></div>
-          <div className="scene-actions"><button className="btn" onClick={next}>🚇 {t('타기 ▸')}</button></div>
+          <div className="speech"><div className="txt narr">🚗 {t('도시 안 이동')}: <b>{step.zone}</b>. {fmt(moveFare, moveCur)}, {t('관람 약 ')}{step.minutes}{t('분 · 지금 ')}{clock(g.minute)})</div></div>
+          <div className="scene-actions">
+            {driving
+              ? <><span className="hint">{t('가속 페달을 눌러 목적지까지 운전하세요.')}</span><button className="btn ghost sm" onClick={next}>{t('건너뛰기')}</button></>
+              : <button className="btn" onClick={next}>🚗 {t('운전해서 이동 ▸')}</button>}
+          </div>
         </>
       );
     }

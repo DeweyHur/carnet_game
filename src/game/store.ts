@@ -7,6 +7,7 @@ import { photoById, placePhoto } from '../data/photos';
 import { MISSIONS, missionById, FINAL_LETTER, EPILOGUE_LETTER } from '../data/missions';
 import { CARD_FEE, FX_EUR, FX_CHANNELS, cityCurrency, convert, foodPrice, fmt, gradeArticle, quote, toEur, type FxChannel, type Grade } from './economy';
 import { theoArrivalDay } from './rival';
+import { sfxArrive, sfxCard, sfxCash, sfxCorrect, sfxDepart, sfxDoor, sfxLose, sfxStamp, sfxWin, sfxWrong, setMuted as setAudioMuted } from '../audio';
 
 export const START_WEEKDAY = 2; // 2026-09-08 화요일
 export const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -64,10 +65,12 @@ export interface GameState {
   /** 불로뉴 메인 미션에서 국경 너머가 해금된 날. 테오의 국경 경주 시작점. */
   theoStartDay: number | null;
   theoRace: RaceResult[];
+  muted: boolean;
 
   // actions
   setPaused: (p: boolean) => void;
   setLang: (l: Locale) => void;
+  setMuted: (m: boolean) => void;
   capturePhoto: (photoId: string) => void;
   newGame: (name: string, home: Currency) => void;
   reset: () => void;
@@ -92,7 +95,7 @@ export const weekdayOf = (day: number) => (START_WEEKDAY + day - 1) % 7;
 export const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
 const parseHm = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
 
-type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'pay' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused' | 'setLang' | 'capturePhoto';
+type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'pay' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused' | 'setLang' | 'setMuted' | 'capturePhoto';
 type Data = Omit<GameState, Actions>;
 const fresh = (): Data => ({
   started: false, lang: 'ko', playerName: '', home: 'KRW', day: 1, minute: 9 * 60, cityId: 'paris',
@@ -100,7 +103,7 @@ const fresh = (): Data => ({
   stamina: 100, reputation: 0, debt: 0,
   unlocked: ['idf'], visited: ['paris'], cards: [], articles: [], stamps: [], collectibles: [], letters: [],
   completed: [], active: null, guesses: [], fxLost: 0, log: [], finalShown: false, voyageShown: false, travelling: null, paused: false,
-  snapshots: [], visitedPois: [], tastedFoods: [], theoStartDay: null, theoRace: [],
+  snapshots: [], visitedPois: [], tastedFoods: [], theoStartDay: null, theoRace: [], muted: false,
 });
 
 let logId = 1;
@@ -189,6 +192,7 @@ export const useGame = create<GameState>()(
         }));
         get().capturePhoto(`food:${foodId}`);
         if (missionPurchase && get().active) set({ active: { ...get().active!, result: { kind: 'buy', expected: guessEur, price } } });
+        sfxCash();
         return { price };
       },
 
@@ -207,6 +211,7 @@ export const useGame = create<GameState>()(
         const photo = placePhoto(city.id, poiId);
         if (photo) get().capturePhoto(photo.id);
         if (!s.visited.includes(city.id)) set({ visited: [...s.visited, city.id] });
+        sfxDoor();
         return { ok: true };
       },
 
@@ -250,6 +255,7 @@ export const useGame = create<GameState>()(
         }
         const arrive = minute + edge.minutes;
         set({ day, minute, travelling: { edge, arriveMinute: arrive } });
+        sfxDepart();
         return { ok: true };
       },
 
@@ -261,6 +267,7 @@ export const useGame = create<GameState>()(
         set({ cityId: edge.to, minute: arriveMinute, travelling: null,
           stamina: Math.max(0, s.stamina - Math.round(edge.minutes / 15)),
           visited: s.visited.includes(edge.to) ? s.visited : [...s.visited, edge.to] });
+        sfxArrive();
         get().addLog(`${dest.names.ko} 도착 (${clock(arriveMinute)}).`, 'story');
       },
 
@@ -291,6 +298,7 @@ export const useGame = create<GameState>()(
               if (!s.cards.includes(step.cardId)) {
                 set({ cards: [...s.cards, step.cardId] });
                 get().addLog(`사실 카드 수집: ${cardById(step.cardId).text.slice(0, 40)}…`, 'card');
+                sfxCard();
               }
               break;
             }
@@ -308,6 +316,7 @@ export const useGame = create<GameState>()(
               if (!s.stamps.some((x) => x.cityId === m.cityId)) {
                 const city = cityById(m.cityId);
                 set({ stamps: [...s.stamps, { cityId: m.cityId, day: s.day }] });
+                sfxStamp();
                 if (city.region === 'border' && !s.theoRace.some((r) => r.cityId === m.cityId)) {
                   const arrival = theoArrivalDay(m.cityId, s.theoStartDay);
                   const won = arrival !== null && s.day <= arrival;
@@ -316,6 +325,7 @@ export const useGame = create<GameState>()(
                     reputation: won ? st.reputation + 2 : st.reputation,
                     wallet: won ? { ...st.wallet, EUR: Math.round((st.wallet.EUR + 20) * 100) / 100 } : st.wallet,
                   }));
+                  setTimeout(() => (won ? sfxWin() : sfxLose()), 250);
                   get().addLog(
                     won ? `테오보다 먼저 ${city.names.ko}에 도착! 특종 보너스 +€20, 평판 +2.` : `${city.names.ko}엔 테오가 먼저 다녀갔다. 이번엔 특종 보너스 없음 — 그래도 기록은 기록.`,
                     won ? 'money' : 'warn',
@@ -365,6 +375,7 @@ export const useGame = create<GameState>()(
           get().addLog(`사실 카드 수집: ${cardById(cardId).text.slice(0, 40)}…`, 'card');
         }
         set({ active: { ...a, wrong: a.wrong + (correct ? 0 : 1), result: { kind: 'answer', correct, picked } }, minute: get().minute + 5 });
+        if (correct) sfxCorrect(); else sfxWrong();
       },
 
       submitArticle: (selected) => {
@@ -398,6 +409,7 @@ export const useGame = create<GameState>()(
       abandonMission: () => set({ active: null, paused: false }),
       setPaused: (p) => set({ paused: p }),
       setLang: (l) => set({ lang: l }),
+      setMuted: (m) => { setAudioMuted(m); set({ muted: m }); },
     }),
     { name: 'carnet-save-v1', partialize: (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => typeof v !== 'function')) as GameState },
   ),
