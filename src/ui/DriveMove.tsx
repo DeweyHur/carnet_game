@@ -4,7 +4,7 @@ import { CONTRACTS, DRIVE_LENGTH, driverLevel, nextDriverXp, tickDrive, upgradeP
 import { cityById } from '../data/cities';
 import { photoById } from '../data/photos';
 import TravelPhoto from './TravelPhoto';
-import { setEngineIntensity, sfxCard, sfxWrong, startEngine, stopEngine, unlockAudio } from '../audio';
+import { setEngineIntensity, sfxDrive, startEngine, stopEngine, unlockAudio, isDriveMusicEnabled, setDriveMusicEnabled } from '../audio';
 import { drawRoad } from './driveCanvas';
 import DriveRouteMap from './DriveRouteMap';
 
@@ -12,6 +12,7 @@ interface Props { fromCoord?: [number, number]; toCoord?: [number, number]; toLa
 
 export default function DriveMove({ fromCoord, toCoord, toLabel, missionKey, onArrive, onClose }: Props) {
   const g = useGame();
+  const [music, setMusic] = useState(isDriveMusicEnabled);
   const run = g.driveRun;
   const city = cityById(g.cityId);
   const [destinationId, setDestinationId] = useState('');
@@ -23,7 +24,7 @@ export default function DriveMove({ fromCoord, toCoord, toLabel, missionKey, onA
   const finish = () => { g.endDrive(); onArrive(); };
   const close = () => { g.endDrive(); (onClose ?? onArrive)(); };
   return <div className="drive-game" role="dialog" aria-modal="true" aria-label="도시 드라이브">
-    <header className="drive-header"><div><span>CARNET / ROAD TRIP</span><h2>{toLabel ?? `${city.names.ko} 자유 드라이브`}</h2></div><div className="driver-badge">운전 Lv.{level} <span>€{g.wallet.EUR.toFixed(0)}</span></div></header>
+    <header className="drive-header"><div><span>CARNET / ROAD TRIP</span><h2>{toLabel ?? `${city.names.ko} 자유 드라이브`}</h2></div><div className="drive-audio-controls"><button aria-label="운전 음악" aria-pressed={music} onClick={() => { unlockAudio(); setDriveMusicEnabled(!music); setMusic(!music); }}>♫ {music ? '음악 ON' : '음악 OFF'}</button><button aria-label="운전 소리" aria-pressed={!g.muted} onClick={() => { unlockAudio(); g.setMuted(!g.muted); }}>{g.muted ? '소리 OFF' : '소리 ON'}</button></div><div className="driver-badge">운전 Lv.{level} <span>€{g.wallet.EUR.toFixed(0)}</span></div></header>
     {!run ? <div className="drive-lobby">
       <div className="drive-lobby-photo"><TravelPhoto photo={photoById(city.id)} priority /><div><span>TAKE THE SCENIC ROUTE</span><h3>길 위에서도,<br />당신만의 플레이.</h3><p>차선을 바꿔 교통을 피하고 사진 필름을 모으세요.<br />40~60초의 아케이드 드라이브 · 목표 달성 시 보너스</p></div></div>
       <div className="drive-briefing"><h3>오늘은 어떤 운전자?</h3>{!missionKey ? <label className="drive-destination">어디로 갈까요?<select value={freeTarget?.id ?? ''} onChange={(e) => setDestinationId(e.target.value)}>{city.pois.filter((p) => p.coord).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label> : <p className="drive-destination">목적지 · {destination}</p>}<div className="drive-contracts">{CONTRACTS.map((c) => <button key={c.id} onClick={() => { unlockAudio(); g.beginDrive(c.id, destination, missionKey); }}><strong>{c.title}<span>목표 +€{c.bonus}</span></strong><small>{c.description}</small><b>{c.goal} →</b></button>)}</div>
@@ -53,7 +54,7 @@ function DrivingSession({ run, from, to, destination, onExit }: { run: DriveRun;
   const [paused, setPaused] = useState(run.state.elapsed > 0);
   const pausedRef = useRef(paused);
   const [exitPrompt, setExitPrompt] = useState(false);
-  const changeLane = (dir: number) => { if (!pausedRef.current) engine.current.lane = Math.max(0, Math.min(2, engine.current.lane + dir)); };
+  const changeLane = (dir: number) => { if (!pausedRef.current) { const next = Math.max(0, Math.min(2, engine.current.lane + dir)); if (next !== engine.current.lane) sfxDrive('lane'); engine.current.lane = next; } };
   const pause = useCallback((value: boolean) => {
     pausedRef.current = value; setPaused(value); input.current = { gas: false, brake: false, boost: false };
     useGame.getState().saveDrive(run.id, engine.current);
@@ -62,14 +63,20 @@ function DrivingSession({ run, from, to, destination, onExit }: { run: DriveRun;
   useEffect(() => {
     if (engine.current.finished) { useGame.getState().settleDrive(run.id); return; }
     let raf = 0, last = performance.now(), checkpoint = 0, lastRender = 0;
-    if (!pausedRef.current) startEngine();
+    if (!pausedRef.current) { startEngine(); if (engine.current.elapsed === 0) sfxDrive('start'); }
+    let lastBoostSound = -10;
     const tick = (now: number) => {
       const seconds = Math.min(.05, (now - last) / 1000); last = now;
       if (!pausedRef.current && !engine.current.finished) {
         const previous = engine.current;
         engine.current = tickDrive(previous, input.current, seconds, run.upgrades);
-        if (engine.current.films > previous.films) sfxCard();
-        if (engine.current.collisions > previous.collisions || engine.current.speeding > previous.speeding) sfxWrong();
+        const current = engine.current;
+        if (current.collisions > previous.collisions) sfxDrive('bump');
+        else if (current.speeding > previous.speeding) sfxDrive('warning');
+        else if (Math.floor(current.combo / 4) > Math.floor(previous.combo / 4)) sfxDrive('combo');
+        else if (current.films > previous.films) sfxDrive('film', current.combo);
+        else if (current.zones > previous.zones) sfxDrive('zone');
+        if (input.current.boost && !input.current.brake && current.energy > 1 && current.elapsed - lastBoostSound > 2.5) { sfxDrive('boost'); lastBoostSound = current.elapsed; }
         setEngineIntensity(engine.current.speed / 112);
         if (now - checkpoint > 1000 || engine.current.finished) {
           useGame.getState().saveDrive(run.id, engine.current); checkpoint = now;
@@ -111,7 +118,7 @@ function DrivingSession({ run, from, to, destination, onExit }: { run: DriveRun;
     onPointerUp: () => { input.current[key] = false; }, onPointerCancel: () => { input.current[key] = false; }, onLostPointerCapture: () => { input.current[key] = false; },
   });
   return <div className="drive-session">
-    <div className="drive-scorebar"><span><b>{frame.score.toLocaleString()}</b> SCORE</span><span className="drive-combo">{frame.combo >= 2 ? `${frame.combo} COMBO ×${Math.min(4, 1 + Math.floor(frame.combo / 4))}` : CONTRACTS.find((c) => c.id === run.contract)?.title}</span><button onClick={() => pause(!paused)} aria-label="주행 일시정지">{paused ? '계속 ▶' : '일시정지 Ⅱ'}</button></div>
+    <div className="drive-scorebar"><span><b>{frame.score.toLocaleString()}</b> SCORE</span><span key={Math.floor(frame.combo / 4)} className={`drive-combo ${frame.combo >= 4 ? 'combo-party' : ''}`}>{frame.combo >= 2 ? `★ ${frame.combo} COMBO ×${Math.min(4, 1 + Math.floor(frame.combo / 4))}` : CONTRACTS.find((c) => c.id === run.contract)?.title}</span><button onClick={() => pause(!paused)} aria-label="주행 일시정지">{paused ? '계속 ▶' : '일시정지 Ⅱ'}</button></div>
     <div className="drive-travel-stage"><DriveRouteMap cityId={run.cityId} from={from} to={to} destination={destination} progress={frame.distance / DRIVE_LENGTH} /><div className="drive-road"><canvas ref={canvas} aria-label="3차선 도로. 방향키로 교통을 피하고 노란 사진 필름을 수집하세요." /><div className="drive-course"><progress value={frame.distance} max={DRIVE_LENGTH} /><span>{Math.round(frame.distance / DRIVE_LENGTH * 100)}% · {frame.elapsed.toFixed(0)}초</span></div>
       {nearZone && <div className={`drive-zone ${frame.speed > 55 ? 'too-fast' : ''}`}>50 <small>앞쪽 제한 구간 · 감속</small></div>}
       {frame.noticeUntil > frame.elapsed && <div className="drive-feedback" aria-live="polite">{frame.notice}</div>}

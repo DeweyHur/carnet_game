@@ -8,7 +8,7 @@ import { MISSIONS, missionById, FINAL_LETTER, EPILOGUE_LETTER } from '../data/mi
 import { CARD_FEE, FX_EUR, FX_CHANNELS, cityCurrency, convert, foodPrice, fmt, gradeArticle, quote, toEur, type FxChannel, type Grade } from './economy';
 import { theoArrivalDay } from './rival';
 import { createDrive, driverLevel, scoreDrive, upgradePrice, upgradeUnlock, type DriveRun, type DriveState, type DriveContract, type CarUpgrades, type Upgrade, type DriveResult } from './driving';
-import { sfxArrive, sfxCard, sfxCash, sfxCorrect, sfxDepart, sfxDoor, sfxLose, sfxStamp, sfxWin, sfxWrong, setMuted as setAudioMuted } from '../audio';
+import { sfxArrive, sfxCard, sfxCash, sfxCorrect, sfxDepart, sfxDoor, sfxLose, sfxStamp, sfxWin, sfxWrong, sfxDrive, setMuted as setAudioMuted } from '../audio';
 
 export const START_WEEKDAY = 2; // 2026-09-08 화요일
 export const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -157,7 +157,7 @@ export const useGame = create<GameState>()(
           driveHistory: [...s.driveHistory.slice(-49), { id, cityId: run.cityId, day: s.day, result }],
           driveRewardedKeys: run.missionKey && !replay ? [...s.driveRewardedKeys, run.missionKey] : s.driveRewardedKeys });
         get().addLog(`드라이브 ${result.grade} · +€${result.earned} · 운전 경험치 +${result.xp}${driverLevel(s.driverXp + result.xp) > driverLevel(s.driverXp) ? ' · 레벨 업!' : ''}`, 'money');
-        if (result.arrived) sfxWin(); else sfxLose();
+        sfxDrive(result.arrived ? 'finish' : 'bump');
       },
       endDrive: () => set({ driveRun: null }),
       upgradeCar: (part) => {

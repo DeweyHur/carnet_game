@@ -14,7 +14,7 @@ export function drawRoad(ctx: CanvasRenderingContext2D, s: DriveState, width: nu
   }
   const roadWidth = (y: number) => w * (.10 + .80 * (y - horizon) / (h - horizon));
   const roadX = (lane: number, y: number) => w / 2 + (lane - 1) * roadWidth(y) / 3;
-  ctx.fillStyle = '#354c49'; ctx.beginPath(); ctx.moveTo(w * .45, horizon); ctx.lineTo(w * .55, horizon); ctx.lineTo(w * .95, h); ctx.lineTo(w * .05, h); ctx.fill();
+  ctx.fillStyle = '#587e87'; ctx.beginPath(); ctx.moveTo(w * .45, horizon); ctx.lineTo(w * .55, horizon); ctx.lineTo(w * .95, h); ctx.lineTo(w * .05, h); ctx.fill();
   ctx.strokeStyle = '#f3e6a3'; ctx.lineWidth = 3;
   for (const sign of [-1, 1]) { ctx.beginPath(); ctx.moveTo(w / 2 + sign * w * .05, horizon); ctx.lineTo(w / 2 + sign * w * .45, h); ctx.stroke(); }
   for (let i = 0; i < 16; i++) {
@@ -50,7 +50,31 @@ export function drawRoad(ctx: CanvasRenderingContext2D, s: DriveState, width: nu
   }
   if (s.speed > 85) { ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 2; for (let i = 0; i < 6; i++) { const x = w * (.11 + i * .15); ctx.beginPath(); ctx.moveTo(x, h * .7); ctx.lineTo(x + (x - w / 2) * .1, h); ctx.stroke(); } }
   ctx.globalAlpha = s.invulnerable > 0 && Math.floor(s.elapsed * 12) % 2 ? .35 : 1;
-  car(ctx, roadX(s.x, carY), carY, Math.min(70, w * .11), '#edaa59'); ctx.globalAlpha = 1;
+  const playerX = roadX(s.x, carY), size = Math.min(70, w * .11);
+  if (s.speed > 85) {
+    for (let i = 0; i < 7; i++) {
+      const p = (s.elapsed * 3 + i / 7) % 1;
+      ctx.globalAlpha = (1 - p) * .8;
+      star(ctx, playerX + Math.sin(i * 5) * size * p, carY + size * .5 + p * 60, 3 + p * 5, i % 2 ? '#ffe297' : '#ffa5ad');
+    }
+    ctx.globalAlpha = 1;
+  }
+  car(ctx, playerX, carY + Math.sin(s.elapsed * 12) * Math.min(1.5, s.speed / 40), size, '#ffbf69'); ctx.globalAlpha = 1;
+  if (s.combo >= 4 && s.noticeUntil > s.elapsed) {
+    const age = 1.6 - (s.noticeUntil - s.elapsed);
+    for (let i = 0; i < 6; i++) {
+      const angle = i * Math.PI / 3 + age;
+      ctx.globalAlpha = Math.max(0, 1 - age / 1.6);
+      star(ctx, playerX + Math.cos(angle) * (size + age * 20), carY - 15 + Math.sin(angle) * (size * .65 + age * 20), 5, '#ffe38c');
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function star(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
+  ctx.fillStyle = color; ctx.beginPath();
+  for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5 - Math.PI / 2, r = i % 2 ? size * .45 : size; ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); }
+  ctx.closePath(); ctx.fill();
 }
 
 function car(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
@@ -58,5 +82,12 @@ function car(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, 
   ctx.fillStyle = '#1f302e'; ctx.fillRect(x - size * .52, y - size * .35, size * 1.04, size * .88);
   ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x - size * .45, y - size * .72, size * .9, size * 1.3, size * .13); ctx.fill();
   ctx.fillStyle = '#35585a'; ctx.fillRect(x - size * .33, y - size * .49, size * .66, size * .33);
+  ctx.fillStyle = '#fffdf2';
+  for (const side of [-1, 1]) {
+    ctx.beginPath(); ctx.ellipse(x + side * size * .16, y - size * .32, size * .095, size * .12, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = '#294f61';
+  for (const side of [-1, 1]) { ctx.beginPath(); ctx.arc(x + side * size * .16, y - size * .29, size * .043, 0, Math.PI * 2); ctx.fill(); }
+  ctx.strokeStyle = '#8d633f'; ctx.lineWidth = Math.max(1, size * .025); ctx.beginPath(); ctx.arc(x, y + size * .03, size * .11, .1, Math.PI - .1); ctx.stroke();
   ctx.fillStyle = '#f7edc2'; ctx.fillRect(x - size * .34, y + size * .37, size * .16, size * .10); ctx.fillRect(x + size * .18, y + size * .37, size * .16, size * .10);
 }

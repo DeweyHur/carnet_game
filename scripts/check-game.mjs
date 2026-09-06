@@ -150,5 +150,27 @@ try {
   assert.equal(state().driveRun, null);
   assert.deepEqual(state().carUpgrades, upgrades);
   console.log('PASS: 20 driving courses, skilled versus passive controls, rewards, upgrades, resume and legacy saves.');
+  // Validate audio envelopes and teardown with a minimal Web Audio graph.
+  const liveOscillators = new Set(), peaks = [];
+  const param = () => ({ value: 0, setValueAtTime(v) { peaks.push(v); }, exponentialRampToValueAtTime(v) { peaks.push(v); }, setTargetAtTime(v) { peaks.push(v); } });
+  const node = () => ({ connect() {}, disconnect() {} });
+  window.AudioContext = class {
+    state = 'running'; currentTime = 0; sampleRate = 8000; destination = node();
+    createGain() { return { ...node(), gain: param() }; }
+    createBiquadFilter() { return { ...node(), frequency: param() }; }
+    createOscillator() { const osc = { ...node(), frequency: param(), detune: param(), start() { liveOscillators.add(osc); }, stop() { liveOscillators.delete(osc); osc.onended?.(); } }; return osc; }
+    createBuffer(_channels, length) { return { getChannelData: () => new Float32Array(length) }; }
+    createBufferSource() { return { ...node(), start() { this.onended?.(); } }; }
+  };
+  const sound = await server.ssrLoadModule('/src/audio.ts');
+  sound.startEngine(); sound.startEngine(); sound.setEngineIntensity(1);
+  for (const event of ['lane', 'film', 'combo', 'boost', 'bump', 'zone', 'warning', 'start', 'finish']) sound.sfxDrive(event, 8);
+  sound.setMuted(true); sound.setMuted(false);
+  sound.setDriveMusicEnabled(false); sound.setDriveMusicEnabled(true);
+  sound.stopEngine(); sound.stopEngine(); sound.stopAmbient();
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  assert.equal(liveOscillators.size, 0, 'Engine and ambient oscillators stop after leaving the drive');
+  assert.ok(peaks.every(Number.isFinite), 'Audio envelopes must contain finite values');
+  console.log('PASS: driving sound events, mute/music switches and oscillator teardown.');
   console.log(`PASS: ${CITIES.length} cities, ${MISSIONS.length} missions, ${Object.keys(PHOTOS).length} local photos; price choices, travel, collection, persistence and duplicate rewards.`);
 } finally { await server.close(); }
