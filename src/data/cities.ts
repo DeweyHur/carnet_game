@@ -4,6 +4,7 @@ export const REGIONS: Record<RegionId, { name: string; blurb: string }> = {
   idf: { name: '일드프랑스', blurb: '파리와 근교. 《Carnet》 편집부가 있는 시작 지역.' },
   nord: { name: '프랑스 북부', blurb: '피카르디·노르망디·샹파뉴·플랑드르. 대성당과 국경의 땅.' },
   centre: { name: '루아르·중부', blurb: '샤르트르와 오를레앙. 순례길과 잔 다르크의 길.' },
+  border: { name: '국경 너머', blurb: '파운드, 같은 유로, 스위스 프랑, 그리고 독일·스페인. 테오가 먼저 떠난 곳들.' },
 };
 
 export const CITIES: City[] = [
@@ -248,6 +249,109 @@ export const CITIES: City[] = [
     ],
     missionIds: ['orleans-may8'],
   },
+  // ─────────────────────────────────────────────────────────────── 국경 너머
+  {
+    id: 'london', tier: 'A', region: 'border', country: 'GB',
+    names: { ko: '런던', fr: 'Londres', en: 'London' },
+    coord: [-0.1276, 51.5072], population: 8900000, priceIndex: 1.25, currency: 'GBP', hostelEur: 30, transitFareEur: 2.8,
+    heritage: ['UNESCO: 웨스트민스터 궁전과 웨스트민스터 사원(1987)'],
+    blurb: '유로스타가 해저 터널을 지나 도착하는 첫 국경. 파운드를 쓰고, 왼쪽으로 차가 다니고, 박물관은 대부분 무료다.',
+    guide: { name: '올리버', archetype: '박물관 도슨트', color: '#3b5c7a',
+      intro: '영란은행 박물관의 자원봉사 안내인. "우리는 1971년에야 십진법 화폐를 썼어요. 그전엔 1파운드가 20실링, 1실링이 12펜스였죠."' },
+    pois: [
+      { id: 'st-pancras', name: '세인트 판크라스 인터내셔널', type: 'station', feeEur: 0, hours: '상시', note: '1868년 개통, 2007년 유로스타 국제선 터미널로 재개관.', sourceId: 'src:st-pancras' },
+      { id: 'boe-museum', name: '영란은행 박물관', type: 'museum', feeEur: 0, closedDays: [0, 6], hours: '10:00-17:00', note: '1694년 설립된 영란은행의 역사와 파운드화 변천을 다룬다.', sourceId: 'src:boe-museum' },
+      { id: 'british-museum', name: '대영박물관', type: 'museum', feeEur: 0, hours: '10:00-17:00 (금 20:00까지)', note: '1759년 개관한 세계 최초의 국립 공공박물관.', sourceId: 'src:british-museum' },
+      { id: 'tower-bridge', name: '타워 브리지 전시관', type: 'monument', feeEur: 13, hours: '09:30-18:00', note: '1894년 개통한 배스큘(도개) 교량.', sourceId: 'src:tower-bridge' },
+    ],
+    foods: [
+      { id: 'fish-chips', name: '피시 앤 칩스', nameLocal: 'Fish and chips', baseEur: 8, venue: 'shop', stamina: 30, origin: '19세기 산업 노동자의 금요일 저녁으로 자리 잡았으며, 1860년 런던 이스트엔드에 첫 전문점이 열렸다고 전해진다.', sourceId: 'src:fish-chips' },
+      { id: 'scone', name: '스콘 크림티', nameLocal: 'Cream tea', baseEur: 4, venue: 'shop', stamina: 15, origin: '스콘에 클로티드 크림과 잼을 발라 홍차와 함께 먹는 영국의 오후 다과.', sourceId: 'src:cream-tea' },
+      { id: 'cafe', name: '카페 (플랫화이트)', nameLocal: 'Flat white', baseEur: 3.5, venue: 'bistro', stamina: 8, origin: '호주·뉴질랜드에서 건너온 커피 문화가 2000년대 런던의 카페가를 바꿔놓았다.', sourceId: 'src:flat-white' },
+    ],
+    missionIds: ['london-pound'],
+  },
+  {
+    id: 'brussels', tier: 'A', region: 'border', country: 'BE',
+    names: { ko: '브뤼셀', fr: 'Bruxelles', en: 'Brussels' },
+    coord: [4.3517, 50.8503], population: 1220000, priceIndex: 0.95, hostelEur: 30, transitFareEur: 2.6,
+    heritage: ['UNESCO: 브뤼셀 그랑플라스(1998)'],
+    blurb: '국경을 넘었지만 지갑은 그대로 열려 있다 — 벨기에도 유로를 쓴다. "화폐가 같은 국경"을 배우는 도시.',
+    guide: { name: '마리케', archetype: '제빵사', color: '#8a6a3a',
+      intro: '와플 가판대 주인. "국경이라고 다 환전소가 있는 건 아니에요. 우리는 그냥… 유로예요."' },
+    pois: [
+      { id: 'grand-place', name: '그랑플라스', type: 'square', feeEur: 0, hours: '상시', note: '중세 길드홀들이 둘러싼 광장. 1695년 포격 이후 재건됐다.', sourceId: 'src:grand-place' },
+      { id: 'atomium', name: '아토미움', type: 'monument', feeEur: 16, hours: '10:00-18:00', note: '1958년 브뤼셀 만국박람회를 위해 세운, 철 결정 구조를 1650억 배로 확대한 건축물.', sourceId: 'src:atomium' },
+      { id: 'parlamentarium', name: '유럽의회 방문센터 (파를라멘타리움)', type: 'museum', feeEur: 0, closedDays: [1], hours: '09:00-18:00', note: '유럽연합의 역사와 제도, 유로화 도입 과정을 무료로 소개한다.', sourceId: 'src:parlamentarium' },
+    ],
+    foods: [
+      { id: 'gaufre', name: '벨기에 와플', nameLocal: 'Gaufre', baseEur: 5.3, venue: 'market', stamina: 20, origin: '리에주식은 진주설탕을 반죽에 섞어 굽고, 브뤼셀식은 더 얇고 바삭하게 굽는다.', sourceId: 'src:gaufre' },
+      { id: 'frites', name: '브뤼셀식 감자튀김', nameLocal: 'Frites', baseEur: 5.9, venue: 'market', stamina: 25, origin: '벨기에는 감자튀김의 원조를 자처하며, 거리마다 프리트콧(friterie)이 있다.', sourceId: 'src:frites' },
+      { id: 'praline', name: '프랄린 한 상자', nameLocal: 'Pralines', baseEur: 8.4, venue: 'shop', stamina: 10, origin: '1912년 뇌하우스가 속을 채운 초콜릿 프랄린을 발명한 뒤, 벨기에 초콜릿의 대명사가 됐다.', sourceId: 'src:neuhaus' },
+      { id: 'cafe', name: '카페', nameLocal: 'Un café', baseEur: 3.5, venue: 'bistro', stamina: 8, origin: '카운터에서 서서 마시면 더 싸다 — 벨기에도 프랑스 못지않은 카페 문화가 있다.', sourceId: 'src:jambon-beurre' },
+    ],
+    missionIds: ['brussels-same-coin'],
+  },
+  {
+    id: 'cologne', tier: 'A', region: 'border', country: 'DE',
+    names: { ko: '쾰른', fr: 'Cologne', en: 'Cologne' },
+    coord: [6.9603, 50.9375], population: 1085000, priceIndex: 1.0, hostelEur: 28, transitFareEur: 3.0,
+    heritage: ['UNESCO: 쾰른 대성당(1996)'],
+    blurb: '라인 강변의 대성당 도시. 화폐는 프랑스와 같은 유로지만, 나라도 말도 맥주잔 크기도 다르다.',
+    guide: { name: '잉그리트', archetype: '박물관 도슨트', color: '#6a4a3a',
+      intro: '초콜릿 박물관 도슨트. "쾰른 사람들에게 쾰쉬는 술이 아니라 정체성이에요. 다른 동네에서 만들면 그건 쾰쉬가 아니거든요."' },
+    pois: [
+      { id: 'cologne-cath', name: '쾰른 대성당', type: 'cathedral', feeEur: 0, hours: '06:00-20:00', note: '1248년 착공해 1880년 완공까지 632년이 걸렸다.', sourceId: 'src:cologne-cath' },
+      { id: 'hohenzollern', name: '호엔촐레른 다리', type: 'bridge', feeEur: 0, hours: '상시', note: '2008년 무렵부터 연인들이 사랑의 자물쇠를 채우는 명소가 됐다.', sourceId: 'src:hohenzollern' },
+      { id: 'schokolade', name: '초콜릿 박물관', type: 'museum', feeEur: 14.5, hours: '10:00-18:00', note: '1993년 개관, 카카오나무 온실과 초콜릿 분수가 있다.', sourceId: 'src:schokoladenmuseum' },
+    ],
+    foods: [
+      { id: 'koelsch', name: '쾰쉬', nameLocal: 'Kölsch', baseEur: 3, venue: 'bistro', stamina: 15, origin: '쾰른에서 양조돼야만 이 이름을 쓸 수 있는 맥주로, 200ml짜리 슈탕에(Stange) 잔에 낸다.', sourceId: 'src:koelsch' },
+      { id: 'halver-hahn', name: '할버 한', nameLocal: 'Halver Hahn', baseEur: 4.5, venue: 'shop', stamina: 20, origin: '이름은 "반 마리 닭"이지만 실제로는 고다 치즈를 얹은 호밀빵이다 — 쾰른 사투리를 잘못 알아들은 데서 이름이 굳었다는 이야기가 전해진다.', sourceId: 'src:halver-hahn' },
+      { id: 'cafe', name: '카페', nameLocal: 'Kaffee', baseEur: 3.5, venue: 'bistro', stamina: 8, origin: '독일식 카페 문화는 케이크와 함께하는 오후 커피 시간(Kaffee und Kuchen)에서 온다.', sourceId: 'src:kaffee-kuchen' },
+    ],
+    missionIds: ['cologne-cathedral'],
+  },
+  {
+    id: 'geneva', tier: 'A', region: 'border', country: 'CH',
+    names: { ko: '제네바', fr: 'Genève', en: 'Geneva' },
+    coord: [6.1432, 46.2044], population: 205000, priceIndex: 1.7, currency: 'CHF', hostelEur: 35, transitFareEur: 3.0,
+    blurb: '스위스는 유럽연합도, 유로존도 아니다. 리옹역에서 TGV 리리아를 타고 도착하면 다시 환전소부터 찾아야 한다.',
+    guide: { name: '앙드레', archetype: '시계공', color: '#5c6b7a',
+      intro: '구시가 시계공방의 장인. "우리가 시계를 잘 만드는 건, 국경이 가까워서 언제나 시간을 정확히 맞춰야 했기 때문일지도 몰라요."' },
+    pois: [
+      { id: 'jet-deau', name: '제트 도(대분수)', type: 'landmark', feeEur: 0, hours: '상시', note: '레만 호수에서 시속 200km로 140m 높이까지 솟아오르는 분수.', sourceId: 'src:jet-deau' },
+      { id: 'reformation-wall', name: '종교개혁 기념벽', type: 'monument', feeEur: 0, hours: '상시', note: '1909년(칼뱅 탄생 400주년) 제막. 칼뱅 등 종교개혁가 조각상이 늘어서 있다.', sourceId: 'src:reformation-wall' },
+      { id: 'cern', name: 'CERN 사이언스 게이트웨이', type: 'museum', feeEur: 0, closedDays: [1], hours: '09:00-17:30', note: '1954년 설립된 유럽입자물리연구소. 1989년 팀 버너스리가 이곳에서 월드와이드웹을 고안했다.', sourceId: 'src:cern-www' },
+    ],
+    foods: [
+      { id: 'fondue', name: '치즈 퐁뒤', nameLocal: 'Fondue', baseEur: 14.3, venue: 'restaurant', stamina: 45, origin: '알프스 산간에서 굳은 치즈와 오래된 빵을 함께 먹기 위해 만든 겨울 음식이 스위스의 대표 요리가 됐다.', sourceId: 'src:fondue' },
+      { id: 'rosti', name: '뢰스티', nameLocal: 'Rösti', baseEur: 13, venue: 'bistro', stamina: 35, origin: '원래 베른 지방 농부의 아침 감자 요리였으나 스위스 전역의 대표 음식이 됐다.', sourceId: 'src:rosti' },
+      { id: 'cafe', name: '카페 크렘', nameLocal: 'Café crème', baseEur: 3.5, venue: 'bistro', stamina: 8, origin: '스위스의 커피값은 유럽에서 손꼽히게 비싸다 — 물가지수를 몸으로 배우기 좋은 잔이다.', sourceId: 'src:swiss-price' },
+    ],
+    missionIds: ['geneva-franc'],
+  },
+  {
+    id: 'barcelona', tier: 'A', region: 'border', country: 'ES',
+    names: { ko: '바르셀로나', fr: 'Barcelone', en: 'Barcelona' },
+    coord: [2.1734, 41.3851], population: 1620000, priceIndex: 0.9, hostelEur: 25, transitFareEur: 2.55,
+    heritage: ['UNESCO: 안토니 가우디의 작품군(1984/2005) — 사그라다 파밀리아·구엘 공원 포함'],
+    blurb: '지중해 빛 아래 가우디의 곡선. 프랑스보다 물가는 조금 낮고, 저녁은 훨씬 늦게 시작된다.',
+    guide: { name: '로라', archetype: '시장 상인', color: '#c17a2e',
+      intro: '보케리아 시장의 하몬 가판대 주인. "여기선 저녁을 9시에 먹어요. 파리보다 두 시간 늦죠 — 그래서 낮잠(siesta)이 필요한 거예요."' },
+    pois: [
+      { id: 'sagrada', name: '사그라다 파밀리아', type: 'basilica', feeEur: 26, hours: '09:00-18:00', note: '가우디가 1883년부터 설계·건축을 맡았다. 2026년은 그의 사후 100주년이다.', sourceId: 'src:sagrada' },
+      { id: 'park-guell', name: '구엘 공원', type: 'park', feeEur: 10, hours: '09:30-19:30', note: '1900~1914년 가우디가 설계한 공원. 원래는 주택단지로 기획됐다.', sourceId: 'src:park-guell' },
+      { id: 'boqueria', name: '보케리아 시장', type: 'market', feeEur: 0, closedDays: [0], hours: '08:00-20:30', note: '1217년 기록에 처음 등장하는, 람블라 거리의 시장.', sourceId: 'src:boqueria' },
+    ],
+    foods: [
+      { id: 'pa-tomaquet', name: '판 콘 토마테', nameLocal: 'Pa amb tomàquet', baseEur: 3.5, venue: 'bistro', stamina: 15, origin: '구운 빵에 잘 익은 토마토를 문질러 올리브유·소금을 더한 카탈루냐의 기본 식탁.', sourceId: 'src:pa-tomaquet' },
+      { id: 'jamon', name: '하몬 이베리코 한 접시', nameLocal: 'Jamón ibérico', baseEur: 12, venue: 'market', stamina: 30, origin: '이베리아 흑돼지를 도토리로 키워 만드는 스페인의 대표 염장 햄.', sourceId: 'src:jamon' },
+      { id: 'crema-catalana', name: '크레마 카탈라나', nameLocal: 'Crema catalana', baseEur: 5, venue: 'bistro', stamina: 15, origin: '커스터드에 캐러멜 막을 입힌 카탈루냐식 디저트로, 프랑스 크렘 브륄레보다 오래됐다는 주장도 있다.', sourceId: 'src:crema-catalana' },
+      { id: 'cafe', name: '카페 콘 레체', nameLocal: 'Café con leche', baseEur: 3.5, venue: 'bistro', stamina: 8, origin: '에스프레소에 따뜻한 우유를 섞어 아침에 마시는 스페인식 커피.', sourceId: 'src:jambon-beurre' },
+    ],
+    missionIds: ['barcelona-gaudi'],
+  },
 ];
 
 export const cityById = (id: string): City => {
@@ -288,6 +392,18 @@ export const EDGES: Edge[] = [
   E('amiens', 'lille', 'ter', 'SNCF TER', '아미앵역', 80, [14, 20], 14, '06:00', '21:30'),
   E('amiens', 'rouen', 'ter', 'SNCF TER', '아미앵역', 90, [15, 22], 8, '06:30', '20:30'),
   E('chartres', 'orleans', 'ter', 'Rémi', '샤르트르역', 75, [10, 15], 8, '06:40', '20:10'),
+  // 국경 너머(§3.3 국경의 셈법) — 국제선 요금은 실제로도 대개 유로 기준으로 안내된다
+  E('paris', 'london', 'eurostar', 'Eurostar', '북역', 136, [50, 200], 17, '05:40', '20:01',
+    '유로스타는 1994년 개통한 채널 터널을 지나 영불해협 밑을 달린다. 국경을 넘어도 표는 유로로 판다.', 'src:eurostar'),
+  E('paris', 'brussels', 'eurostar', 'Eurostar', '북역', 82, [30, 120], 25, '06:13', '21:22',
+    '옛 탈리스(Thalys) 노선으로, 2023년 유로스타 브랜드에 통합됐다. 벨기에도 유로존이라 환전 없이 바로 쓸 수 있다.', 'src:thalys'),
+  E('lille', 'brussels', 'eurostar', 'Eurostar', '릴 유럽역', 38, [12, 35], 12, '06:30', '22:00'),
+  E('paris', 'cologne', 'eurostar', 'Eurostar', '북역', 195, [39, 109], 4, '07:13', '17:13',
+    '옛 탈리스·ICE 국제선. 벨기에·독일을 거치며 세 나라, 한 통화(유로)를 지난다.', 'src:thalys'),
+  E('paris', 'geneva', 'tgv', 'TGV Lyria', '리옹역', 190, [39, 120], 6, '06:58', '19:11',
+    'TGV 리리아는 SNCF와 스위스 국철(SBB/CFF/FFS)의 합작 노선이다. 국경을 넘으면 유로존을 벗어나 스위스 프랑을 쓴다.', 'src:tgv-lyria'),
+  E('paris', 'barcelona', 'tgv', 'TGV inOui · Renfe', '리옹역', 390, [59, 150], 1, '08:25', '08:25',
+    '페르피냥–피게레스 국경 터널(2010 개통)을 지나는 프랑스-스페인 직결 고속선.', 'src:lgv-perpignan'),
 ];
 
 /** 양방향 조회 */

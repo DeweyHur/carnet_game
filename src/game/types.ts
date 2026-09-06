@@ -2,7 +2,7 @@
 // 기획서 4장 "도시 데이터 스키마"를 프로토타입 규모로 축약한 것.
 
 export type Tier = 'S' | 'A' | 'B' | 'H';
-export type RegionId = 'idf' | 'nord' | 'centre';
+export type RegionId = 'idf' | 'nord' | 'centre' | 'border';
 export type Currency = 'EUR' | 'KRW' | 'GBP' | 'CHF';
 
 export interface Source {
@@ -16,7 +16,7 @@ export interface Poi {
   id: string;
   name: string;
   type: string; // cathedral, museum, market, ...
-  feeEur: number;
+  feeEur: number; // 이 도시 통화 기준 실제 입장료(City.currency)
   /** 0=일 1=월 … 6=토. 비어 있으면 연중무휴 */
   closedDays?: number[];
   hours?: string; // 표시용 "09:00-18:00"
@@ -30,7 +30,7 @@ export interface Food {
   id: string;
   name: string;
   nameLocal: string;
-  /** 파리 기준가(€). 실제 가격 = base × 도시 물가지수 × 판매처 계수 */
+  /** 이 도시 통화 기준 상품 기준가. 실제 가격 = base × 도시 물가지수 × 판매처 계수 */
   baseEur: number;
   venue: VenueTier;
   stamina: number; // 회복량
@@ -55,13 +55,17 @@ export interface City {
   coord: [number, number];
   population: number;
   priceIndex: number; // 파리=1.00
+  /** 이 도시에서 실제로 쓰는 통화. 없으면 EUR(유로존 프랑스 도시 기본값). */
+  currency?: Currency;
   heritage?: string[];
   blurb: string;
   guide: Guide;
   pois: Poi[];
   foods: Food[];
   missionIds: string[];
-  hostelEur: number; // 1박 기준
+  hostelEur: number; // 1박 기준(이 도시 통화)
+  /** 도시 내 1회권 요금(이 도시 통화). 없으면 €2.50 상당. */
+  transitFareEur?: number;
 }
 
 export type Mode = 'metro' | 'rer' | 'transilien' | 'ter' | 'tgv' | 'intercites' | 'eurostar' | 'bus';

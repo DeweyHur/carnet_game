@@ -58,6 +58,32 @@ TARGETS = {
     'food:carbonnade': ('Carbonade flamande', '카르보나드 플라망드'),
     'food:welsh': ('Welsh rarebit', '웰시'),
     'food:moules': ('Moules-frites', '홍합과 감자튀김'),
+    # ── 국경 너머: 런던·브뤼셀·제네바
+    'london': ('Big Ben', '빅벤과 웨스트민스터궁'),
+    'london:st-pancras': ('St Pancras railway station', '세인트 판크라스 인터내셔널'),
+    'london:british-museum': ('British Museum', '대영박물관'),
+    'london:tower-bridge': ('Tower Bridge', '타워 브리지'),
+    'london:boe-museum': ('Bank of England Museum', '영란은행 박물관'),
+    'brussels': ('Grand-Place', '브뤼셀 그랑플라스'),
+    'brussels:atomium': ('Atomium', '아토미움'),
+    'geneva': ("Jet d'Eau", '제네바 분수'),
+    'geneva:reformation-wall': ('Reformation Wall', '종교개혁 기념벽'),
+    'food:fish-chips': ('Fish and chips', '피시 앤 칩스'),
+    'food:scone': ('Scone', '스콘'),
+    'food:gaufre': ('Belgian waffle', '벨기에 와플'),
+    'food:neuhaus': ('Neuhaus (chocolatier)', '뇌하우스 프랄린'),
+    'food:fondue': ('Fondue', '치즈 퐁뒤'),
+    'food:rosti': ('Rösti', '뢰스티'),
+    # ── 국경 너머: 쾰른·바르셀로나
+    'cologne': ('Cologne Cathedral', '쾰른 대성당'),
+    'cologne:hohenzollern': ('Hohenzollern Bridge', '호엔촐레른 다리'),
+    'barcelona': ('Sagrada Família', '사그라다 파밀리아'),
+    'barcelona:park-guell': ('Park Güell', '구엘 공원'),
+    'barcelona:boqueria': ('La Boqueria', '보케리아 시장'),
+    'food:koelsch': ('Kölsch (beer)', '쾰쉬'),
+    'food:pa-tomaquet': ('Pa amb tomàquet', '판 콘 토마테'),
+    'food:jamon': ('Jamón ibérico', '이베리코 하몬'),
+    'food:crema-catalana': ('Crema catalana', '크레마 카탈라나'),
 }
 HEADERS = {'User-Agent': 'CarnetGame/0.2 (educational travel game; Commons photo attribution downloader)'}
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Currency, FactCard, Speaker } from '../game/types';
 import { sourceById } from '../data/sources';
-import { CURRENCY_META, FX_CHANNELS, FX_EUR, FX_DATE, fmt, quote, type FxChannel } from '../game/economy';
+import { CURRENCY_META, FX_CHANNELS, FX_EUR, FX_DATE, convert, fmt, quote, type FxChannel } from '../game/economy';
 import { useGame } from '../game/store';
 import { cityById } from '../data/cities';
 
@@ -30,12 +30,12 @@ export function Avatar({ who, name, color }: { who: Speaker; name?: string; colo
 }
 
 /** 통화 병기: 현지 통화 크게 + 자국 통화 작게 (기획서 §3.3) */
-export function Price({ eur }: { eur: number }) {
+export function Price({ amount, currency = 'EUR' }: { amount: number; currency?: Currency }) {
   const home = useGame((s) => s.home);
   return (
     <div className="price">
-      {fmt(eur, 'EUR')}
-      {home !== 'EUR' && <small>≈ {fmt(eur * FX_EUR[home], home)}</small>}
+      {fmt(amount, currency)}
+      {home !== currency && <small>≈ {fmt(convert(amount, currency, home), home)}</small>}
     </div>
   );
 }

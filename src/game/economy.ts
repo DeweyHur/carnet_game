@@ -20,6 +20,10 @@ export function fmt(amount: number, cur: Currency): string {
 /** EUR 금액을 다른 통화로 (기준환율) */
 export const eurTo = (eur: number, cur: Currency) => eur * FX_EUR[cur];
 export const toEur = (amount: number, cur: Currency) => amount / FX_EUR[cur];
+/** from 통화 금액을 to 통화로 (기준환율, EUR을 거쳐 계산) */
+export const convert = (amount: number, from: Currency, to: Currency) => eurTo(toEur(amount, from), to);
+/** 도시가 실제로 쓰는 통화. 없으면 EUR(유로존 프랑스 도시 기본값). */
+export const cityCurrency = (city: City): Currency => city.currency ?? 'EUR';
 
 /** 환전 경로 5종과 스프레드 (기획서 §3.3) */
 export type FxChannel = 'airport' | 'city' | 'bank' | 'atm';
@@ -54,8 +58,8 @@ export function foodPrice(food: Food, city: City): number {
 export const HOME_COFFEE_KRW = 4500;
 export function coffeeIndex(city: City): number {
   const cafe = city.foods.find((f) => f.id === 'cafe');
-  const eur = cafe ? foodPrice(cafe, city) : 3.5 * city.priceIndex;
-  return eurTo(eur, 'KRW') / HOME_COFFEE_KRW;
+  const amount = cafe ? foodPrice(cafe, city) : 3.5 * city.priceIndex;
+  return convert(amount, cityCurrency(city), 'KRW') / HOME_COFFEE_KRW;
 }
 
 export type Grade = 'S' | 'A' | 'B' | 'C';

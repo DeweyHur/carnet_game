@@ -65,6 +65,29 @@ export const CARDS: FactCard[] = [
   { id: 'or-siege', cityId: 'orleans', poiId: 'maison-jeanne', text: '1429년 5월 8일, 잔 다르크가 합류한 프랑스군이 오를레앙의 포위를 풀었다. 백년전쟁의 전환점이었다.', sourceId: 'src:siege-orleans' },
   { id: 'or-fetes', cityId: 'orleans', text: '오를레앙은 1430년부터 거의 매년 5월 8일 포위 해제를 기념하는 축제(Fêtes johanniques)를 열어 왔다.', sourceId: 'src:fetes-johanniques' },
   { id: 'or-cotignac', cityId: 'orleans', text: '코티냑은 모과로 만든 젤리로, 작은 나무 상자에 담아 파는 오를레앙의 중세 이래 특산품이다.', sourceId: 'src:cotignac' },
+  // ── 런던
+  { id: 'ln-boe', cityId: 'london', poiId: 'boe-museum', text: '영란은행은 1694년 프랑스와의 전쟁 자금을 조달하기 위해 설립된 잉글랜드의 중앙은행이다.', sourceId: 'src:boe-museum' },
+  { id: 'ln-decimal', cityId: 'london', poiId: 'boe-museum', text: '영국은 1971년 2월 15일 "십진화의 날(D-Day)"에 1파운드=20실링=240펜스 체계를 버리고 1파운드=100펜스 십진 화폐로 바꿨다.', sourceId: 'src:decimal-day' },
+  { id: 'ln-bm', cityId: 'london', poiId: 'british-museum', text: '대영박물관은 1759년 문을 연 세계 최초의 국립 공공박물관으로, 상설 전시 입장이 무료다.', sourceId: 'src:british-museum' },
+  { id: 'ln-tower', cityId: 'london', poiId: 'tower-bridge', text: '타워 브리지는 1894년 개통한 배스큘(도개) 교량으로, 지금도 큰 배가 지날 때 다리 상판이 들어 올려진다.', sourceId: 'src:tower-bridge' },
+  { id: 'ln-fish', cityId: 'london', text: '피시 앤 칩스는 19세기 영국 산업 노동자의 값싼 한 끼로 퍼졌으며, 1860년 런던 이스트엔드에 첫 전문점이 열렸다고 전해진다.', sourceId: 'src:fish-chips' },
+  // ── 브뤼셀
+  { id: 'br-grandplace', cityId: 'brussels', poiId: 'grand-place', text: '그랑플라스는 1695년 프랑스군의 포격으로 대부분 파괴된 뒤, 4년 만에 지금의 모습으로 재건됐다.', sourceId: 'src:grand-place' },
+  { id: 'br-atomium', cityId: 'brussels', poiId: 'atomium', text: '아토미움은 1958년 브뤼셀 만국박람회를 위해 철 결정 구조를 1650억 배로 확대해 세운 건축물이다.', sourceId: 'src:atomium' },
+  { id: 'br-euro', cityId: 'brussels', poiId: 'parlamentarium', text: '유로는 1999년 은행 간 전자화폐로 먼저 도입되고, 2002년에야 지폐와 동전이 유통되기 시작했다.', sourceId: 'src:euro-history' },
+  { id: 'br-praline', cityId: 'brussels', text: '벨기에식 프랄린(속을 채운 초콜릿)은 1912년 장 뇌하우스 2세가 브뤼셀의 가족 초콜릿 가게에서 발명했다고 전해진다.', sourceId: 'src:neuhaus' },
+  // ── 쾰른
+  { id: 'co-cath', cityId: 'cologne', poiId: 'cologne-cath', text: '쾰른 대성당은 1248년 착공했지만 공사가 오래 중단됐다가 1880년에야 완공됐다 — 632년이 걸린 셈이다.', sourceId: 'src:cologne-cath' },
+  { id: 'co-hohenzollern', cityId: 'cologne', poiId: 'hohenzollern', text: '호엔촐레른 다리는 2008년 무렵부터 연인들이 사랑의 자물쇠를 채우는 명소가 되어, 지금은 수십만 개가 걸려 있다.', sourceId: 'src:hohenzollern' },
+  { id: 'co-koelsch', cityId: 'cologne', text: '쾰쉬는 유럽연합의 지리적 표시제로 보호받는 명칭이라, 쾰른 인근에서 정해진 방식으로 양조한 맥주만 그 이름을 쓸 수 있다.', sourceId: 'src:koelsch' },
+  // ── 제네바
+  { id: 'ge-reform', cityId: 'geneva', poiId: 'reformation-wall', text: '종교개혁 기념벽은 장 칼뱅 탄생 400주년인 1909년에 제막됐으며, 제네바가 종교개혁의 중심지였음을 기린다.', sourceId: 'src:reformation-wall' },
+  { id: 'ge-cern', cityId: 'geneva', poiId: 'cern', text: 'CERN은 1954년 설립된 유럽입자물리연구소로, 1989년 팀 버너스리가 이곳에서 월드와이드웹을 처음 제안했다.', sourceId: 'src:cern-www' },
+  { id: 'ge-chf', cityId: 'geneva', text: '스위스는 유럽연합 회원국이 아니며 유로존에도 속하지 않아, 스위스 프랑(CHF)이라는 독자 통화를 쓴다.', sourceId: 'src:swiss-price' },
+  // ── 바르셀로나
+  { id: 'ba-sagrada', cityId: 'barcelona', poiId: 'sagrada', text: '안토니 가우디는 1883년부터 사그라다 파밀리아의 설계와 건축을 맡았지만, 1926년 세상을 떠날 때까지 완공을 보지 못했다.', sourceId: 'src:sagrada' },
+  { id: 'ba-guell', cityId: 'barcelona', poiId: 'park-guell', text: '구엘 공원은 1900~1914년 가우디가 설계했으며, 원래는 영국식 전원주택 단지로 기획됐다가 공공 공원이 됐다.', sourceId: 'src:park-guell' },
+  { id: 'ba-boqueria', cityId: 'barcelona', poiId: 'boqueria', text: '보케리아 시장은 1217년 기록에 처음 등장할 만큼 오래된, 람블라 거리의 노천 시장에서 시작됐다.', sourceId: 'src:boqueria' },
 ];
 
 export const cardById = (id: string): FactCard => {

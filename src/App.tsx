@@ -18,6 +18,7 @@ export default function App() {
   const log = useGame((s) => s.log);
   const letters = useGame((s) => s.letters);
   const finalShown = useGame((s) => s.finalShown);
+  const voyageShown = useGame((s) => s.voyageShown);
   const active = useGame((s) => s.active);
   const [selected, setSelected] = useState<string | null>('paris');
   const [notebook, setNotebook] = useState(false);
@@ -27,6 +28,7 @@ export default function App() {
   // 도착하면 도착 도시 카드 열기
   useEffect(() => { if (!travelling) setSelected(cityId); }, [cityId, travelling]);
   useEffect(() => { if (finalShown && !active) setFinalOpen(true); }, [finalShown, active]);
+  useEffect(() => { if (voyageShown && !active) setFinalOpen(true); }, [voyageShown, active]);
   useEffect(() => {
     if (!travelling) return;
     const timer = window.setTimeout(() => useGame.getState().arrive(), 4500);
@@ -59,7 +61,7 @@ export default function App() {
       {finalOpen && last && (
         <div className="scene" onClick={() => setFinalOpen(false)}>
           <div className="scene-box" onClick={(e) => e.stopPropagation()}>
-            <div className="mission-tag">프랑스 북부·중부 완주</div>
+            <div className="mission-tag">지역 완주 · L.의 편지</div>
             <div className="letter"><h3>✉ {last.title}</h3>{last.text}</div>
             <div className="scene-actions"><button className="btn" onClick={() => setFinalOpen(false)}>닫기</button></div>
           </div>

@@ -5,6 +5,7 @@ import { CURRENCY_META, FX_EUR, fmt } from '../game/economy';
 import TravelPhoto from './TravelPhoto';
 import { photoById } from '../data/photos';
 import { MISSIONS } from '../data/missions';
+import { CITIES } from '../data/cities';
 
 export default function Intro() {
   const newGame = useGame((s) => s.newGame);
@@ -12,13 +13,13 @@ export default function Intro() {
   const [home, setHome] = useState<Currency>('KRW');
   return (
     <div className="intro">
-      <div className="intro-landscape"><TravelPhoto photo={photoById('paris')} priority /><div className="intro-photo-note"><span>01 / PARIS, FRANCE</span><b>길을 잃어도,<br />이야기는 남으니까.</b><small>한 장의 사진에서 시작하는 프랑스 여행</small></div></div>
+      <div className="intro-landscape"><TravelPhoto photo={photoById('paris')} priority /><div className="intro-photo-note"><span>01 / PARIS, FRANCE</span><b>길을 잃어도,<br />이야기는 남으니까.</b><small>한 장의 사진에서 시작해 국경 너머로 이어지는 여행</small></div></div>
       <div className="intro-card">
         <div className="eyebrow">A LITTLE JOURNEY, A THOUSAND STORIES</div>
         <h1>Carnet<span className="intro-period">.</span><small>세계를 걷는 기록</small></h1>
         <p className="intro-invitation">기차표 한 장, 카메라 하나.<br />당신만의 여행을 써 내려가세요.</p>
-        <p>파리의 작은 여행 잡지에 도착한 낡은 사진 상자. 사라진 선배 L.의 흔적을 따라 골목을 걷고, 현지 음식을 맛보고, 다음 도시로 향하는 기사를 써보세요.</p>
-        <div className="intro-features"><span><b>12</b>개의 실제 도시</span><span><b>{MISSIONS.length}</b>개의 취재 미션</span><span><b>∞</b>나만의 시선</span></div>
+        <p>파리의 작은 여행 잡지에 도착한 낡은 사진 상자. 사라진 선배 L.의 흔적을 따라 골목을 걷고, 현지 음식을 맛보고, 다음 도시로 향하는 기사를 써보세요. 라이벌 작가 테오는 이미 국경 너머로 떠났습니다 — 프랑스를 다 걷고 갈지, 그를 앞질러 갈지는 당신의 선택입니다.</p>
+        <div className="intro-features"><span><b>{CITIES.length}</b>개의 실제 도시</span><span><b>{MISSIONS.length}</b>개의 취재 미션</span><span><b>∞</b>나만의 시선</span></div>
         <label>작가 이름<input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김카르네" /></label>
         <label>출신국 통화 (자국 통화 — 모든 가격에 병기됩니다)
           <select value={home} onChange={(e) => setHome(e.target.value as Currency)}>

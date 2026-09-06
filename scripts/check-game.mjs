@@ -16,7 +16,7 @@ try {
   const { foodPrice } = await server.ssrLoadModule('/src/game/economy.ts');
   const { useGame } = await server.ssrLoadModule('/src/game/store.ts');
   const state = () => useGame.getState();
-  assert.equal(DISCOVERY_MISSIONS.length, 24);
+  assert.equal(DISCOVERY_MISSIONS.length, CITIES.length * 2);
   assert.equal(new Set(MISSIONS.map((m) => m.id)).size, MISSIONS.length);
   const positions = new Set();
   for (const city of CITIES) {

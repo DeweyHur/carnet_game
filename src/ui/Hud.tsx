@@ -1,13 +1,14 @@
 import { useGame, WEEKDAYS, weekdayOf, clock } from '../game/store';
-import { FX_EUR, fmt } from '../game/economy';
+import { toEur, fmt } from '../game/economy';
 import { cityById, REGIONS } from '../data/cities';
+import type { Currency } from '../game/types';
 
 interface Props { onNotebook: () => void; onCity: () => void }
 
 export default function Hud({ onNotebook, onCity }: Props) {
   const s = useGame();
   const city = cityById(s.cityId);
-  const eurTotal = s.wallet.EUR + (s.home === 'EUR' ? 0 : s.wallet[s.home] / FX_EUR[s.home]);
+  const eurTotal = (Object.keys(s.wallet) as Currency[]).reduce((sum, c) => sum + toEur(s.wallet[c], c), 0);
   const unread = s.letters.length;
   return (
     <div className="hud">

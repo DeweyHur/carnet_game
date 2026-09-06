@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { cityById, edgesFrom, REGIONS } from '../data/cities';
 import { missionById, missionsForCity } from '../data/missions';
 import { useGame, WEEKDAYS, weekdayOf, clock } from '../game/store';
-import { coffeeIndex, foodPrice, VENUE_NAME, fmt, FX_EUR } from '../game/economy';
+import { cityCurrency, coffeeIndex, convert, foodPrice, VENUE_NAME, fmt, FX_EUR } from '../game/economy';
 import { Price } from './common';
 import type { Edge } from '../game/types';
 import { photoById, placePhoto } from '../data/photos';
@@ -18,6 +18,7 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? 'missions');
   const s = useGame();
   const city = cityById(cityId);
+  const cur = cityCurrency(city);
   const here = s.cityId === cityId;
   const paris = cityById('paris');
   const wd = weekdayOf(s.day);
@@ -65,7 +66,7 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
             })}
             {here && (
               <div className="row">
-                <div><div className="n">숙소에서 자기</div><div className="s">호스텔 1박 {fmt(Math.round(city.hostelEur * city.priceIndex), 'EUR')} · 체력 회복 · 다음 날 08:00</div></div>
+                <div><div className="n">숙소에서 자기</div><div className="s">호스텔 1박 {fmt(Math.round(city.hostelEur * city.priceIndex), cur)}{cur !== s.home && ` (≈ ${fmt(convert(Math.round(city.hostelEur * city.priceIndex), cur, s.home), s.home)})`} · 체력 회복 · 다음 날 08:00</div></div>
                 <button className="btn sm ghost" onClick={() => s.sleep()}>자기</button>
               </div>
             )}
@@ -84,7 +85,7 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
                 <div className={`s${closed ? ' closed' : ''}`}>{p.hours ?? '상시'}{p.closedDays?.length ? ` · ${p.closedDays.map((d) => WEEKDAYS[d]).join('·')} 휴관` : ''}{closed ? ` — 오늘(${WEEKDAYS[wd]}) 휴관` : ''}</div>
                 {p.note && <div className="s">{p.note}</div>}
               </div>
-              <div className="place-action"><Price eur={p.feeEur} />{here && <button className="btn sm ghost" disabled={closed || !!s.active} onClick={() => { const result = s.visitPoi(p.id, 30); setMsg(result.ok ? `${p.name} 방문 완료. ${placePhoto(cityId, p.id) ? '사진을 앨범에 붙였어요.' : '산책 기록을 남겼어요.'}` : result.reason!); }}>{visited ? '다시 산책' : '방문하기'}</button>}</div>
+              <div className="place-action"><Price amount={p.feeEur} currency={cur} />{here && <button className="btn sm ghost" disabled={closed || !!s.active} onClick={() => { const result = s.visitPoi(p.id, 30); setMsg(result.ok ? `${p.name} 방문 완료. ${placePhoto(cityId, p.id) ? '사진을 앨범에 붙였어요.' : '산책 기록을 남겼어요.'}` : result.reason!); }}>{visited ? '다시 산책' : '방문하기'}</button>}</div>
               </div>
             </div>
           );
@@ -120,11 +121,11 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
         {tab === 'food' && (
           <>
             <p className="blurb">{city.names.ko}에서 맛보는 한 끼. 먹으면 체력이 회복되고 음식 사진이 앨범에 남아요.</p>
-            {here && !s.completed.includes(`${cityId}-discovery-food`) && <button className="food-challenge" disabled={!!s.active} onClick={() => s.startMission(`${cityId}-discovery-food`)}>€ 가격표 맞추기 도전 <span>선택형 미식 미션 →</span></button>}
+            {here && !s.completed.includes(`${cityId}-discovery-food`) && <button className="food-challenge" disabled={!!s.active} onClick={() => s.startMission(`${cityId}-discovery-food`)}>가격표 맞추기 도전 <span>선택형 미식 미션 →</span></button>}
             {city.foods.map((f) => {
               const price = foodPrice(f, city);
               const pf = paris.foods.find((x) => x.id === f.id);
-              const ratio = pf ? price / foodPrice(pf, paris) : null;
+              const ratio = pf ? convert(price, cur, 'EUR') / foodPrice(pf, paris) : null;
               return (
                 <div className="food-card" key={f.id}>
                   <TravelPhoto photo={photoById(`food:${f.id}`)} className="food-image" compact />
@@ -135,7 +136,7 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
                   </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <Price eur={price} />
+                    <Price amount={price} currency={cur} />
                     {here && <button className="btn sm ghost" style={{ marginTop: 4 }} onClick={() => s.buyFood(f.id)}>먹기 +{f.stamina}</button>}
                   </div>
                 </div>

@@ -4,8 +4,8 @@ import type { Currency, Edge, RegionId, Step } from './types';
 import { CITIES, cityById } from '../data/cities';
 import { cardById } from '../data/cards';
 import { photoById, placePhoto } from '../data/photos';
-import { MISSIONS, missionById, FINAL_LETTER } from '../data/missions';
-import { CARD_FEE, FX_EUR, FX_CHANNELS, foodPrice, gradeArticle, quote, toEur, type FxChannel, type Grade } from './economy';
+import { MISSIONS, missionById, FINAL_LETTER, EPILOGUE_LETTER } from '../data/missions';
+import { CARD_FEE, FX_EUR, FX_CHANNELS, cityCurrency, convert, foodPrice, fmt, gradeArticle, quote, toEur, type FxChannel, type Grade } from './economy';
 
 export const START_WEEKDAY = 2; // 2026-09-08 화요일
 export const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -50,6 +50,7 @@ export interface GameState {
   fxLost: number; // 환전·카드 수수료로 잃은 누적 EUR
   log: LogEntry[];
   finalShown: boolean;
+  voyageShown: boolean;
   travelling: { edge: Edge; arriveMinute: number } | null;
   paused: boolean;
   snapshots: Snapshot[];
@@ -63,7 +64,7 @@ export interface GameState {
   reset: () => void;
   addLog: (text: string, kind?: LogEntry['kind']) => void;
   spendMinutes: (m: number, stamina?: number) => void;
-  payEur: (eur: number, label: string) => boolean;
+  pay: (amount: number, currency: Currency, label: string) => boolean;
   exchange: (amount: number, from: Currency, to: Currency, ch: FxChannel) => void;
   buyFood: (foodId: string, guessEur?: number) => { price: number } | null;
   visitPoi: (poiId: string, minutes: number) => { ok: boolean; reason?: string };
@@ -82,14 +83,14 @@ export const weekdayOf = (day: number) => (START_WEEKDAY + day - 1) % 7;
 export const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
 const parseHm = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
 
-type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'payEur' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused' | 'capturePhoto';
+type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'pay' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused' | 'capturePhoto';
 type Data = Omit<GameState, Actions>;
 const fresh = (): Data => ({
   started: false, playerName: '', home: 'KRW', day: 1, minute: 9 * 60, cityId: 'paris',
   wallet: { EUR: 0, KRW: 3_000_000, GBP: 0, CHF: 0 },
   stamina: 100, reputation: 0, debt: 0,
   unlocked: ['idf'], visited: ['paris'], cards: [], articles: [], stamps: [], collectibles: [], letters: [],
-  completed: [], active: null, guesses: [], fxLost: 0, log: [], finalShown: false, travelling: null, paused: false,
+  completed: [], active: null, guesses: [], fxLost: 0, log: [], finalShown: false, voyageShown: false, travelling: null, paused: false,
   snapshots: [], visitedPois: [], tastedFoods: [],
 });
 
@@ -121,33 +122,34 @@ export const useGame = create<GameState>()(
 
       spendMinutes: (m, st = 0) => set((s) => ({ minute: s.minute + m, stamina: Math.max(0, s.stamina - st) })),
 
-      payEur: (eur, label) => {
+      // amount는 currency 기준 실제 금액(도시 통화 또는 EUR). 부족하면 카드(자국 통화, 수수료 1.5%) → 편집장 선지급 순.
+      pay: (amount, currency, label) => {
         const s = get();
         const w = { ...s.wallet };
         let fxLost = s.fxLost;
-        if (w.EUR >= eur) {
-          w.EUR = Math.round((w.EUR - eur) * 100) / 100;
+        if (w[currency] >= amount) {
+          w[currency] = Math.round((w[currency] - amount) * 100) / 100;
           set({ wallet: w });
-          get().addLog(`${label}: −€${eur.toFixed(2)} (현금)`, 'money');
+          get().addLog(`${label}: −${fmt(amount, currency)} (현금)`, 'money');
           return true;
         }
         // 부족분은 카드 결제(자국 통화 계좌에서 인출, 수수료 1.5%)
-        const remain = eur - w.EUR;
-        const homeNeed = remain * FX_EUR[s.home] * (1 + CARD_FEE);
+        const remain = amount - w[currency];
+        const homeNeed = convert(remain, currency, s.home) * (1 + CARD_FEE);
         if (w[s.home] >= homeNeed) {
-          w.EUR = 0;
+          w[currency] = 0;
           w[s.home] = Math.round(w[s.home] - homeNeed);
-          fxLost += remain * CARD_FEE;
+          fxLost += toEur(remain, currency) * CARD_FEE;
           set({ wallet: w, fxLost });
-          get().addLog(`${label}: −€${eur.toFixed(2)} (현금 부족분 €${remain.toFixed(2)}은 카드, 수수료 1.5%)`, 'money');
+          get().addLog(`${label}: −${fmt(amount, currency)} (현금 부족분 ${fmt(remain, currency)}은 카드, 수수료 1.5%)`, 'money');
           return true;
         }
-        // 파산 → 편집장 선지급 €300, 이자 10%
-        const adv = 300;
-        w.EUR = Math.round((w.EUR + adv) * 100) / 100;
-        set({ wallet: w, debt: s.debt + adv * 1.1 });
-        get().addLog('잔고 부족. 마고 편집장이 €300을 선지급했다 (이자 10%, 원고료에서 차감).', 'warn');
-        return get().payEur(eur, label);
+        // 파산 → 편집장 선지급 €300 상당, 이자 10%
+        const advLocal = convert(300, 'EUR', currency);
+        w[currency] = Math.round((w[currency] + advLocal) * 100) / 100;
+        set({ wallet: w, debt: s.debt + 300 * 1.1 });
+        get().addLog(`잔고 부족. 마고 편집장이 ${fmt(advLocal, currency)}(≈€300)을 선지급했다 (이자 10%, 원고료에서 차감).`, 'warn');
+        return get().pay(amount, currency, label);
       },
 
       exchange: (amount, from, to, ch) => {
@@ -170,7 +172,7 @@ export const useGame = create<GameState>()(
         const missionPurchase = missionStep?.t === 'buy' && missionStep.foodId === foodId;
         if (missionPurchase && s.active?.result?.kind === 'buy') return { price: s.active.result.price };
         const price = foodPrice(food, city);
-        get().payEur(price, `${food.name} 구매`);
+        get().pay(price, cityCurrency(city), `${food.name} 구매`);
         set((st) => ({
           stamina: Math.min(100, st.stamina + food.stamina), minute: st.minute + 15,
           guesses: guessEur !== undefined ? [...st.guesses, { foodId, cityId: city.id, expected: guessEur, actual: price }] : st.guesses,
@@ -190,7 +192,7 @@ export const useGame = create<GameState>()(
         if (poi.closedDays?.includes(wd)) return { ok: false, reason: `${poi.name}은(는) ${WEEKDAYS[wd]}요일 휴관입니다. 실제 개장 요일을 따릅니다.` };
         if (s.minute + minutes > CURFEW_MINUTE) return { ok: false, reason: '너무 늦었습니다. 오늘은 여기까지 — 숙소에서 자고 내일 다시.' };
         if (s.stamina < 15) return { ok: false, reason: '체력이 바닥났습니다. 뭔가 먹거나 자야 합니다.' };
-        if (poi.feeEur > 0) get().payEur(poi.feeEur, `${poi.name} 입장`);
+        if (poi.feeEur > 0) get().pay(poi.feeEur, cityCurrency(city), `${poi.name} 입장`);
         set({ minute: s.minute + minutes, stamina: Math.max(0, s.stamina - Math.round(minutes / 8)) });
         set({ visitedPois: Array.from(new Set([...s.visitedPois, `${city.id}:${poiId}`])) });
         const photo = placePhoto(city.id, poiId);
@@ -203,7 +205,7 @@ export const useGame = create<GameState>()(
         const s = get();
         const city = cityById(s.cityId);
         const cost = Math.round(city.hostelEur * city.priceIndex);
-        get().payEur(cost, `${city.names.ko} 호스텔 1박`);
+        get().pay(cost, cityCurrency(city), `${city.names.ko} 호스텔 1박`);
         const late = s.minute > 24 * 60;
         set({ day: s.day + 1, minute: WAKE_MINUTE, stamina: late ? 80 : 100,
           active: s.active ? { ...s.active, pendingSleep: false } : null });
@@ -222,7 +224,7 @@ export const useGame = create<GameState>()(
         let last = parseHm(edge.last);
         if (last < first0) last += 24 * 60; // 자정 넘는 막차
         if (!advance && s.minute > last) return { ok: false, reason: `막차(${edge.last})가 떠났습니다. 내일 첫차를 예약하세요.` };
-        get().payEur(fare, `${dest.names.ko}행 ${edge.operator} (${advance ? '미리 예약' : '당일'})`);
+        get().pay(fare, 'EUR', `${dest.names.ko}행 ${edge.operator} (${advance ? '미리 예약' : '당일'})`);
         let minute = s.minute;
         let day = s.day;
         if (advance) {
@@ -296,7 +298,8 @@ export const useGame = create<GameState>()(
               break;
             }
             case 'move': {
-              get().payEur(2.5, `${step.zone} 이동 (1회권)`);
+              const moveCity = cityById(m.cityId);
+              get().pay(moveCity.transitFareEur ?? 2.5, cityCurrency(moveCity), `${step.zone} 이동 (1회권)`);
               set({ minute: get().minute + step.minutes, stamina: Math.max(0, get().stamina - 3) });
               break;
             }
@@ -309,10 +312,15 @@ export const useGame = create<GameState>()(
           const completed = [...get().completed, m.id];
           set({ active: null, completed });
           get().addLog(`미션 완료: 「${m.title}」`, 'story');
-          // 프로토타입 엔딩: 북부·중부 전부 완료
+          // 북부·중부 소도시 전부 완료 → 축하 편지 (국경 너머는 불로뉴 미션에서 이미 해금됨)
           const remote = MISSIONS.filter((x) => !x.id.includes('-discovery-') && ['nord', 'centre'].includes(cityById(x.cityId).region));
           if (!get().finalShown && remote.every((x) => completed.includes(x.id))) {
             set({ finalShown: true, letters: [...get().letters, { ...FINAL_LETTER, day: get().day }] });
+          }
+          // 국경 너머(런던·브뤼셀·제네바·쾰른·바르셀로나) 전부 완료 → 완결 편지
+          const border = MISSIONS.filter((x) => !x.id.includes('-discovery-') && cityById(x.cityId).region === 'border');
+          if (!get().voyageShown && border.length > 0 && border.every((x) => completed.includes(x.id))) {
+            set({ voyageShown: true, letters: [...get().letters, { ...EPILOGUE_LETTER, day: get().day }] });
           }
         } else {
           set({ active: { ...a, step: next, result: undefined } });

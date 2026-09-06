@@ -5,7 +5,7 @@ import { cityById } from '../data/cities';
 import { cardById } from '../data/cards';
 import type { Speaker, Step } from '../game/types';
 import { Avatar, ExchangeForm, FactCardView, Price } from './common';
-import { foodPrice, fmt, FX_EUR, type Grade } from '../game/economy';
+import { cityCurrency, convert, foodPrice, fmt, CURRENCY_META, type Grade } from '../game/economy';
 import { priceChoices } from '../game/priceChoices';
 import { photoById, placePhoto } from '../data/photos';
 import TravelPhoto from './TravelPhoto';
@@ -81,21 +81,26 @@ function StepView({ step, guideName, guideRole, guideColor }: { step: Step; guid
     case 'order': return <Order step={step} />;
     case 'visit': return <Visit step={step} />;
     case 'buy': return <Buy step={step} />;
-    case 'exchange':
+    case 'exchange': {
+      const already = g.wallet[step.to] >= 20;
       return (
         <>
-          <div className="speaker"><Avatar who="guide" name={guideName} color={guideColor} /><div className="speech"><Who who="guide" name={guideName} role={guideRole} /><div className="txt">{g.home === 'KRW' ? step.hint : g.home === 'EUR' ? '이미 유로를 가지고 있네요. 바로 다음 취재로 가도 좋아요.' : `보유한 ${g.home}를 유로로 바꿔보세요. 환전소마다 실제 받는 금액이 어떻게 다른지 살펴봐요.`}</div></div></div>
-          {g.home !== 'EUR' && <ExchangeForm defaultFrom={g.home} defaultTo={step.to} />}
-          <div className="scene-actions"><span className="hint">보유 {fmt(g.wallet.EUR, 'EUR')}</span><button className="btn ghost" disabled={g.wallet.EUR < 20} onClick={next}>유로가 생겼다 ▸</button></div>
+          <div className="speaker"><Avatar who="guide" name={guideName} color={guideColor} /><div className="speech"><Who who="guide" name={guideName} role={guideRole} /><div className="txt">{already ? `이미 ${CURRENCY_META[step.to].name}를 충분히 갖고 있네요. 바로 다음 취재로 가도 좋아요.` : step.hint}</div></div></div>
+          {!already && <ExchangeForm defaultFrom={step.from} defaultTo={step.to} />}
+          <div className="scene-actions"><span className="hint">보유 {fmt(g.wallet[step.to], step.to)}</span><button className="btn ghost" disabled={g.wallet[step.to] < 20} onClick={next}>{CURRENCY_META[step.to].name}이(가) 생겼다 ▸</button></div>
         </>
       );
-    case 'move':
+    }
+    case 'move': {
+      const moveCur = cityCurrency(city);
+      const moveFare = city.transitFareEur ?? 2.5;
       return (
         <>
-          <div className="speech"><div className="txt narr">도시 안 이동: <b>{step.zone}</b>. 1회권 €2.50, 약 {step.minutes}분. (지금 {clock(g.minute)})</div></div>
+          <div className="speech"><div className="txt narr">도시 안 이동: <b>{step.zone}</b>. 1회권 {fmt(moveFare, moveCur)}, 약 {step.minutes}분. (지금 {clock(g.minute)})</div></div>
           <div className="scene-actions"><button className="btn" onClick={next}>🚇 타기 ▸</button></div>
         </>
       );
+    }
     case 'article': return <Article baseFee={step.baseFee} />;
     case 'letter':
       return (
@@ -212,6 +217,7 @@ function Visit({ step }: { step: Extract<Step, { t: 'visit' }> }) {
   const g = useGame();
   const city = cityById(g.cityId);
   const poi = city.pois.find((p) => p.id === step.poiId)!;
+  const cur = cityCurrency(city);
   const [err, setErr] = useState<string | null>(null);
   const wd = weekdayOf(g.day);
   const closed = poi.closedDays?.includes(wd);
@@ -221,13 +227,13 @@ function Visit({ step }: { step: Extract<Step, { t: 'visit' }> }) {
       <div className="q">📍 {poi.name}</div>
       <div className="row" style={{ borderBottom: 'none' }}>
         <div className="s">{poi.hours ?? '상시'}{poi.closedDays?.length ? ` · ${poi.closedDays.map((d) => WEEKDAYS[d]).join('·')} 휴관` : ''} · 관람 약 {step.minutes}분 · 지금 {clock(g.minute)}, {WEEKDAYS[wd]}요일{poi.note ? ` · ${poi.note}` : ''}</div>
-        <Price eur={poi.feeEur} />
+        <Price amount={poi.feeEur} currency={cur} />
       </div>
       {(err || closed) && <div className="closed-notice">{err ?? `${poi.name}은(는) ${WEEKDAYS[wd]}요일 휴관입니다. 실제 개장 요일을 따릅니다.`}<br /><small>숙소에서 자고 내일 다시 오거나, 미션을 잠시 접어둘 수 있습니다.</small></div>}
       <div className="scene-actions">
         <span className="hint">체력 {g.stamina}</span>
         <button className="btn ghost sm" onClick={() => g.setPaused(true)}>잠시 접기</button>
-        {(err || closed) && <button className="btn ghost" onClick={() => { g.sleep(); setErr(null); }}>숙소에서 자기 (€{Math.round(city.hostelEur * city.priceIndex)})</button>}
+        {(err || closed) && <button className="btn ghost" onClick={() => { g.sleep(); setErr(null); }}>숙소에서 자기 ({fmt(Math.round(city.hostelEur * city.priceIndex), cur)})</button>}
         <button className="btn" disabled={closed} onClick={go}>입장 ▸</button>
       </div>
     </>
@@ -238,6 +244,7 @@ function Buy({ step }: { step: Extract<Step, { t: 'buy' }> }) {
   const g = useGame();
   const city = cityById(g.cityId);
   const food = city.foods.find((f) => f.id === step.foodId)!;
+  const cur = cityCurrency(city);
   const price = foodPrice(food, city);
   const [guess, setGuess] = useState<number | null>(null);
   const choices = useMemo(() => priceChoices(price, `${city.id}:${food.id}`), [price, city.id, food.id]);
@@ -255,23 +262,23 @@ function Buy({ step }: { step: Extract<Step, { t: 'buy' }> }) {
           {step.guess ? (
             <div className="price-game">
               <p>이 도시에서는 얼마일까요? 가격표 하나를 골라보세요.</p>
-              <div className="price-options">{choices.map((value, i) => <button key={value} aria-pressed={guess === value} className={guess === value ? 'selected' : ''} onClick={() => setGuess(value)}><span>{String.fromCharCode(65 + i)}</span><b>{fmt(value, 'EUR')}</b><small>≈ {fmt(value * FX_EUR[home], home)}</small></button>)}</div>
+              <div className="price-options">{choices.map((value, i) => <button key={value} aria-pressed={guess === value} className={guess === value ? 'selected' : ''} onClick={() => setGuess(value)}><span>{String.fromCharCode(65 + i)}</span><b>{fmt(value, cur)}</b><small>≈ {fmt(convert(value, cur, home), home)}</small></button>)}</div>
               <div className="scene-actions"><span className="hint">선택한 값은 예상가예요. 결제는 실제 가격으로 진행돼요.</span><button className="btn" disabled={guess === null} onClick={doBuy}>가격 확인하고 맛보기 →</button></div>
             </div>
           ) : (
-            <div className="scene-actions"><Price eur={price} /><button className="btn" onClick={doBuy}>사기</button></div>
+            <div className="scene-actions"><Price amount={price} currency={cur} /><button className="btn" onClick={doBuy}>사기</button></div>
           )}
-          <div className="hint" style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>힌트: 파리 기준가 {fmt(food.baseEur, 'EUR')} · 이 도시 물가지수 {city.priceIndex.toFixed(2)}</div>
+          <div className="hint" style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>힌트: 기준가 {fmt(food.baseEur, cur)} · 이 도시 물가지수 {city.priceIndex.toFixed(2)}</div>
         </>
       ) : (
         <>
           <div className="receipt">
-            <div className="l"><span>{food.nameLocal}</span><span>{fmt(price, 'EUR')}</span></div>
-            <div className="l"><span>≈ 자국 통화</span><span>{fmt(price * FX_EUR[home], home)}</span></div>
-            {err !== null && <div className="l"><span>내 예상 €{bought}</span><span>오차 {Math.round(err * 100)}%</span></div>}
-            <div className="l tot"><span>체력 +{food.stamina}</span><span>{fmt(g.wallet.EUR, 'EUR')} 남음</span></div>
+            <div className="l"><span>{food.nameLocal}</span><span>{fmt(price, cur)}</span></div>
+            {cur !== home && <div className="l"><span>≈ 자국 통화</span><span>{fmt(convert(price, cur, home), home)}</span></div>}
+            {err !== null && <div className="l"><span>내 예상 {fmt(bought, cur)}</span><span>오차 {Math.round(err * 100)}%</span></div>}
+            <div className="l tot"><span>체력 +{food.stamina}</span><span>{fmt(g.wallet[cur], cur)} 남음</span></div>
           </div>
-          {err !== null && <div className="explain">{err < 0.15 ? '거의 정확. 이 도시 물가가 손에 잡히기 시작했다.' : err < 0.4 ? '방향은 맞다. 파리 기준가에 물가지수를 곱해 보자.' : '많이 빗나갔다. 카드 결제 전에 현지 통화로 한 번 더 셈해 보는 습관.'}</div>}
+          {err !== null && <div className="explain">{err < 0.15 ? '거의 정확. 이 도시 물가가 손에 잡히기 시작했다.' : err < 0.4 ? '방향은 맞다. 기준가에 물가지수를 곱해 보자.' : '많이 빗나갔다. 카드 결제 전에 현지 통화로 한 번 더 셈해 보는 습관.'}</div>}
           <div className="scene-actions"><button className="btn" onClick={g.nextStep}>계속 ▸</button></div>
         </>
       )}

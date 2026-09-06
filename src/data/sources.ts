@@ -64,6 +64,47 @@ export const SOURCES: Source[] = [
   { id: 'src:ter-nomad', title: 'TER Nomad (Normandie)', url: 'https://fr.wikipedia.org/wiki/TER_Normandie', license: 'CC BY-SA' },
   { id: 'src:lgv-nord', title: 'LGV Nord', url: 'https://fr.wikipedia.org/wiki/LGV_Nord', license: 'CC BY-SA' },
   { id: 'src:remi', title: 'Rémi (Centre-Val de Loire 철도)', url: 'https://fr.wikipedia.org/wiki/TER_Centre-Val_de_Loire', license: 'CC BY-SA' },
+  // ── 런던
+  { id: 'src:st-pancras', title: 'St Pancras railway station', url: 'https://en.wikipedia.org/wiki/St_Pancras_railway_station', license: 'CC BY-SA' },
+  { id: 'src:boe-museum', title: 'Bank of England Museum', url: 'https://en.wikipedia.org/wiki/Bank_of_England_Museum', license: 'CC BY-SA' },
+  { id: 'src:decimal-day', title: 'Decimal Day (1971)', url: 'https://en.wikipedia.org/wiki/Decimal_Day', license: 'CC BY-SA' },
+  { id: 'src:british-museum', title: 'British Museum', url: 'https://en.wikipedia.org/wiki/British_Museum', license: 'CC BY-SA' },
+  { id: 'src:tower-bridge', title: 'Tower Bridge', url: 'https://en.wikipedia.org/wiki/Tower_Bridge', license: 'CC BY-SA' },
+  { id: 'src:fish-chips', title: 'Fish and chips', url: 'https://en.wikipedia.org/wiki/Fish_and_chips', license: 'CC BY-SA' },
+  { id: 'src:cream-tea', title: 'Cream tea', url: 'https://en.wikipedia.org/wiki/Cream_tea', license: 'CC BY-SA' },
+  { id: 'src:flat-white', title: 'Flat white', url: 'https://en.wikipedia.org/wiki/Flat_white', license: 'CC BY-SA' },
+  // ── 브뤼셀
+  { id: 'src:grand-place', title: 'Grand-Place (Brussels)', url: 'https://en.wikipedia.org/wiki/Grand-Place', license: 'CC BY-SA' },
+  { id: 'src:atomium', title: 'Atomium', url: 'https://en.wikipedia.org/wiki/Atomium', license: 'CC BY-SA' },
+  { id: 'src:parlamentarium', title: 'Parlamentarium', url: 'https://en.wikipedia.org/wiki/Parlamentarium', license: 'CC BY-SA' },
+  { id: 'src:euro-history', title: 'Euro — 도입 연혁', url: 'https://en.wikipedia.org/wiki/Euro', license: 'CC BY-SA' },
+  { id: 'src:gaufre', title: 'Belgian waffle', url: 'https://en.wikipedia.org/wiki/Belgian_waffle', license: 'CC BY-SA' },
+  { id: 'src:frites', title: 'French fries — 벨기에 기원 논쟁', url: 'https://en.wikipedia.org/wiki/French_fries', license: 'CC BY-SA' },
+  { id: 'src:neuhaus', title: 'Neuhaus (chocolatier)', url: 'https://en.wikipedia.org/wiki/Neuhaus_(chocolatier)', license: 'CC BY-SA' },
+  { id: 'src:thalys', title: 'Thalys → Eurostar 통합(2023)', url: 'https://en.wikipedia.org/wiki/Thalys', license: 'CC BY-SA' },
+  // ── 쾰른
+  { id: 'src:cologne-cath', title: 'Cologne Cathedral', url: 'https://en.wikipedia.org/wiki/Cologne_Cathedral', license: 'CC BY-SA' },
+  { id: 'src:hohenzollern', title: 'Hohenzollern Bridge', url: 'https://en.wikipedia.org/wiki/Hohenzollern_Bridge', license: 'CC BY-SA' },
+  { id: 'src:schokoladenmuseum', title: 'Chocolate Museum, Cologne', url: 'https://en.wikipedia.org/wiki/Chocolate_Museum,_Cologne', license: 'CC BY-SA' },
+  { id: 'src:koelsch', title: 'Kölsch (beer)', url: 'https://en.wikipedia.org/wiki/K%C3%B6lsch_(beer)', license: 'CC BY-SA' },
+  { id: 'src:halver-hahn', title: 'Halver Hahn', url: 'https://de.wikipedia.org/wiki/Halven_Hahn', license: 'CC BY-SA' },
+  { id: 'src:kaffee-kuchen', title: 'Kaffee und Kuchen', url: 'https://de.wikipedia.org/wiki/Kaffee_und_Kuchen', license: 'CC BY-SA' },
+  // ── 제네바
+  { id: 'src:jet-deau', title: "Jet d'Eau", url: 'https://en.wikipedia.org/wiki/Jet_d%27Eau', license: 'CC BY-SA' },
+  { id: 'src:reformation-wall', title: 'International Monument to the Reformation', url: 'https://en.wikipedia.org/wiki/International_Monument_to_the_Reformation', license: 'CC BY-SA' },
+  { id: 'src:cern-www', title: 'CERN — World Wide Web(1989)', url: 'https://en.wikipedia.org/wiki/CERN', license: 'CC BY-SA' },
+  { id: 'src:fondue', title: 'Fondue', url: 'https://en.wikipedia.org/wiki/Fondue', license: 'CC BY-SA' },
+  { id: 'src:rosti', title: 'Rösti', url: 'https://en.wikipedia.org/wiki/R%C3%B6sti', license: 'CC BY-SA' },
+  { id: 'src:swiss-price', title: 'Cost of living in Switzerland', url: 'https://en.wikipedia.org/wiki/Economy_of_Switzerland', license: 'CC BY-SA' },
+  { id: 'src:tgv-lyria', title: 'TGV Lyria', url: 'https://en.wikipedia.org/wiki/TGV_Lyria', license: 'CC BY-SA' },
+  // ── 바르셀로나
+  { id: 'src:sagrada', title: 'Sagrada Família', url: 'https://en.wikipedia.org/wiki/Sagrada_Fam%C3%ADlia', license: 'CC BY-SA' },
+  { id: 'src:park-guell', title: 'Park Güell', url: 'https://en.wikipedia.org/wiki/Park_G%C3%BCell', license: 'CC BY-SA' },
+  { id: 'src:boqueria', title: 'La Boqueria', url: 'https://en.wikipedia.org/wiki/La_Boqueria', license: 'CC BY-SA' },
+  { id: 'src:pa-tomaquet', title: 'Pa amb tomàquet', url: 'https://en.wikipedia.org/wiki/Pa_amb_tom%C3%A0quet', license: 'CC BY-SA' },
+  { id: 'src:jamon', title: 'Jamón ibérico', url: 'https://en.wikipedia.org/wiki/Jam%C3%B3n_ib%C3%A9rico', license: 'CC BY-SA' },
+  { id: 'src:crema-catalana', title: 'Crema catalana', url: 'https://en.wikipedia.org/wiki/Crema_catalana', license: 'CC BY-SA' },
+  { id: 'src:lgv-perpignan', title: 'Perpignan–Figueres high-speed rail line', url: 'https://en.wikipedia.org/wiki/Perpignan%E2%80%93Figueres_high-speed_rail_line', license: 'CC BY-SA' },
 ];
 
 export const sourceById = (id: string) => SOURCES.find((s) => s.id === id);

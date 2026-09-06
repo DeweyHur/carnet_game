@@ -42,7 +42,7 @@ export const MISSIONS: Mission[] = [
   {
     id: 'boulogne-archives', cityId: 'boulogne', type: 'main', minutes: 35,
     title: '지구의 기록',
-    summary: 'L.의 첫 사진. 알베르 칸 박물관에서 오토크롬 세 장과 현재를 맞춘다. 완료 시 프랑스 북부·루아르 지역 해금.',
+    summary: 'L.의 첫 사진. 알베르 칸 박물관에서 오토크롬 세 장과 현재를 맞춘다. 완료 시 프랑스 북부·루아르, 그리고 국경 너머(런던·브뤼셀·쾰른·제네바·바르셀로나)까지 해금 — 라이벌 테오가 먼저 국경으로 떠난다.',
     cardIds: ['b-kahn-1', 'b-kahn-2', 'b-kahn-3', 'b-seguin'],
     requires: ['paris-opening'],
     steps: [
@@ -56,9 +56,13 @@ export const MISSIONS: Mission[] = [
       { t: 'photo', photoId: 'boulogne:seine-musicale', hint: 'L.의 메모: "한때 자동차를 만들던 섬. 지금은 음악이 흐른다." 현재 사진에서 옛 장소를 찾아보자.', options: ['시테 섬', '스갱 섬 (르노 공장, 현 라 센 뮤지칼)', '생루이 섬'], answer: 1, cardId: 'b-seguin' },
       { t: 'photo', photoId: 'boulogne', hint: 'L.의 메모: "1929년 금융 위기로 모든 것을 잃어가던 수집가. 그의 정원과 사진은 우리에게 남았다." 이 장소의 주인은?', options: ['시테코의 은행가 에밀 가이야르', '알베르 칸', '루이 14세'], answer: 1, cardId: 'b-kahn-3' },
       G('세 장을 모두 살펴봤네요. L.이 남긴 봉투가 하나 더 있어요. "사진을 따라온 사람에게"라고 적혀 있었어요.'),
+      { t: 'say', who: 'theo', name: '테오', text: '(문을 벌컥 열며) 아, 여기 있었네요. 《르 글로브》의 테오예요. 마고가 신입을 들였다더니.' },
+      { t: 'say', who: 'theo', name: '테오', text: '그 사진 상자, 나도 압니다. L.이 사라지기 전에 나한테도 도시 이름을 몇 개 흘렸거든요 — 런던, 브뤼셀, 쾰른, 제네바, 바르셀로나. 국경 너머 다섯 곳.' },
+      { t: 'say', who: 'theo', name: '테오', text: '난 이미 유로스타 표를 끊었어요. 아미앵이니 랭스니 하는 소도시에 시간 쓸 생각 없어요. 특종은 국경에 있으니까. 늦게 오면 내 기사부터 읽게 될 거예요.' },
+      { t: 'say', who: 'margot', text: '(끼어들며) 테오, 취재원 정보는 편집부 공유물이에요. — 신입, 저 다섯 도시 지금 다 지도에 열어줄게요. 순서는 당신이 정해요. 소도시부터 걷든, 테오보다 먼저 국경을 넘든.' },
       { t: 'article', baseFee: 180 },
-      { t: 'letter', title: 'L.의 첫 번째 편지', text: '칸은 세계를 사진으로 모으면 사람들이 서로를 덜 미워할 거라고 믿었어. 나는 그게 순진하다고 생각했는데, 유리판을 하나씩 보다 보니 모르겠더라.\n\n북쪽으로 가. 대성당의 도시들. 아미앵에서 시작해. 거기서 세계를 80일에 돌 수 있는지 물어봐.\n\n— L.' },
-      { t: 'unlock', regions: ['nord', 'centre'], note: '프랑스 북부(아미앵·루앙·랭스·릴)와 루아르·중부(샤르트르·오를레앙)가 지도에서 열렸다.' },
+      { t: 'letter', title: 'L.의 첫 번째 편지', text: '칸은 세계를 사진으로 모으면 사람들이 서로를 덜 미워할 거라고 믿었어. 나는 그게 순진하다고 생각했는데, 유리판을 하나씩 보다 보니 모르겠더라.\n\n북쪽으로 가. 대성당의 도시들. 아미앵에서 시작해. 거기서 세계를 80일에 돌 수 있는지 물어봐.\n\n국경 너머도 이미 알고 있지? 테오가 먼저 표를 끊었다는 것도. 서두르든 천천히 가든, 유로가 끝나는 곳에서 진짜 여행이 시작돼.\n\n— L.' },
+      { t: 'unlock', regions: ['nord', 'centre', 'border'], note: '프랑스 북부·중부, 그리고 국경 너머(런던·브뤼셀·쾰른·제네바·바르셀로나)까지 한꺼번에 지도에서 열렸다. 테오가 먼저 국경으로 떠났다 — 어디부터 갈지는 당신이 정한다.' },
       { t: 'collect', item: '오토크롬 복제본: 일본 정원, 1910년대' },
       { t: 'stamp' },
     ],
@@ -320,6 +324,122 @@ export const MISSIONS: Mission[] = [
       { t: 'stamp' },
     ],
   },
+  // ─────────────────────────────────────────────────────────────── 런던
+  {
+    id: 'london-pound', cityId: 'london', type: 'city', minutes: 40,
+    title: '파운드의 무게',
+    summary: '유로스타로 넘는 첫 국경. 영란은행에서 배우는 파운드의 역사, 그리고 첫 실전 환전.',
+    cardIds: ['ln-boe', 'ln-decimal', 'ln-bm', 'ln-tower', 'ln-fish'],
+    requires: ['boulogne-archives'],
+    steps: [
+      N('해저 터널을 빠져나오자 표지판이 바뀐다. 세인트 판크라스, 붉은 벽돌과 유리 지붕. 여기서부터 파운드다.'),
+      G('올리버예요. 영란은행 박물관에서 자원봉사를 해요. 방금 전에도 프랑스 기자가 한 명 다녀갔어요 — 테오라고 했나. 뭘 그리 서두르던지.'),
+      { t: 'exchange', from: 'EUR', to: 'GBP', hint: '지갑의 유로를 파운드로 바꿔보세요. 여기서부터는 파운드로 셈해야 해요.' },
+      { t: 'visit', poiId: 'boe-museum', minutes: 45 },
+      { t: 'card', cardId: 'ln-boe', who: 'guide', text: '1694년, 프랑스와의 전쟁 자금을 대려고 세운 은행이에요. 화폐도 결국 전쟁과 국경에서 태어나요.' },
+      { t: 'quiz', q: '1971년 "십진화의 날" 이후 영국의 화폐 체계는?', options: ['1파운드 = 100펜스', '1파운드 = 240펜스', '1파운드 = 20실링'], answer: 0, cardId: 'ln-decimal', explain: '그 전에는 1파운드 = 20실링 = 240펜스였다 — 계산이 훨씬 복잡했다.' },
+      { t: 'visit', poiId: 'british-museum', minutes: 60 },
+      { t: 'card', cardId: 'ln-bm', who: 'narrator', text: '1759년 개관. 상설 전시는 지금도 무료다 — "지식은 모두의 것"이라는 설립 정신 때문이라고 안내판에 적혀 있다.' },
+      { t: 'visit', poiId: 'tower-bridge', minutes: 40 },
+      { t: 'card', cardId: 'ln-tower', who: 'guide', text: '1894년 개통. 지금도 큰 배가 지나면 다리 상판이 들어 올려져요. 관광객들은 그걸 보려고 시간표를 미리 확인해요.' },
+      { t: 'buy', foodId: 'fish-chips', guess: true },
+      { t: 'card', cardId: 'ln-fish', who: 'guide', text: '19세기 산업 노동자의 금요일 저녁이었어요. 지금은 관광객 저녁이 됐지만.' },
+      { t: 'buy', foodId: 'scone', guess: true },
+      { t: 'article', baseFee: 230 },
+      { t: 'stamp' },
+      { t: 'collect', item: '옛 화폐: 1실링 동전 (1971년 이전)' },
+    ],
+  },
+  // ─────────────────────────────────────────────────────────────── 브뤼셀
+  {
+    id: 'brussels-same-coin', cityId: 'brussels', type: 'city', minutes: 35,
+    title: '화폐가 같은 국경',
+    summary: '유로스타로 국경을 넘었지만 환전소가 필요 없다. 왜 그런지 파를라멘타리움에서 배운다.',
+    cardIds: ['br-grandplace', 'br-atomium', 'br-euro', 'br-praline'],
+    requires: ['boulogne-archives'],
+    steps: [
+      N('북역에서 1시간 22분. 창밖 표지판이 프랑스어에서 프랑스어·네덜란드어 병기로 바뀐다. 나라가 바뀌었다.'),
+      G('마리케예요. 와플 가판대를 해요. 지갑을 다시 열 필요는 없어요 — 여기도 유로거든요. 어제 프랑스 기자가 그걸 몰라서 환전소를 한참 찾아다니던데요.'),
+      { t: 'visit', poiId: 'grand-place', minutes: 30 },
+      { t: 'quiz', q: '그랑플라스가 지금의 모습으로 다시 지어진 계기는?', options: ['1695년 프랑스군의 포격', '1830년 벨기에 독립', '제2차 세계대전 폭격'], answer: 0, cardId: 'br-grandplace', explain: '루이 14세의 군대가 포격한 지 4년 만에 길드들이 재건했다.' },
+      { t: 'visit', poiId: 'atomium', minutes: 50 },
+      { t: 'quiz', q: '아토미움은 무엇을 1650억 배로 확대한 모형인가?', options: ['DNA 이중나선', '철의 결정 구조', '태양계'], answer: 1, cardId: 'br-atomium', explain: '1958년 브뤼셀 만국박람회를 위해 세워졌다.' },
+      { t: 'visit', poiId: 'parlamentarium', minutes: 40 },
+      { t: 'card', cardId: 'br-euro', who: 'guide', text: '유로는 1999년에 은행 사이에서 먼저 쓰였고, 지폐·동전은 2002년에야 나왔어요. 그래서 국경을 넘어도 지갑은 그대로예요.' },
+      { t: 'buy', foodId: 'gaufre', guess: true },
+      { t: 'buy', foodId: 'praline', guess: true },
+      { t: 'card', cardId: 'br-praline', who: 'guide' },
+      { t: 'article', baseFee: 200 },
+      { t: 'stamp' },
+    ],
+  },
+  // ─────────────────────────────────────────────────────────────── 쾰른
+  {
+    id: 'cologne-cathedral', cityId: 'cologne', type: 'city', minutes: 35,
+    title: '632년의 첨탑',
+    summary: '같은 유로, 다른 나라. 632년 걸려 완공된 대성당과 이름을 지켜야 하는 맥주.',
+    cardIds: ['co-cath', 'co-hohenzollern', 'co-koelsch'],
+    requires: ['boulogne-archives'],
+    steps: [
+      N('북역에서 국제선으로 세 시간 남짓. 라인 강이 보이기 시작하면 대성당의 두 첨탑이 도시 어디서나 눈에 띈다.'),
+      G('잉그리트예요. 초콜릿 박물관 도슨트. 지난주에도 특종을 찾는다는 프랑스 기자가 왔었어요 — 사흘 만에 다섯 나라를 돈다고 자랑하던데.'),
+      { t: 'visit', poiId: 'cologne-cath', minutes: 60 },
+      { t: 'quiz', q: '쾰른 대성당이 착공부터 완공까지 걸린 기간은?', options: ['약 100년', '약 300년', '약 630년'], answer: 2, cardId: 'co-cath', explain: '1248년 착공, 공사가 오래 중단됐다가 1880년 완공됐다.' },
+      { t: 'visit', poiId: 'hohenzollern', minutes: 25 },
+      { t: 'card', cardId: 'co-hohenzollern', who: 'narrator', text: '난간 곳곳에 자물쇠가 겹겹이 걸려 있다. 열쇠는 대부분 라인 강에 던져졌다.' },
+      { t: 'buy', foodId: 'koelsch', guess: true },
+      { t: 'card', cardId: 'co-koelsch', who: 'guide', text: '유럽연합 지리적 표시 보호를 받는 이름이에요. 쾰른 인근에서, 정해진 방식으로 만들어야만 "쾰쉬"라고 부를 수 있어요.' },
+      { t: 'buy', foodId: 'halver-hahn', guess: true },
+      { t: 'article', baseFee: 210 },
+      { t: 'stamp' },
+    ],
+  },
+  // ─────────────────────────────────────────────────────────────── 제네바
+  {
+    id: 'geneva-franc', cityId: 'geneva', type: 'city', minutes: 40,
+    title: '유로가 끝나는 곳',
+    summary: '스위스는 유럽연합도 유로존도 아니다. 리옹역에서 TGV 리리아로 넘는 진짜 국경, 첫 CHF 환전.',
+    cardIds: ['ge-reform', 'ge-cern', 'ge-chf'],
+    requires: ['boulogne-archives'],
+    steps: [
+      N('리옹역에서 TGV 리리아로 세 시간. 국경을 넘는 순간 안내 방송이 바뀐다 — 이제부터는 스위스 프랑이다.'),
+      G('앙드레예요. 시계공방을 해요. 최근에 프랑스 기자 한 명이 환전도 안 하고 카드만 긁다가 수수료로 꽤 잃었다는 소문이 있던데 — 테오였을 거예요, 아마.'),
+      { t: 'exchange', from: 'EUR', to: 'CHF', hint: '스위스는 유로존이 아니에요. 유로를 스위스 프랑으로 바꿔보세요.' },
+      { t: 'card', cardId: 'ge-chf', who: 'guide', text: '스위스는 유럽연합 회원국도 아니에요. 국경 하나를 넘었을 뿐인데 화폐도, 관세동맹도 다 달라져요.' },
+      { t: 'visit', poiId: 'reformation-wall', minutes: 30 },
+      { t: 'card', cardId: 'ge-reform', who: 'narrator', text: '칼뱅 탄생 400주년인 1909년에 세운 벽. 종교개혁가들의 조각이 나란히 서 있다.' },
+      { t: 'visit', poiId: 'cern', minutes: 60 },
+      { t: 'quiz', q: 'CERN에서 팀 버너스리가 1989년 처음 제안한 것은?', options: ['입자 가속기', '월드와이드웹', '원자시계'], answer: 1, cardId: 'ge-cern', explain: '오늘날 우리가 쓰는 인터넷의 문서 체계가 여기서 시작됐다.' },
+      { t: 'buy', foodId: 'fondue', guess: true },
+      { t: 'buy', foodId: 'rosti', guess: true },
+      { t: 'article', baseFee: 240 },
+      { t: 'stamp' },
+      { t: 'collect', item: '옛 화폐: 스위스 프랑 지폐' },
+    ],
+  },
+  // ─────────────────────────────────────────────────────────────── 바르셀로나
+  {
+    id: 'barcelona-gaudi', cityId: 'barcelona', type: 'city', minutes: 40,
+    title: '미완성의 성당',
+    summary: '가우디 사후 100주년. 아직도 짓고 있는 성당과 아직 열지 않은 저녁 식탁.',
+    cardIds: ['ba-sagrada', 'ba-guell', 'ba-boqueria'],
+    requires: ['boulogne-archives'],
+    steps: [
+      N('리옹역에서 국경 터널을 지나 여섯 시간 반. 도착하면 해가 아직 높다 — 이곳의 저녁은 훨씬 늦게 시작된다.'),
+      G('로라예요. 보케리아 시장에서 하몬을 팔아요. 프랑스 기자 한 명이 여기서도 스쳐 지나갔어요. 사진만 찍고 시식은 하나도 안 하던데 — 아까운 일이죠.'),
+      { t: 'visit', poiId: 'sagrada', minutes: 70 },
+      { t: 'quiz', q: '사그라다 파밀리아가 아직도 미완성인 이유와 가장 관련 깊은 사실은?', options: ['가우디 사후에도 그의 설계·모형을 바탕으로 공사가 이어지고 있다', '스페인 내전 때 전소되어 처음부터 다시 지었다', '유네스코가 완공을 금지했다'], answer: 0, cardId: 'ba-sagrada', explain: '가우디는 1926년 세상을 떠났다 — 2026년은 그의 사후 100주년이다.' },
+      { t: 'visit', poiId: 'park-guell', minutes: 50 },
+      { t: 'card', cardId: 'ba-guell', who: 'narrator', text: '원래는 영국식 전원주택 60채를 짓는 개발 사업이었다. 두 채만 팔렸고, 나머지는 공공 공원이 됐다.' },
+      { t: 'visit', poiId: 'boqueria', minutes: 40 },
+      { t: 'card', cardId: 'ba-boqueria', who: 'guide', text: '1217년 기록에 처음 등장해요. 800년 넘게 같은 자리에서 장이 서고 있는 거죠.' },
+      { t: 'buy', foodId: 'jamon', guess: true },
+      { t: 'buy', foodId: 'pa-tomaquet', guess: true },
+      { t: 'buy', foodId: 'crema-catalana', guess: true },
+      { t: 'article', baseFee: 200 },
+      { t: 'stamp' },
+    ],
+  },
 ];
 
 // Short optional assignments make every destination playable beyond the main story.
@@ -328,6 +448,8 @@ const lenses: Record<string, string> = {
   argenteuil: '모네가 보았던 빛을 찾아', montreuil: '담장 너머의 작은 여행', versailles: '거울 속으로 걷는 오후',
   chartres: '순례자의 시선으로', amiens: '첨탑 아래, 물길을 따라', reims: '돌에 새겨진 대관식',
   rouen: '시곗바늘 아래 골목 산책', lille: '플랑드르의 색을 모으다', orleans: '루아르로 보내는 엽서',
+  london: '파운드로 다시 배우는 셈', brussels: '국경인데 지갑은 그대로', cologne: '라인 강, 632년의 탑',
+  geneva: '유로가 끝나는 자리에서', barcelona: '늦은 저녁의 도시',
 };
 export const DISCOVERY_MISSIONS: Mission[] = CITIES.flatMap((city, index) => {
   const cards = CARDS.filter((c) => c.cityId === city.id && !c.fiction).slice(0, 2);
@@ -363,8 +485,14 @@ export const missionById = (id: string): Mission => {
   return m;
 };
 
-/** 프랑스 북부·중부 완주 시 열리는 마지막 편지 (프로토타입 엔딩) */
+/** 프랑스 북부·중부(소도시) 완주 시 열리는 편지 */
 export const FINAL_LETTER = {
   title: 'L.의 두 번째 편지',
-  text: '대성당들을 다 봤구나. 그럼 이제 알겠지 — 이 도시들은 전부 "왜 여기에"라는 질문에 답하려고 생긴 거야. 강, 언덕, 왕, 순례길.\n\n다음은 국경이야. 북역에서 유로스타를 타. 런던은 파운드를 써. 브뤼셀은 유로를 쓰지만 나라가 다르지. 제네바는 프랑이야.\n\n같은 €100이 세 국경에서 어떻게 달라지는지 써 봐. 그게 내가 마지막으로 하려던 기사였어.\n\n— L.\n\n(프로토타입은 여기까지입니다. 다음 빌드: 런던·브뤼셀·제네바 — 첫 실전 환전.)',
+  text: '대성당들을 다 봤구나. 그럼 이제 알겠지 — 이 도시들은 전부 "왜 여기에"라는 질문에 답하려고 생긴 거야. 강, 언덕, 왕, 순례길.\n\n국경 너머는 어디까지 갔어? 테오가 아직 다 못 썼다면, 당신이 먼저 쓸 기회가 남아 있어.\n\n같은 €100이 국경마다 얼마나 달라지는지 계속 써 봐. 그게 내가 마지막으로 하려던 기사였어.\n\n— L.',
+};
+
+/** 국경 너머(런던·브뤼셀·쾰른·제네바·바르셀로나) 전부 완주 시 열리는 완결 편지 */
+export const EPILOGUE_LETTER = {
+  title: 'L.의 마지막 편지',
+  text: '다섯 국경을 다 넘었구나. 파운드, 그대로인 유로, 스위스 프랑 — 같은 유럽 안에서도 돈은 이렇게나 다른 얼굴을 하고 있어.\n\n테오는 아마 벌써 다음 특종을 찾아 떠났을 거야. 상관없어. 당신 수첩엔 그가 못 가진 게 있으니까 — 문장마다 붙은 출처, 그리고 직접 걸어서 잰 물가의 감각.\n\n나는 아직 어딘가에 있어. 다음 편지는 유럽 밖에서 쓸게.\n\n— L.\n\n(프로토타입은 여기까지입니다. 다음 빌드: 유럽 전역과 아시아·북미로 확장.)',
 };
