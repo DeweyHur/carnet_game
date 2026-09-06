@@ -5,13 +5,29 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 // MapLibre v6는 워커를 별도 모듈로 로드한다. Vite가 번들에 포함하도록 명시.
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 maplibregl.setWorkerUrl(workerUrl);
-import { CITIES, cityById, edgesFrom } from '../data/cities';
+import { CITIES, cityById, edgesFrom, REGIONS } from '../data/cities';
 import { useGame } from '../game/store';
 import { FALLBACK_STYLE } from '../data/fallbackMap';
+import type { RegionId } from '../game/types';
 
 // 기획서 §3.1: MapLibre GL JS + 벡터 타일. 프로토타입은 무료 공개 스타일을 쓰고,
 // 실서비스에서는 PMTiles(OpenMapTiles/Protomaps) 자체 호스팅으로 교체한다.
 const STYLE_PRIMARY = 'https://tiles.openfreemap.org/styles/positron';
+
+/** 잠긴 도시 주변에 원형 "안개"를 그린다 (기획서 §3.1: 해금 지역은 빛나고 잠긴 지역은 안개). */
+function fogCircle([lon, lat]: [number, number], radiusKm: number, steps = 48): number[][] {
+  const latRad = (lat * Math.PI) / 180;
+  const kmPerDegLon = 111.32 * Math.cos(latRad);
+  const kmPerDegLat = 110.574;
+  const ring: number[][] = [];
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * 2 * Math.PI;
+    ring.push([lon + (radiusKm * Math.cos(a)) / kmPerDegLon, lat + (radiusKm * Math.sin(a)) / kmPerDegLat]);
+  }
+  return ring;
+}
+
+const TIER_LABEL: Record<string, string> = { S: '메인 무대(S)', A: '거점 도시(A)', H: '유산 노드(H)' };
 
 interface Props { onSelect: (cityId: string) => void; selected: string | null }
 
@@ -44,6 +60,11 @@ export default function MapView({ onSelect, selected }: Props) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
     // 스타일 로드(또는 폴백으로 교체)마다 게임 레이어를 다시 얹는다
     map.on('style.load', () => {
+      if (!map.getSource('fog')) {
+        map.addSource('fog', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addLayer({ id: 'fog', type: 'fill', source: 'fog', paint: { 'fill-color': '#2b241c', 'fill-opacity': 0.4 } });
+        map.addLayer({ id: 'fog-line', type: 'line', source: 'fog', paint: { 'line-color': '#2b241c', 'line-opacity': 0.25, 'line-width': 1, 'line-dasharray': [1, 2] } });
+      }
       if (!map.getSource('edges')) {
         map.addSource('edges', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({ id: 'edges', type: 'line', source: 'edges', paint: { 'line-color': '#b5482f', 'line-width': 2, 'line-dasharray': [2, 2] } });
@@ -88,6 +109,15 @@ export default function MapView({ onSelect, selected }: Props) {
       src.setData({ type: 'FeatureCollection', features: edgesFrom(cityId).filter((e) => unlocked.includes(cityById(e.to).region)).map((e) => ({
         type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [here.coord, cityById(e.to).coord] },
       })) });
+      const fogSrc = map.getSource('fog') as GeoJSONSource | undefined;
+      if (fogSrc) {
+        fogSrc.setData({
+          type: 'FeatureCollection',
+          features: CITIES.filter((c) => !unlocked.includes(c.region)).map((c) => ({
+            type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [fogCircle(c.coord, c.tier === 'S' ? 55 : 35)] },
+          })),
+        });
+      }
     };
     if (map.isStyleLoaded()) draw(); else map.once('idle', draw);
   }, [cityId, unlocked, stamps, selected]);
@@ -131,5 +161,38 @@ export default function MapView({ onSelect, selected }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unlockedKey, cityId, travelling]);
 
-  return <div className="map-wrap"><div className="map" ref={ref} /></div>;
+  const flyToRegion = (id: RegionId) => {
+    const map = mapRef.current;
+    const pts = CITIES.filter((c) => c.region === id).map((c) => c.coord);
+    if (!map || !pts.length) return;
+    const lons = pts.map((p) => p[0]); const lats = pts.map((p) => p[1]);
+    map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 70, duration: 1000, maxZoom: 11 });
+  };
+  const stampedCount = new Set(stamps.map((s) => s.cityId)).size;
+
+  return (
+    <div className="map-wrap">
+      <div className="map" ref={ref} />
+      <div className="map-legend">
+        <div className="map-legend-head"><span className="eyebrow">CARNET · 세계지도</span><b>{stampedCount} / {CITIES.length} 도시 취재 완료</b></div>
+        <div className="map-legend-tiers">
+          <span><i className="dot tier-S" />{TIER_LABEL.S}</span>
+          <span><i className="dot tier-A" />{TIER_LABEL.A}</span>
+          <span><i className="dot tier-H" />{TIER_LABEL.H}</span>
+          <span><i className="dot locked" />안개 · 잠긴 지역</span>
+        </div>
+        <div className="map-legend-regions">
+          {(Object.keys(REGIONS) as RegionId[]).map((id) => {
+            const open = unlocked.includes(id);
+            const count = CITIES.filter((c) => c.region === id).length;
+            return (
+              <button key={id} className={`map-region${open ? '' : ' locked'}`} disabled={!open} onClick={() => flyToRegion(id)}>
+                <span>{open ? '' : '🔒 '}{REGIONS[id].name}</span><small>{count}개 도시</small>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }

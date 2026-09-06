@@ -23,7 +23,7 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>('paris');
   const [notebook, setNotebook] = useState(false);
   const [finalOpen, setFinalOpen] = useState(false);
-  const [mapMode, setMapMode] = useState(false);
+  const [mapMode, setMapMode] = useState(true);
 
   // 도착하면 도착 도시 카드 열기
   useEffect(() => { if (!travelling) setSelected(cityId); }, [cityId, travelling]);

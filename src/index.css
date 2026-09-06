@@ -385,6 +385,30 @@ button { color: inherit; }
 .map-loading { position: absolute; display: grid; place-items: center; background: #e3eadb; }
 .journey-main.is-map { pointer-events: none; }
 .journey-main.is-map .journey-heading { pointer-events: auto; }
+.journey-main.is-map .map-assignment { pointer-events: auto; }
+
+/* ── 지도 중심 UI: 지도가 게임의 핵심 화면 ─────────────────── */
+.app.map-mode .map-wrap, .app.map-mode .map-loading { bottom: 28px; }
+.map-legend { position: absolute; top: 16px; left: 16px; z-index: 4; background: #fffdf6ee; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow); max-width: 240px; backdrop-filter: blur(4px); }
+.map-legend-head { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.map-legend-head b { font-family: var(--serif); font-size: 15px; }
+.map-legend-tiers { display: grid; gap: 6px; font-size: 11px; color: var(--ink-2); margin-bottom: 10px; }
+.map-legend-tiers span { display: flex; align-items: center; gap: 7px; }
+.map-legend-tiers .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent-2); flex: none; }
+.map-legend-tiers .dot.tier-S { width: 13px; height: 13px; background: var(--accent); }
+.map-legend-tiers .dot.tier-H { background: var(--gold); border-radius: 2px; transform: rotate(45deg); }
+.map-legend-tiers .dot.locked { background: none; border: 1.5px dashed var(--ink-3); }
+.map-legend-regions { display: grid; gap: 5px; }
+.map-region { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--paper-2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 11px; text-align: left; color: var(--ink); }
+.map-region:not(:disabled):hover { border-color: var(--ink); }
+.map-region small { color: var(--ink-3); font-size: 10px; }
+.map-region.locked { opacity: .55; cursor: not-allowed; }
+.map-assignment { position: fixed; left: 28px; bottom: 28px; z-index: 7; display: flex; align-items: center; gap: 12px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 10px; background: #fffdf6f2; box-shadow: var(--shadow); text-align: left; max-width: 320px; backdrop-filter: blur(4px); }
+.map-assignment .note-icon { font-size: 20px; color: var(--accent-2); flex: none; }
+.map-assignment small { display: block; font-size: 9px; color: var(--ink-3); margin-bottom: 2px; }
+.map-assignment b { font-family: var(--serif); font-size: 13px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.map-assignment .note-arrow { margin-left: auto; flex: none; color: var(--ink-3); }
+.map-assignment:disabled { opacity: .5; }
 .travel-overlay { z-index: 19; top: 50%; transform: translate(-50%, -50%); width: 590px; padding: 18px; box-shadow: 0 20px 100px #102e3b66; }
 .train-window .photo-open { height: 250px; border-radius: 6px; }
 .train-window figcaption { display: none; }
@@ -433,6 +457,10 @@ button { color: inherit; }
   .panel-body { max-height: 550px; overflow-y: auto; }
   .destination-strip { position: relative; inset: auto; height: auto; margin: 0 0 24px; flex: none; order: 1; }
   .map-wrap, .map-loading { inset: 158px 18px auto; height: 407px; }
+  .app.map-mode .map-wrap, .app.map-mode .map-loading { height: 500px; }
+  .map-assignment { display: none; }
+  .map-legend { max-width: 190px; padding: 10px 12px; }
+  .map-legend-regions { display: none; }
   .scene { position: fixed; }
   .drawer { position: fixed; }
   .log { position: fixed; bottom: 14px; right: 18px; }

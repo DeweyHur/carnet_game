@@ -28,13 +28,18 @@ export default function Journey({ selected, onSelect, onAlbum, mapMode, onMap }:
         </div>
         <div className="journey-notes"><button className="next-assignment" onClick={() => { if (s.active) s.setPaused(false); else if (next) s.startMission(next.id); }} disabled={!!s.travelling || (!s.active && !next)}><span className="note-icon">✎</span><span><small>{s.active ? '이어 쓰는 여행' : '편집부의 다음 취재'}</small><b>{s.active ? '접어둔 미션 이어하기' : next?.title ?? '모든 취재를 마쳤어요'}</b></span><span className="note-arrow">↗</span></button><button className="album-note" onClick={onAlbum}><span className="note-icon">▧</span><span><small>나만의 여행 앨범</small><b>{s.snapshots.length}장의 기억</b></span><span className="note-arrow">→</span></button></div>
       </>}
+      {mapMode && (
+        <button className="map-assignment" onClick={() => { if (s.active) s.setPaused(false); else if (next) s.startMission(next.id); }} disabled={!!s.travelling || (!s.active && !next)}>
+          <span className="note-icon">✎</span><span><small>{s.active ? '이어 쓰는 여행' : '편집부의 다음 취재'}</small><b>{s.active ? '접어둔 미션 이어하기' : next?.title ?? '모든 취재를 마쳤어요'}</b></span><span className="note-arrow">↗</span>
+        </button>
+      )}
     </div>
-    <section className="destination-strip" aria-label="도시 여행 목록"><div className="strip-heading"><span>다음 페이지의 도시들</span><small>{s.visited.length} / {CITIES.length} CITIES VISITED</small></div><div className="destination-scroll">{CITIES.map((c, i) => {
+    {!mapMode && <section className="destination-strip" aria-label="도시 여행 목록"><div className="strip-heading"><span>다음 페이지의 도시들</span><small>{s.visited.length} / {CITIES.length} CITIES VISITED</small></div><div className="destination-scroll">{CITIES.map((c, i) => {
       const picture = photoById(c.id);
       const locked = !s.unlocked.includes(c.region);
       return <button key={c.id} className={`destination-card${c.id === city.id ? ' chosen' : ''}`} onClick={() => { setPhotoIndex(0); onSelect(c.id); }} aria-pressed={c.id === city.id}>
         {picture && <img src={picture.thumb} alt="" loading="lazy" width={240} height={150} />}<span className="postcard-number">{String(i + 1).padStart(2, '0')}</span><div><b>{c.names.ko}</b><small>{locked ? '🔒 이야기 진행으로 열기' : s.visited.includes(c.id) ? '✓ 나의 발자취' : c.names.fr}</small></div>
       </button>;
-    })}</div></section>
+    })}</div></section>}
   </>;
 }
