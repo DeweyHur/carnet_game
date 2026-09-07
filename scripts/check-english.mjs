@@ -59,6 +59,18 @@ export async function checkEnglish(server, useGame) {
       const {default:Component}=await server.ssrLoadModule(`/src/ui/${file}.tsx`);
       assertRender(Component,{onJournal(){},onNotebook(){},onCity(){},onClose(){},selected:'paris',onSelect(){},onAlbum(){},mapMode:false,onMap(){}},file);
     }
+    const {METRO_TRIPS,tripStops}=await server.ssrLoadModule('/src/data/metro.ts');
+    for (const trip of METRO_TRIPS) {
+      for (const stop of tripStops(trip)) {
+        assert.equal(translateEnglish(`${stop.direction} 방면`),`Towards ${stop.direction}`);
+        assert.equal(translateEnglish(`${stop.line}호선 공식 노선도 ↗`),`Official line ${stop.line} map ↗`);
+        if (stop.transfer) assert.equal(translateEnglish(`${stop.line}호선으로 갈아타기 →`),`Change to line ${stop.line} →`);
+      }
+    }
+    const {CARDS}=await server.ssrLoadModule('/src/data/cards.ts');
+    for (const card of CARDS) {
+      assert.equal(translateEnglish(`사실 카드 수집: ${card.text.slice(0,40)}…`),`Fact card collected: ${translateEnglish(card.text)}`,'Legacy truncated card logs must translate completely');
+    }
     const {default:Panel}=await server.ssrLoadModule('/src/ui/CityPanel.tsx');
     const {CITIES}=await server.ssrLoadModule('/src/data/cities.ts');
     for (const city of CITIES) for (const tab of ['places','transport','food','missions']) assertRender(Panel,{cityId:city.id,initialTab:tab,onClose(){}},`${city.id}/${tab}`);

@@ -1,11 +1,14 @@
 import { useGame, type Locale } from './game/store';
 import english from './data/english.json';
+import { CARDS } from './data/cards';
 
 /**
  * Display-only localisation. IDs, quiz answers and saved content remain language-neutral.
  * Literal text and interpolated messages share a checked-in English catalog.
  */
 const DICT: Record<string, string> = {
+  '{0}호선으로 갈아타기 →': 'Change to line {0} →',
+  '{0}호선 공식 노선도 ↗': 'Official line {0} map ↗',
   'Carnet — 한 정거장씩, 파리 여행': 'Carnet — Paris, one station at a time',
   '언어': 'Language',
   // 공통 버튼·상태
@@ -300,6 +303,12 @@ export function t(lang: Locale, ko: string): string {
 }
 
 export const ENGLISH: Record<string, string> = { ...DICT, ...english };
+// Older saves stored only the first 40 characters of collected fact cards.
+// Match the complete legacy message so ordinary text and player names stay intact.
+const legacyCardLogs = new Map(CARDS.map((card) => [
+  `사실 카드 수집: ${card.text.slice(0, 40)}…`,
+  `Fact card collected: ${ENGLISH[card.text]}`,
+]));
 const hangul = /[가-힣]/;
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const templates = Object.entries(ENGLISH).filter(([key]) => /\{\d+\}/.test(key))
@@ -312,6 +321,8 @@ export function translateEnglish(text: string): string {
   if (!hangul.test(text)) return text;
   const exact = ENGLISH[text];
   if (exact !== undefined) return exact;
+  const legacy = legacyCardLogs.get(text);
+  if (legacy !== undefined) return legacy;
   const cached = cache.get(text);
   if (cached !== undefined) return cached;
   let result: string | undefined;
