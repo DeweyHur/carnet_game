@@ -1,9 +1,25 @@
 // Authored together so every new journey ships in Korean and English.
-export const RAIL_ENGLISH: Record<string, string> = {};
+import { EUROPE_ENGLISH, EUROPE_TRIPS, type CountryCode } from './railEurope';
+export const RAIL_ENGLISH: Record<string, string> = { ...EUROPE_ENGLISH };
 const b = (ko: string, en: string) => { RAIL_ENGLISH[ko] = en; return ko; };
 export const RAIL_COPY = {
   title: b('다음 도시까지, 창가 한 자리.', 'A window seat to your next city.'),
-  intro: b('기차에서 시작해 골목에서 완성하는 여덟 편의 여행. 서두르지 말고, 오늘의 풍경을 골라보세요.', 'Eight journeys that begin on a train and unfold in the streets. Take your time. Choose the moments you want to keep.'),
+  intro: b('프랑스에서 중부·동유럽까지. 국경을 넘고, 현지 친구를 만나고, 골목에서 나만의 여행을 완성해요.', 'From France to Central and Eastern Europe. Cross borders, meet local friends and make the journey your own in the streets.'),
+  region: b('여행 지역', 'Travel region'),
+  europe: b('중부·동유럽', 'Central & Eastern Europe'),
+  france: b('프랑스 코스', 'France journeys'),
+  friend: b('이 도시에서 만난 친구', 'Your friend in this city'),
+  ask: b('현지 친구의 팁 듣기', 'Ask your local friend for a tip'),
+  onward: b('다음 도시로 이야기 잇기', 'Continue the story in another city'),
+  origin: b('각 코스는 표시된 출발역에서 시작합니다. 현재 도시에서 그 역까지의 이동은 포함하지 않아요.', 'Each itinerary starts at its displayed departure station. Travel from your current city to that station is not included.'),
+  night: b('밤기차 여행 · 좌석·쿠셋·침대 예약을 확인하세요.', 'Overnight journey · Check seat, couchette or sleeper reservations.'),
+  musicOn: b('나라별 음악 켜기', 'Play country music themes'),
+  musicOff: b('음악 끄기', 'Stop music'),
+  volume: b('음악 볼륨', 'Music volume'),
+  musicNote: b('나라별 분위기에서 영감을 받은 오리지널 합성 음악', 'Original synthesized music inspired by each country’s atmosphere'),
+  musicError: b('음악을 재생하지 못했어요. 다시 눌러보세요.', 'Music could not start. Please try again.'),
+  currency: b('현지 통화', 'Local currency'),
+  worldGoal: b('국경 너머 스물한 도시', 'Twenty-one cities across borders'),
   home: b('← 파리 지하철', '← Paris metro'),
   rail: b('기차로 더 멀리 ↗', 'Explore by train ↗'),
   all: b('모든 여행', 'All journeys'),
@@ -45,10 +61,10 @@ export const RAIL_COPY = {
   price: b('기차표를 더 알뜰하게', 'Make your rail budget go further'),
   tip: b('날짜와 출발 시간을 바꾸어 비교하고, TGV INOUI·OUIGO의 총액과 수하물·좌석·변경 조건을 함께 보세요. 파리 중심역과 외곽역은 다를 수 있어 역까지 가는 비용도 더하세요. 고정 최저가를 약속하지 않아요.', 'Compare different dates and departure times. Check the total price and baggage, seat and exchange conditions for TGV INOUI and OUIGO. A Paris-area station may be outside the city centre, so include the cost of reaching it. There is no guaranteed lowest fare.'),
   navigo: b('나비고와 장거리 기차표는 별개예요. 이 코스의 TGV와 지역 간 열차는 별도 승차권을 확인하세요.', 'Navigo and long-distance rail tickets are separate. Check separate tickets for the TGV and interregional trains in these journeys.'),
-  goals: [b('첫 기차 여행', 'First rail adventure'), b('세 도시의 기억', 'Three cities of memories'), b('다섯 도시의 산책가', 'Five-city wanderer'), b('프랑스 여덟 빛깔', 'Eight shades of France')],
+  goals: [b('첫 기차 여행', 'First rail adventure'), b('세 도시의 기억', 'Three cities of memories'), b('다섯 도시의 산책가', 'Five-city wanderer'), b('여덟 도시의 발자국', 'Eight cities of footprints')],
 };
 export interface RailMoment { title: string; photo: string; text: string; choices: [string, string] }
-export interface RailTrip { id: string; name: string; theme: 'water'|'culture'|'green'; tagline: string; from: string; to: string; via?: string; train: string; arrival: string; window: string; guide: string; moments: RailMoment[]; quiz: { question: string; options: string[]; answer: number } }
+export interface RailTrip { id: string; country?: CountryCode; source?: string; next?: string[]; night?: boolean; name: string; theme: 'water'|'culture'|'green'; tagline: string; from: string; to: string; via?: string; train: string; arrival: string; window: string; guide: string; moments: RailMoment[]; quiz: { question: string; options: string[]; answer: number } }
 const moment = (title: string, photo: string, ko: string, en: string, choices: [string,string,string,string]): RailMoment => ({title,photo,text:b(ko,en),choices:[b(choices[0],choices[1]),b(choices[2],choices[3])]});
 export const RAIL_TRIPS: RailTrip[] = [
   { id:'lyon', name:b('리옹','Lyon'), theme:'culture', tagline:b('두 강 사이, 골목에서 천천히','Slow streets between two rivers'), from:'Paris Gare de Lyon', to:'Lyon Part-Dieu', train:'TGV INOUI',
@@ -63,4 +79,5 @@ export const RAIL_TRIPS: RailTrip[] = [
   {id:'nice',name:b('니스','Nice'),theme:'water',tagline:b('기차를 갈아타고, 바다의 오후로','Change trains for an afternoon by the sea'),from:'Paris Gare de Lyon',via:'Marseille Saint-Charles',to:'Nice Ville',train:'TGV INOUI → TER',arrival:b('Nice Ville에서 해안까지는 도심을 지나 이동해요. 프롬나드 데 장글레와 구시가를 연결해 걸어보세요. 파리에서 니스로 가는 직행도 있으므로 실제 여행에서는 함께 비교하세요.','From Nice Ville, make your way through the centre to the coast. Link the Promenade des Anglais with the old town. Direct Paris–Nice trains also exist, so compare them for your real trip.'),window:b('마르세유에서 열차를 바꾸고 여행의 리듬도 바꿔요. 오늘은 니스에 도착해서 만날 바다를 사진으로 먼저 펼쳐봅니다.','Change trains in Marseille and change the rhythm of your day. These photographs offer a preview of the sea waiting in Nice.'),guide:'https://www.explorenicecotedazur.com/en/',moments:[moment('Promenade des Anglais','nice','프롬나드 데 장글레에서 수평선을 바라봐요. 산책로에서는 자전거와 보행자 공간을 살피며 천천히 걸어요.','Look towards the horizon from the Promenade des Anglais. Notice the spaces for cyclists and pedestrians as you stroll.',['수평선을 길게 담기','Frame a wide horizon','바다를 보며 쉬기','Rest facing the sea']),moment('Cours Saleya','nice:market','쿠르 살레야에서는 광장과 주변 골목을 살펴요. 시장의 종류와 운영일은 달라질 수 있으니 현지 안내를 확인해요.','Explore Cours Saleya and its surrounding streets. Market types and operating days vary, so check local information.',['골목의 색 기록하기','Record the street colours','광장 카페에서 쉬기','Pause at a square-side café']),moment('Baie des Anges','nice','마지막 장은 바다에 남겨요. 오늘의 해안 산책로 이름, 프롬나드 데 장글레를 수첩에 적어요.','Leave the final page for the sea. Write down the name of today’s coastal promenade: Promenade des Anglais.',['바다에게 보내는 편지','A letter to the sea','다음 기차 여행 계획','A plan for my next train journey'])],quiz:{question:b('니스의 해안 산책로 이름은?','What is the name of Nice’s coastal promenade?'),options:['Promenade des Anglais','La Rambla','Unter den Linden'],answer:0}},
   {id:'dijon',name:b('디종','Dijon'),theme:'culture',tagline:b('궁전과 작은 올빼미를 찾아','A palace and a little owl'),from:'Paris Gare de Lyon',to:'Dijon Ville',train:'TGV INOUI',arrival:b('Dijon Ville에서 구시가로 향해요. 궁전 광장과 노트르담 주변을 연결하는 산책을 준비해보세요.','Head from Dijon Ville into the old town. Plan a walk connecting the palace square and the streets around Notre-Dame.'),window:b('오늘의 탐험은 큰 궁전과 작은 조각을 함께 찾는 일. 커다란 지도보다 자세히 보는 눈을 준비해요.','Today’s expedition pairs a grand palace with a tiny carving. Pack an eye for detail rather than a grand plan.'),guide:'https://en.destinationdijon.com/cultural-heritage/eglise-notre-dame/',moments:[moment('Palais des ducs','dijon','부르고뉴 공작의 궁전 앞에서 광장의 곡선을 따라봐요. 정면 사진과 모퉁이 사진 중 하나를 남겨요.','Follow the curves of the square in front of the Ducal Palace. Keep a frontal view or a picture from a corner.',['궁전 전경 담기','Frame the palace','광장 곡선 스케치하기','Sketch the curve of the square']),moment('Notre-Dame','dijon:owl','노트르담 외벽의 작은 올빼미 조각을 찾아보는 산책이에요. 작은 표식을 찾는 재미를 수첩에 남겨요.','Look for the small owl carving on the outside of Notre-Dame. Keep the pleasure of finding a tiny landmark in your notebook.',['올빼미 발견 메모','An owl-discovery note','건물의 다른 조각 보기','Look for other carved details']),moment('Dijon · souvenir','dijon','오늘은 궁전보다 작은 올빼미가 더 기억에 남을지도 몰라요. 여행의 크기는 건물의 크기로 정해지지 않으니까요.','The little owl may stay with you longer than the palace. A journey’s meaning does not depend on the size of its buildings.',['작은 발견 엽서','A little-discovery postcard','궁전의 오후 엽서','An afternoon-at-the-palace postcard'])],quiz:{question:b('노트르담 외벽에서 찾은 동물은?','Which animal did you look for on Notre-Dame’s wall?'),options:[b('여우','Fox'),b('올빼미','Owl'),b('고래','Whale')],answer:1}},
 ];
-export const railSource = (trip: RailTrip, connecting = false) => `https://www.sncf-connect.com/en-en/train/route/${connecting ? 'marseille' : 'paris'}/${trip.via && !connecting ? 'marseille' : trip.id}`;
+RAIL_TRIPS.push(...EUROPE_TRIPS);
+export const railSource = (trip: RailTrip, connecting = false) => trip.source ?? `https://www.sncf-connect.com/en-en/train/route/${connecting ? 'marseille' : 'paris'}/${trip.via && !connecting ? 'marseille' : trip.id}`;
