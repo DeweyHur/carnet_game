@@ -7,8 +7,9 @@ import { sfxArrive, sfxDepart, unlockAudio } from '../audio';
 import './metro.css';
 import LanguageSwitch from './LanguageSwitch';
 import { useGame } from '../game/store';
+import { RAIL_COPY } from '../data/rail';
 
-export default function MetroJourney({ onJournal }: { onJournal: () => void }) {
+export default function MetroJourney({ onJournal, onRail }: { onJournal: () => void; onRail?: () => void }) {
   // A locale change updates text without resetting the route or station.
   useGame((s) => s.lang);
   const [tripId, setTripId] = useState('eiffel');
@@ -41,6 +42,7 @@ export default function MetroJourney({ onJournal }: { onJournal: () => void }) {
   function choose(id: string) { setRiding(false); setIndex(0); setTripId(id); }
   function save() { const next = [...new Set([...saved, trip.id])]; setSaved(next); try { localStorage.setItem('carnet-metro-postcards', JSON.stringify(next)); } catch { setSaveError(true); } }
   return <main className="metro-page">
+    {onRail && <div className="metro-rail-invite"><span>FRANCE · 08 NEW JOURNEYS</span><button onClick={onRail}>{display(RAIL_COPY.rail)}</button></div>}
     <header className="metro-header"><a className="metro-brand" href="#">carnet<span>{display("파리를 여행하는 방법")}</span></a><nav><LanguageSwitch /><a href="#metro-routes">{display("여행 코스")}</a><a href="#metro-tickets">{display("교통비 아끼기")}</a><button onClick={onJournal}>{display("여행 수첩 ↗")}</button></nav></header>
     <section className="metro-intro"><div><p className="metro-kicker">PARIS, UNE STATION À LA FOIS</p><h1>{display("한 정거장씩,")}<br/>{display("파리와 가까워지는 여행.")}</h1><p>{display("어느 방향 열차를 타야 할지, 어디에서 갈아탈지.")}<br/>{display("함께 타보고, 마음에 드는 풍경 앞에서 내려요.")}</p></div><div className="metro-intro-note"><span>{display("오늘의 작은 모험")}</span><b>{display("루브르 → 에펠탑")}</b><p><i className="line-badge line-1">1</i> → <i className="line-badge line-6">6</i>{display(" 지하철 두 번, 하나의 여행")}</p><small>{display("실제 노선 · 역별 여행 체험 · 현장 사진")}</small></div></section>
     <section id="metro-routes" className="metro-route-picker" aria-label={display("여행 코스 선택")}>{display(METRO_TRIPS.map((t, i) => <button key={t.id} aria-pressed={trip.id === t.id} onClick={() => choose(t.id)}><span>0{display(i + 1)} / {t.legs.map((l) => display(`${l.line}호선`)).join(' → ')}</span><b>{display(t.title)}</b><small>{display(t.subtitle)}</small></button>))}</section>

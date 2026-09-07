@@ -1,6 +1,7 @@
 import { useGame, type Locale } from './game/store';
 import english from './data/english.json';
 import { CARDS } from './data/cards';
+import { RAIL_ENGLISH } from './data/rail';
 
 /**
  * Display-only localisation. IDs, quiz answers and saved content remain language-neutral.
@@ -302,7 +303,7 @@ export function t(lang: Locale, ko: string): string {
   return lang === 'en' ? translateEnglish(ko) : ko;
 }
 
-export const ENGLISH: Record<string, string> = { ...DICT, ...english };
+export const ENGLISH: Record<string, string> = { ...DICT, ...english, ...RAIL_ENGLISH };
 // Older saves stored only the first 40 characters of collected fact cards.
 // Match the complete legacy message so ordinary text and player names stay intact.
 const legacyCardLogs = new Map(CARDS.map((card) => [

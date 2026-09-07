@@ -13,6 +13,7 @@ import { photoById } from './data/photos';
 import { useT } from './i18n';
 import { requestAmbient, sfxPage, stopAmbient, unlockAudio } from './audio';
 import MetroJourney from './ui/MetroJourney';
+import RailJourney from './ui/RailJourney';
 const MapView = lazy(() => import('./ui/MapView'));
 
 export default function App() {
@@ -22,7 +23,9 @@ export default function App() {
     document.title = lang === 'en' ? 'Carnet — Paris, one station at a time' : 'Carnet — 한 정거장씩, 파리 여행';
   }, [lang]);
   const [journal, setJournal] = useState(false);
-  if (!journal) return <MetroJourney onJournal={() => setJournal(true)} />;
+  const [rail, setRail] = useState(false);
+  if (rail) return <RailJourney onMetro={() => setRail(false)} />;
+  if (!journal) return <MetroJourney onJournal={() => setJournal(true)} onRail={() => setRail(true)} />;
   return <><JournalApp /><button className="metro-return" onClick={() => setJournal(false)}>{display("← 지하철 여행")}</button></>;
 }
 

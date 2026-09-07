@@ -15,6 +15,22 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {
+    'lyon': ('Place Bellecour', 'Place Bellecour · Lyon'),
+    'lyon:old-town': ('Vieux Lyon', 'Vieux Lyon'),
+    'bordeaux': ('Place de la Bourse', 'Place de la Bourse · Bordeaux'),
+    'bordeaux:mirror': ("Miroir d\'eau", "Miroir d’eau · Bordeaux"),
+    'strasbourg': ('Petite France, Strasbourg', 'Petite France · Strasbourg'),
+    'strasbourg:cathedral': ('Strasbourg Cathedral', 'Cathédrale Notre-Dame · Strasbourg'),
+    'nantes': ('Château des ducs de Bretagne', 'Château des ducs de Bretagne · Nantes'),
+    'nantes:machines': ('File:Elephant de nantes.jpg', 'Les Machines de l’île · Nantes'),
+    'rennes': ('Parlement de Bretagne', 'Parlement de Bretagne · Rennes'),
+    'rennes:park': ('Parc du Thabor', 'Parc du Thabor · Rennes'),
+    'marseille': ('Old Port of Marseille', 'Vieux-Port · Marseille'),
+    'marseille:mucem': ('Museum of European and Mediterranean Civilisations', 'Mucem · Marseille'),
+    'nice': ('Promenade des Anglais', 'Promenade des Anglais · Nice'),
+    'nice:market': ('fr:Cours Saleya', 'Cours Saleya · Nice'),
+    'dijon': ('Palace of the Dukes of Burgundy', 'Palais des ducs · Dijon'),
+    'dijon:owl': ('Church of Notre-Dame of Dijon', 'Notre-Dame · Dijon'),
     'paris:metro-palais-royal': ('Palais Royal–Musée du Louvre (Paris Métro)', '팔레 루아얄 뮈제 뒤 루브르 역'),
     'paris:metro-tuileries': ('Tuileries (Paris Métro)', '튈르리 역'),
     'paris:metro-champs': ('Champs-Élysées–Clemenceau (Paris Métro)', '샹젤리제 클레망소 역'),

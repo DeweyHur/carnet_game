@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import ts from 'typescript';
+import { checkRail } from './check-rail.mjs';
 
 export async function checkEnglish(server, useGame) {
   const { translateEnglish, ENGLISH } = await server.ssrLoadModule('/src/i18n.ts');
@@ -16,7 +17,7 @@ export async function checkEnglish(server, useGame) {
     else if (Array.isArray(value)) value.forEach((v,i) => data(v,`${path}[${i}]`));
     else if (value && typeof value === 'object') Object.entries(value).forEach(([k,v]) => data(v,`${path}.${k}`));
   }
-  for (const file of ['cities', 'cards', 'missions', 'photos', 'sources', 'metro', 'parisArrondissements']) {
+  for (const file of ['cities', 'cards', 'missions', 'photos', 'sources', 'metro', 'rail', 'parisArrondissements']) {
     const module = await server.ssrLoadModule(`/src/data/${file}.ts`);
     for (const [key,value] of Object.entries(module)) if (typeof value !== 'function') data(value, `${file}.${key}`);
   }
@@ -59,6 +60,7 @@ export async function checkEnglish(server, useGame) {
       const {default:Component}=await server.ssrLoadModule(`/src/ui/${file}.tsx`);
       assertRender(Component,{onJournal(){},onNotebook(){},onCity(){},onClose(){},selected:'paris',onSelect(){},onAlbum(){},mapMode:false,onMap(){}},file);
     }
+    await checkRail(server,assertRender);
     const {METRO_TRIPS,tripStops}=await server.ssrLoadModule('/src/data/metro.ts');
     for (const trip of METRO_TRIPS) {
       for (const stop of tripStops(trip)) {
