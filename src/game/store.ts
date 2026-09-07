@@ -7,8 +7,7 @@ import { photoById, placePhoto } from '../data/photos';
 import { MISSIONS, missionById, FINAL_LETTER, EPILOGUE_LETTER } from '../data/missions';
 import { CARD_FEE, FX_EUR, FX_CHANNELS, cityCurrency, convert, foodPrice, fmt, gradeArticle, quote, toEur, type FxChannel, type Grade } from './economy';
 import { theoArrivalDay } from './rival';
-import { createDrive, driverLevel, scoreDrive, upgradePrice, upgradeUnlock, type DriveRun, type DriveState, type DriveContract, type CarUpgrades, type Upgrade, type DriveResult } from './driving';
-import { sfxArrive, sfxCard, sfxCash, sfxCorrect, sfxDepart, sfxDoor, sfxLose, sfxStamp, sfxWin, sfxWrong, sfxDrive, setMuted as setAudioMuted } from '../audio';
+import { sfxArrive, sfxCard, sfxCash, sfxCorrect, sfxDepart, sfxDoor, sfxLose, sfxStamp, sfxWin, sfxWrong, setMuted as setAudioMuted } from '../audio';
 
 export const START_WEEKDAY = 2; // 2026-09-08 화요일
 export const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -67,21 +66,9 @@ export interface GameState {
   theoStartDay: number | null;
   theoRace: RaceResult[];
   muted: boolean;
-  driverXp: number;
-  driveSerial: number;
-  carUpgrades: CarUpgrades;
-  driveRun: DriveRun | null;
-  driveHistory: { id: number; cityId: string; day: number; result: DriveResult }[];
-  driveBestScores: Record<string, number>;
-  driveRewardedKeys: string[];
 
   // actions
   setPaused: (p: boolean) => void;
-  beginDrive: (contract: DriveContract, label: string, missionKey?: string) => void;
-  saveDrive: (id: number, state: DriveState) => void;
-  settleDrive: (id: number) => void;
-  endDrive: () => void;
-  upgradeCar: (part: Upgrade) => boolean;
   setLang: (l: Locale) => void;
   setMuted: (m: boolean) => void;
   capturePhoto: (photoId: string) => void;
@@ -108,7 +95,7 @@ export const weekdayOf = (day: number) => (START_WEEKDAY + day - 1) % 7;
 export const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
 const parseHm = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
 
-type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'pay' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused' | 'setLang' | 'setMuted' | 'capturePhoto' | 'beginDrive' | 'saveDrive' | 'settleDrive' | 'endDrive' | 'upgradeCar';
+type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'pay' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused' | 'setLang' | 'setMuted' | 'capturePhoto';
 type Data = Omit<GameState, Actions>;
 const fresh = (): Data => ({
   started: false, lang: 'ko', playerName: '', home: 'KRW', day: 1, minute: 9 * 60, cityId: 'paris',
@@ -117,7 +104,6 @@ const fresh = (): Data => ({
   unlocked: ['idf'], visited: ['paris'], cards: [], articles: [], stamps: [], collectibles: [], letters: [],
   completed: [], active: null, guesses: [], fxLost: 0, log: [], finalShown: false, voyageShown: false, travelling: null, paused: false,
   snapshots: [], visitedPois: [], tastedFoods: [], theoStartDay: null, theoRace: [], muted: false,
-  driverXp: 0, driveSerial: 0, carUpgrades: { handling: 0, boost: 0, bumper: 0 }, driveRun: null, driveHistory: [], driveBestScores: {}, driveRewardedKeys: [],
 });
 
 let logId = 1;
@@ -134,40 +120,6 @@ export const useGame = create<GameState>()(
         get().addLog('《Carnet》 편집부에 첫 출근. 예산 €2,000 상당 (자국 통화).', 'story');
       },
       reset: () => set({ ...fresh(), lang: get().lang }),
-
-      beginDrive: (contract, label, missionKey) => {
-        const s = get();
-        if (s.travelling || s.driveRun || (!missionKey && s.active)) return;
-        if (missionKey && (!s.active || `${s.active.missionId}:${s.active.step}` !== missionKey || get().currentStep()?.t !== 'move')) return;
-        const id = s.driveSerial + 1;
-        set({ driveSerial: id, driveRun: { id, cityId: s.cityId, label, missionKey, contract, upgrades: { ...s.carUpgrades }, state: createDrive(id * 971 + s.day * 31) } });
-      },
-      saveDrive: (id, state) => {
-        const run = get().driveRun;
-        if (!run || run.id !== id || run.result || state.elapsed < run.state.elapsed) return;
-        set({ driveRun: { ...run, state } });
-      },
-      settleDrive: (id) => {
-        const s = get(); const run = s.driveRun;
-        if (!run || run.id !== id || run.result || !run.state.finished) return;
-        const replay = !!run.missionKey && s.driveRewardedKeys.includes(run.missionKey);
-        const result = scoreDrive(run.state, run.contract, driverLevel(s.driverXp));
-        if (replay) { result.earned = 0; result.xp = 0; result.gross = 0; result.repairs = 0; }
-        set({ driverXp: s.driverXp + result.xp, wallet: { ...s.wallet, EUR: Math.round((s.wallet.EUR + result.earned) * 100) / 100 },
-          driveRun: { ...run, result }, minute: s.minute + (run.missionKey ? 0 : 15),
-          driveHistory: [...s.driveHistory.slice(-49), { id, cityId: run.cityId, day: s.day, result }],
-          driveBestScores: { ...s.driveBestScores, [run.cityId]: Math.max(s.driveBestScores[run.cityId] ?? 0, result.score, ...s.driveHistory.filter((entry) => entry.cityId === run.cityId).map((entry) => entry.result.score)) },
-          driveRewardedKeys: run.missionKey && !replay ? [...s.driveRewardedKeys, run.missionKey] : s.driveRewardedKeys });
-        get().addLog(`드라이브 ${result.grade} · +€${result.earned} · 운전 경험치 +${result.xp}${driverLevel(s.driverXp + result.xp) > driverLevel(s.driverXp) ? ' · 레벨 업!' : ''}`, 'money');
-        sfxDrive(result.arrived ? 'finish' : 'bump');
-      },
-      endDrive: () => set({ driveRun: null }),
-      upgradeCar: (part) => {
-        const s = get(); const rank = s.carUpgrades[part];
-        if (s.driveRun || rank === undefined || rank >= 3 || driverLevel(s.driverXp) < upgradeUnlock(rank) || s.wallet.EUR < upgradePrice(rank)) return false;
-        set({ wallet: { ...s.wallet, EUR: Math.round((s.wallet.EUR - upgradePrice(rank)) * 100) / 100 }, carUpgrades: { ...s.carUpgrades, [part]: rank + 1 } });
-        sfxCash(); return true;
-      },
 
       capturePhoto: (photoId) => {
         const s = get();
@@ -345,7 +297,7 @@ export const useGame = create<GameState>()(
             case 'card': {
               if (!s.cards.includes(step.cardId)) {
                 set({ cards: [...s.cards, step.cardId] });
-                get().addLog(`사실 카드 수집: ${cardById(step.cardId).text.slice(0, 40)}…`, 'card');
+                get().addLog(`사실 카드 수집: ${cardById(step.cardId).text}…`, 'card');
                 sfxCard();
               }
               break;
@@ -384,7 +336,7 @@ export const useGame = create<GameState>()(
             }
             case 'move': {
               const moveCity = cityById(m.cityId);
-              get().pay(moveCity.transitFareEur ?? 2.5, cityCurrency(moveCity), `${step.zone} 현지 이동비`);
+              if (!get().pay(moveCity.transitFareEur ?? 2.5, cityCurrency(moveCity), `${step.zone} 현지 이동비`)) return;
               set({ minute: get().minute + step.minutes, stamina: Math.max(0, get().stamina - 3) });
               break;
             }
@@ -420,7 +372,7 @@ export const useGame = create<GameState>()(
         const cardId = step && 'cardId' in step ? step.cardId : undefined;
         if (cardId && !get().cards.includes(cardId)) {
           set({ cards: [...get().cards, cardId] });
-          get().addLog(`사실 카드 수집: ${cardById(cardId).text.slice(0, 40)}…`, 'card');
+          get().addLog(`사실 카드 수집: ${cardById(cardId).text}…`, 'card');
         }
         set({ active: { ...a, wrong: a.wrong + (correct ? 0 : 1), result: { kind: 'answer', correct, picked } }, minute: get().minute + 5 });
         if (correct) sfxCorrect(); else sfxWrong();
@@ -454,12 +406,16 @@ export const useGame = create<GameState>()(
         return { grade: g.grade, fee };
       },
 
-      abandonMission: () => set({ active: null, paused: false, driveRun: null }),
+      abandonMission: () => set({ active: null, paused: false }),
       setPaused: (p) => set({ paused: p }),
       setLang: (l) => set({ lang: l }),
       setMuted: (m) => { setAudioMuted(m); set({ muted: m }); },
     }),
-    { name: 'carnet-save-v1', partialize: (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => typeof v !== 'function')) as GameState },
+    { name: 'carnet-save-v1', merge: (persisted, current) => {
+      const saved = persisted && typeof persisted === 'object' ? persisted as Record<string, unknown> : {};
+      const allowed = new Set(Object.keys(fresh()));
+      return { ...current, ...Object.fromEntries(Object.entries(saved).filter(([key]) => allowed.has(key))) };
+    }, partialize: (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => typeof v !== 'function')) as GameState },
   ),
 );
 

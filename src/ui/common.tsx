@@ -1,3 +1,4 @@
+import { translateDisplay as display } from '../i18n';
 import { useState } from 'react';
 import type { Currency, FactCard, Speaker } from '../game/types';
 import { sourceById } from '../data/sources';
@@ -11,8 +12,8 @@ export function FactCardView({ card }: { card: FactCard }) {
   const src = sourceById(card.sourceId);
   return (
     <div className="factcard">
-      <div className="t">{card.text}</div>
-      <div className="src">{t('출처: ')}{src ? <a href={src.url} target="_blank" rel="noreferrer">{src.title}</a> : card.sourceId} · {src?.license}</div>
+      <div className="t">{display(card.text)}</div>
+      <div className="src">{t('출처: ')}{display(src ? <a href={src.url} target="_blank" rel="noreferrer">{display(src.title)}</a> : card.sourceId)} · {display(src?.license)}</div>
     </div>
   );
 }
@@ -25,10 +26,10 @@ export function Avatar({ who, name, color }: { who: Speaker; name?: string; colo
     echo: { txt: '記', bg: '#6b5a2a' },
     narrator: { txt: '…', bg: '#8a7a62' },
     player: { txt: '나', bg: '#4f7a4a' },
-    guide: { txt: name?.slice(0, 1) ?? '안', bg: color ?? '#4f6d7a' },
+    guide: { txt: display(name)?.slice(0, 1) ?? '안', bg: color ?? '#4f6d7a' },
   };
   const m = map[who];
-  return <div className={`avatar${who === 'narrator' ? ' narr' : ''}`} style={{ background: m.bg }}>{m.txt}</div>;
+  return <div className={`avatar${who === 'narrator' ? ' narr' : ''}`} style={{ background: m.bg }}>{display(m.txt)}</div>;
 }
 
 /** 통화 병기: 현지 통화 크게 + 자국 통화 작게 (기획서 §3.3) */
@@ -36,8 +37,8 @@ export function Price({ amount, currency = 'EUR' }: { amount: number; currency?:
   const home = useGame((s) => s.home);
   return (
     <div className="price">
-      {fmt(amount, currency)}
-      {home !== currency && <small>≈ {fmt(convert(amount, currency, home), home)}</small>}
+      {display(fmt(amount, currency))}
+      {display(home !== currency && <small>≈ {display(fmt(convert(amount, currency, home), home))}</small>)}
     </div>
   );
 }
@@ -57,28 +58,28 @@ export function ExchangeForm({ defaultFrom, defaultTo, onDone }: { defaultFrom?:
   return (
     <div>
       <div className="fxboard">
-        <div className="l h"><span>{t('ECB 기준환율 (EUR=1)')}</span><span>{FX_DATE.replace('(예시)', t('(예시)'))}</span></div>
-        {curs.filter((c) => c !== 'EUR').map((c) => (
-          <div className="l" key={c}><span>1 EUR = {FX_EUR[c].toLocaleString()} {c}</span><span>1 {c} = {(1 / FX_EUR[c]).toFixed(c === 'KRW' ? 5 : 3)} EUR</span></div>
-        ))}
+        <div className="l h"><span>{t('ECB 기준환율 (EUR=1)')}</span><span>{display(FX_DATE.replace('(예시)', t('(예시)')))}</span></div>
+        {display(curs.filter((c) => c !== 'EUR').map((c) => (
+          <div className="l" key={c}><span>1 EUR = {display(FX_EUR[c].toLocaleString())} {display(c)}</span><span>1 {display(c)} = {display((1 / FX_EUR[c]).toFixed(c === 'KRW' ? 5 : 3))} EUR</span></div>
+        )))}
       </div>
       <div className="fx-form">
-        <select value={from} onChange={(e) => setFrom(e.target.value as Currency)}>{curs.map((c) => <option key={c} value={c}>{c} {t(CURRENCY_META[c].name)} ({t('보유')} {fmt(wallet[c], c)})</option>)}</select>
-        <select value={to} onChange={(e) => setTo(e.target.value as Currency)}>{curs.map((c) => <option key={c} value={c}>→ {c} {t(CURRENCY_META[c].name)}</option>)}</select>
+        <select value={from} onChange={(e) => setFrom(e.target.value as Currency)}>{display(curs.map((c) => <option key={c} value={c}>{display(c)} {t(CURRENCY_META[c].name)} ({t('보유')} {display(fmt(wallet[c], c))})</option>))}</select>
+        <select value={to} onChange={(e) => setTo(e.target.value as Currency)}>{display(curs.map((c) => <option key={c} value={c}>→ {display(c)} {t(CURRENCY_META[c].name)}</option>))}</select>
         <input className="full" type="number" value={amount} min={0} onChange={(e) => setAmount(Number(e.target.value))} />
       </div>
-      {(Object.keys(FX_CHANNELS) as FxChannel[]).map((k) => {
+      {display((Object.keys(FX_CHANNELS) as FxChannel[]).map((k) => {
         const c = FX_CHANNELS[k];
         const qq = quote(amount, from, to, k);
         return (
           <div className="channel" key={k} style={{ borderColor: ch === k ? 'var(--ink)' : undefined }} onClick={() => setCh(k)}>
-            <div><div className="cn">{ch === k ? '● ' : '○ '}{t(c.name)} <span className="tag">{k === 'atm' ? `€${c.fixedEur} + ${(c.spread * 100).toFixed(1)}%` : `${(c.spread * 100).toFixed(1)}%`}</span></div><div className="ct">{t(c.tip)}</div></div>
-            <div className="cr">{fmt(qq.receive, to)}<small>−{fmt(qq.lost, to)} {t('손실')}</small></div>
+            <div><div className="cn">{display(ch === k ? '● ' : '○ ')}{t(c.name)} <span className="tag">{display(k === 'atm' ? `€${c.fixedEur} + ${(c.spread * 100).toFixed(1)}%` : `${(c.spread * 100).toFixed(1)}%`)}</span></div><div className="ct">{t(c.tip)}</div></div>
+            <div className="cr">{display(fmt(qq.receive, to))}<small>−{display(fmt(qq.lost, to))} {t('손실')}</small></div>
           </div>
         );
-      })}
+      }))}
       <div className="scene-actions">
-        <span className="hint">{t('기준환율이면')} {fmt(q.mid, to)} — {fmt(q.lost, to)}{t('이 사라진다.')}</span>
+        <span className="hint">{t('기준환율이면')} {display(fmt(q.mid, to))} — {display(fmt(q.lost, to))}{t('이 사라진다.')}</span>
         <button className="btn" disabled={!ok} onClick={() => { exchange(amount, from, to, ch); onDone?.(); }}>{t('환전하기')}</button>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { translateDisplay as display } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import type { Map as MLMap, Marker, GeoJSONSource } from 'maplibre-gl';
@@ -45,6 +46,7 @@ export default function MapView({ onSelect, selected }: Props) {
   const unlocked = useGame((s) => s.unlocked);
   const stamps = useGame((s) => s.stamps);
   const travelling = useGame((s) => s.travelling);
+  const lang = useGame((s) => s.lang);
 
   // 지도 생성
   useEffect(() => {
@@ -92,7 +94,8 @@ export default function MapView({ onSelect, selected }: Props) {
     for (const c of CITIES) {
       const el = document.createElement('div');
       el.className = `pin tier-${c.tier}`;
-      el.innerHTML = `<div class="dot"></div><div class="lbl">${c.names.ko}</div>`;
+      el.innerHTML = '<div class="dot"></div><div class="lbl"></div>';
+      el.querySelector('.lbl')!.textContent = display(c.names.ko);
       el.addEventListener('click', (ev) => { ev.stopPropagation(); onSelect(c.id); });
       const m = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(c.coord).addTo(map);
       markers.current[c.id] = m;
@@ -107,6 +110,7 @@ export default function MapView({ onSelect, selected }: Props) {
       const el = markers.current[c.id]?.getElement();
       if (!el) continue;
       const done = stamps.some((s) => s.cityId === c.id);
+      el.querySelector('.lbl')!.textContent = display(c.names.ko);
       // maplibregl-marker 클래스는 유지해야 위치가 잡힌다
       const flags: Record<string, boolean> = { pin: true, [`tier-${c.tier}`]: true, locked: !unlocked.includes(c.region), here: c.id === cityId, done, sel: selected === c.id };
       for (const [k, v] of Object.entries(flags)) el.classList.toggle(k, v);
@@ -134,7 +138,7 @@ export default function MapView({ onSelect, selected }: Props) {
       }
     };
     if (map.isStyleLoaded()) draw(); else map.once('idle', draw);
-  }, [cityId, unlocked, stamps, selected]);
+  }, [cityId, unlocked, stamps, selected, lang]);
 
   // 이동 애니메이션
   useEffect(() => {
@@ -188,24 +192,24 @@ export default function MapView({ onSelect, selected }: Props) {
     <div className="map-wrap">
       <div className="map" ref={ref} />
       <div className="map-legend">
-        <div className="map-legend-head"><span className="eyebrow">CARNET · 세계지도</span><b>{stampedCount} / {CITIES.length} {t('도시 취재 완료')}</b></div>
+        <div className="map-legend-head"><span className="eyebrow">{display("CARNET · 세계지도")}</span><b>{display(stampedCount)} / {display(CITIES.length)} {t('도시 취재 완료')}</b></div>
         <div className="map-legend-tiers">
           <span><i className="dot tier-S" />{t(TIER_LABEL.S)}</span>
           <span><i className="dot tier-A" />{t(TIER_LABEL.A)}</span>
           <span><i className="dot tier-H" />{t(TIER_LABEL.H)}</span>
           <span><i className="dot locked" />{t('안개 · 잠긴 지역')}</span>
         </div>
-        {zoomTier === 'world' && <div className="map-legend-hint">{t('확대하면 거점·유산 도시 이름도 보여요.')}</div>}
+        {display(zoomTier === 'world' && <div className="map-legend-hint">{t('확대하면 거점·유산 도시 이름도 보여요.')}</div>)}
         <div className="map-legend-regions">
-          {(Object.keys(REGIONS) as RegionId[]).map((id) => {
+          {display((Object.keys(REGIONS) as RegionId[]).map((id) => {
             const open = unlocked.includes(id);
             const count = CITIES.filter((c) => c.region === id).length;
             return (
               <button key={id} className={`map-region${open ? '' : ' locked'}`} disabled={!open} onClick={() => flyToRegion(id)}>
-                <span>{open ? '' : '🔒 '}{t(REGIONS[id].name)}</span><small>{count}{t('개 도시')}</small>
+                <span>{display(open ? '' : '🔒 ')}{t(REGIONS[id].name)}</span><small>{display(count)}{t('개 도시')}</small>
               </button>
             );
-          })}
+          }))}
         </div>
       </div>
     </div>

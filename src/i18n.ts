@@ -1,11 +1,13 @@
 import { useGame, type Locale } from './game/store';
+import english from './data/english.json';
 
 /**
- * 최소 UI 다국어 지원 (기획서 §1 "한국어·영어 → 프랑스어" 원칙의 1단계).
- * 인터페이스 문자열만 사전에 등록한다 — 도시·미션 서사 콘텐츠는 아직 한국어 전용이며,
- * 사전에 없는 문자열은 원문(한국어) 그대로 표시된다 (ROADMAP.md 참고).
+ * Display-only localisation. IDs, quiz answers and saved content remain language-neutral.
+ * Literal text and interpolated messages share a checked-in English catalog.
  */
 const DICT: Record<string, string> = {
+  'Carnet — 한 정거장씩, 파리 여행': 'Carnet — Paris, one station at a time',
+  '언어': 'Language',
   // 공통 버튼·상태
   '계속 ▸': 'Continue ▸',
   '확인': 'Confirm',
@@ -15,9 +17,8 @@ const DICT: Record<string, string> = {
   '접어 넣기 ▸': 'Tuck it away ▸',
   '지도 보기 ▸': 'View map ▸',
   '미션 완료 ▸': 'Finish mission ▸',
-  '운전해서 이동 ▸': 'Drive there ▸',
+  '풍경을 따라 이동 ▸': 'Continue the journey ▸',
   '건너뛰기': 'Skip',
-  '가속 페달을 눌러 목적지까지 운전하세요.': 'Hold the accelerator to drive to your destination.',
   '가속 ▲': 'Gas ▲',
   '경로를 찾는 중…': 'Finding a route…',
   '실시간 경로를 불러오지 못해 직선 도로로 대신합니다.': 'Could not fetch a live route — using a straight road instead.',
@@ -291,11 +292,48 @@ const DICT: Record<string, string> = {
 
 export function useT() {
   const lang = useGame((s) => s.lang);
-  return (ko: string): string => (lang === 'en' ? DICT[ko] ?? ko : ko);
+  return (ko: string): string => t(lang, ko);
 }
 
 export function t(lang: Locale, ko: string): string {
-  return lang === 'en' ? DICT[ko] ?? ko : ko;
+  return lang === 'en' ? translateEnglish(ko) : ko;
+}
+
+export const ENGLISH: Record<string, string> = { ...DICT, ...english };
+const hangul = /[가-힣]/;
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const templates = Object.entries(ENGLISH).filter(([key]) => /\{\d+\}/.test(key))
+  .sort(([a], [b]) => b.replace(/\{\d+\}/g, '').length - a.replace(/\{\d+\}/g, '').length)
+  .map(([key, value]) => ({ pattern: new RegExp('^' + key.split(/\{\d+\}/).map(escapeRegex).join('(.*?)') + '$', 's'), value }));
+const phrases = Object.keys(ENGLISH).filter((key) => key.length > 1 && hangul.test(key) && !/\{\d+\}/.test(key)).sort((a, b) => b.length - a.length);
+const phrasePattern = new RegExp(phrases.map(escapeRegex).join('|'), 'g');
+const cache = new Map<string, string>();
+export function translateEnglish(text: string): string {
+  if (!hangul.test(text)) return text;
+  const exact = ENGLISH[text];
+  if (exact !== undefined) return exact;
+  const cached = cache.get(text);
+  if (cached !== undefined) return cached;
+  let result: string | undefined;
+  for (const template of templates) {
+    const match = template.pattern.exec(text);
+    if (!match) continue;
+    result = template.value.replace(/\{(\d+)\}/g, (_, i: string) => translateEnglish(match[Number(i) + 1] ?? ''));
+    break;
+  }
+  // Supports older saved messages assembled from already-translated fragments.
+  result ??= text.replace(phrasePattern, (key) => ENGLISH[key]);
+  if (cache.size > 3000) cache.clear();
+  cache.set(text, result);
+  return result;
+}
+
+/** Translate only displayed text, never mutate data or React elements. */
+export function translateDisplay<T>(value: T): T {
+  if (useGame.getState().lang !== 'en') return value;
+  if (typeof value === 'string') return translateEnglish(value) as T;
+  if (Array.isArray(value)) return value.map(translateDisplay) as T;
+  return value;
 }
 
 /** "N일차" ↔ "Day N" */

@@ -1,3 +1,4 @@
+import { translateDisplay as display } from './i18n';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import Hud from './ui/Hud';
 import CityPanel from './ui/CityPanel';
@@ -11,10 +12,21 @@ import TravelPhoto from './ui/TravelPhoto';
 import { photoById } from './data/photos';
 import { useT } from './i18n';
 import { requestAmbient, sfxPage, stopAmbient, unlockAudio } from './audio';
-import DriveMove from './ui/DriveMove';
+import MetroJourney from './ui/MetroJourney';
 const MapView = lazy(() => import('./ui/MapView'));
 
 export default function App() {
+  const lang = useGame((s) => s.lang);
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.title = lang === 'en' ? 'Carnet — Paris, one station at a time' : 'Carnet — 한 정거장씩, 파리 여행';
+  }, [lang]);
+  const [journal, setJournal] = useState(false);
+  if (!journal) return <MetroJourney onJournal={() => setJournal(true)} />;
+  return <><JournalApp /><button className="metro-return" onClick={() => setJournal(false)}>{display("← 지하철 여행")}</button></>;
+}
+
+function JournalApp() {
   const t = useT();
   const started = useGame((s) => s.started);
   const cityId = useGame((s) => s.cityId);
@@ -29,8 +41,6 @@ export default function App() {
   const [notebook, setNotebook] = useState(false);
   const [finalOpen, setFinalOpen] = useState(false);
   const [mapMode, setMapMode] = useState(true);
-  const [driveOpen, setDriveOpen] = useState(false);
-  const driveRun = useGame((s) => s.driveRun);
 
   // 브라우저 자동재생 정책: 첫 사용자 제스처에서 오디오 컨텍스트를 깨운다
   useEffect(() => {
@@ -40,7 +50,7 @@ export default function App() {
     return () => { window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
   }, []);
   // 여행 중에는 은은한 배경음, 음소거 시 정지
-  useEffect(() => { if (started && !muted) requestAmbient(); else stopAmbient(); }, [started, muted]);
+  useEffect(() => { if (started && !muted) requestAmbient(); else stopAmbient(); return () => stopAmbient(); }, [started, muted]);
   // 도착하면 도착 도시 카드 열기
   useEffect(() => { if (!travelling) setSelected(cityId); }, [cityId, travelling]);
   useEffect(() => { if (finalShown && !active) setFinalOpen(true); }, [finalShown, active]);
@@ -57,33 +67,32 @@ export default function App() {
 
   return (
     <div className={`app${mapMode ? ' map-mode' : ''}`}>
-      {mapMode && <Suspense fallback={<div className="map-loading">{t('여행 지도를 펼치는 중…')}</div>}><MapView onSelect={(id) => setSelected(id)} selected={selected} /></Suspense>}
+      {display(mapMode && <Suspense fallback={<div className="map-loading">{t('여행 지도를 펼치는 중…')}</div>}><MapView onSelect={(id) => setSelected(id)} selected={selected} /></Suspense>)}
       <Hud onNotebook={() => { sfxPage(); setNotebook(true); }} onCity={() => setSelected(cityId)} />
       <Journey key={`journey-${selected ?? cityId}`} selected={selected} onSelect={setSelected} onAlbum={() => { sfxPage(); setNotebook(true); }} mapMode={mapMode} onMap={() => setMapMode((m) => !m)} />
-      {selected && !travelling && <CityPanel key={`panel-${selected}`} cityId={selected} onClose={() => setSelected(null)} onDrive={() => setDriveOpen(true)} initialTab={selected === cityId ? 'missions' : 'transport'} />}
-      {travelling && (
+      {display(selected && !travelling && <CityPanel key={`panel-${selected}`} cityId={selected} onClose={() => setSelected(null)} initialTab={selected === cityId ? 'missions' : 'transport'} />)}
+      {display(travelling && (
         <div className="travel-overlay">
           <TravelPhoto photo={photoById(travelling.edge.to)} className="train-window" priority />
-          <div className="eyebrow">EN ROUTE / 다음 풍경으로</div>
-          <div className="t">{travelling.edge.operator} · {travelling.edge.station} 출발</div>
-          <div className="d">{cityById(travelling.edge.from).names.ko} → {cityById(travelling.edge.to).names.ko} · 도착 예정 {clock(travelling.arriveMinute)}</div>
-          {travelling.edge.windowFact && <div className="w">🪟 차창 밖: {travelling.edge.windowFact}</div>}
+          <div className="eyebrow">{display("EN ROUTE / 다음 풍경으로")}</div>
+          <div className="t">{display(travelling.edge.operator)} · {display(travelling.edge.station)}{display(" 출발")}</div>
+          <div className="d">{display(cityById(travelling.edge.from).names.ko)} → {display(cityById(travelling.edge.to).names.ko)}{display(" · 도착 예정 ")}{display(clock(travelling.arriveMinute))}</div>
+          {display(travelling.edge.windowFact && <div className="w">{display("🪟 차창 밖: ")}{display(travelling.edge.windowFact)}</div>)}
           <div className="train-progress"><i /></div>
         </div>
-      )}
-      <div className="log">{recent.map((e) => <div className={`e ${e.kind}`} key={e.id}>{e.text}</div>)}</div>
-      {notebook && <Notebook onClose={() => { sfxPage(); setNotebook(false); }} />}
+      ))}
+      <div className="log">{display(recent.map((e) => <div className={`e ${e.kind}`} key={e.id}>{display(e.text)}</div>))}</div>
+      {display(notebook && <Notebook onClose={() => { sfxPage(); setNotebook(false); }} />)}
       <Scene />
-      {(driveOpen || (driveRun && !driveRun.missionKey)) && <DriveMove onArrive={() => setDriveOpen(false)} onClose={() => setDriveOpen(false)} />}
-      {finalOpen && last && (
+      {display(finalOpen && last && (
         <div className="scene" onClick={() => setFinalOpen(false)}>
           <div className="scene-box" onClick={(e) => e.stopPropagation()}>
             <div className="mission-tag">{t('지역 완주 · L.의 편지')}</div>
-            <div className="letter"><h3>✉ {last.title}</h3>{last.text}</div>
+            <div className="letter"><h3>✉ {display(last.title)}</h3>{display(last.text)}</div>
             <div className="scene-actions"><button className="btn" onClick={() => setFinalOpen(false)}>{t('닫기')}</button></div>
           </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }

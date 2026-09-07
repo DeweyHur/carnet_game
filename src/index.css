@@ -87,18 +87,6 @@ a { color: var(--accent-2); }
 .poi-pin.origin .lbl::before { content: '↳ '; }
 .arr-label { font-family: var(--mono); font-size: 10px; color: var(--ink-3); background: #fffdf6cc; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; pointer-events: none; opacity: .75; }
 
-/* ── 운전 미니게임(DriveMove) ─────────────────────────────────────────── */
-.drive-wrap { position: absolute; inset: 0; }
-.drive-map { width: 100%; height: 100%; }
-.drive-car { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 20px; transform: rotate(var(--heading, 0deg)); filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
-.drive-hud { position: absolute; top: 16px; right: 16px; width: 190px; display: flex; align-items: center; gap: 8px; z-index: 2; }
-.drive-progress { flex: 1; height: 8px; background: #0004; border-radius: 4px; overflow: hidden; border: 1px solid #fff3; }
-.drive-progress i { display: block; height: 100%; background: var(--accent); transition: width .15s linear; }
-.drive-speed { font-family: var(--mono); font-size: 11px; background: #fffdf6ee; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
-.drive-note { position: absolute; top: 56px; right: 16px; max-width: 220px; background: #fffdf6ee; border: 1px solid var(--line); padding: 6px 10px; border-radius: 8px; font-size: 11px; text-align: right; z-index: 2; }
-.drive-pedal { position: absolute; top: 96px; right: 16px; width: 78px; height: 78px; border-radius: 50%; background: var(--ink); color: var(--paper); font-family: var(--serif); font-weight: 700; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.4); border: none; user-select: none; touch-action: none; z-index: 2; }
-.drive-pedal:active { background: var(--accent); }
-@media (max-width: 600px) { .drive-hud { top: 10px; right: 10px; width: 150px; } .drive-note { top: 44px; right: 10px; max-width: 170px; } .drive-pedal { top: 78px; right: 10px; width: 68px; height: 68px; font-size: 12px; } }
 
 /* ── 패널(도시 카드) ─────────────────────────────────── */
 .panel { position: absolute; left: 12px; bottom: 12px; width: 400px; max-width: calc(100% - 24px); max-height: calc(100% - 110px); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); display: flex; flex-direction: column; z-index: 6; overflow: hidden; }
@@ -564,7 +552,5 @@ button { color: inherit; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 
-.city-drive-launch { width: 100%; padding: 14px; border: 0; border-radius: 12px; background: #256f5e; color: white; font-weight: bold; cursor: pointer; margin: 12px 0; }
-.city-drive-launch:disabled { opacity: .45; }
 .city-details, .mission-details { font-size: 12px; line-height: 1.7; }
 .city-details summary, .mission-details summary { cursor: pointer; padding: 10px 0; color: #6b7967; }

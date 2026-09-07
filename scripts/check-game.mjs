@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'vite';
-import { checkDriving } from './check-driving.mjs';
+import { checkEnglish } from './check-english.mjs';
 
 // Exercise the actual TypeScript modules with an isolated, in-memory save slot.
 const saved = new Map();
@@ -9,7 +9,6 @@ globalThis.localStorage = { getItem: (k) => saved.get(k) ?? null, setItem: (k, v
 globalThis.window = { localStorage: globalThis.localStorage };
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' });
 try {
-  await checkDriving(server);
   const { CITIES, edgesFrom } = await server.ssrLoadModule('/src/data/cities.ts');
   const { MISSIONS, DISCOVERY_MISSIONS } = await server.ssrLoadModule('/src/data/missions.ts');
   const { CARDS } = await server.ssrLoadModule('/src/data/cards.ts');
@@ -18,68 +17,27 @@ try {
   const { foodPrice } = await server.ssrLoadModule('/src/game/economy.ts');
   const { useGame } = await server.ssrLoadModule('/src/game/store.ts');
   const state = () => useGame.getState();
-  const { routePoint, routeLength } = await server.ssrLoadModule('/src/game/driveRoute.ts');
-  const route = [[2, 48], [2, 48.01], [2, 48.04]];
-  assert.deepEqual(routePoint(route, 0), route[0]);
-  assert.deepEqual(routePoint(route, 1), route[2]);
-  assert.ok(Math.abs(routePoint(route, .5)[1] - 48.02) < .00001, 'Map movement follows distance, not vertex count');
-  assert.deepEqual(routePoint([[2, 48], [2, 48]], .5), [2, 48]);
-  assert.ok(routeLength(route) > 4400 && routeLength(route) < 4500);
-  const { createDrive, tickDrive, scoreDrive, driverLevel } = await server.ssrLoadModule('/src/game/driving.ts');
-  const upgrades = { handling: 0, boost: 0, bumper: 0 };
-  const simulate = (seed, steer) => {
-    let s = createDrive(seed);
-    while (!s.finished) {
-      const next = s.objects.find((o) => !o.resolved);
-      const zone = next?.kind === 'zone';
-      if (steer && next && !zone) {
-        const film = s.objects.find((o) => !o.resolved && o.kind === 'film' && o.distance === next.distance);
-        s = { ...s, lane: film?.lane ?? (next.lane + 1) % 3 };
-      }
-      s = tickDrive(s, { gas: true, brake: !!(steer && zone && next.distance - s.distance < 65 && s.speed > 49), boost: false }, .05, upgrades);
+  const { METRO_TRIPS, STATION_PHOTOS, tripStops, dayComparison } = await server.ssrLoadModule('/src/data/metro.ts');
+  for (const trip of METRO_TRIPS) {
+    assert.ok(photoById(trip.photo) && photoById(trip.stationPhoto));
+    const stops = tripStops(trip);
+    for (const stop of stops) assert.ok(photoById(STATION_PHOTOS[stop.name]), `Missing station photo: ${stop.name}`);
+    assert.equal(stops[0].transfer, false);
+    assert.equal(stops.filter((s) => s.transfer).length, trip.legs.length - 1);
+    for (let i = 1; i < trip.legs.length; i++) {
+      assert.equal(trip.legs[i - 1].stations.at(-1), trip.legs[i].stations[0], 'Transfers share the same actual station');
     }
-    return s;
-  };
-  let clean;
-  for (let seed = 1; seed <= 20; seed++) {
-    clean = simulate(seed, true);
-    const passive = simulate(seed, false);
-    assert.equal(clean.collisions, 0, 'Readable course always has a safe lane');
-    assert.equal(clean.speeding, 0, 'Braking can clear every speed zone');
-    assert.ok(clean.films >= 6);
-    assert.ok(clean.score > passive.score, 'Steering and collecting outperform holding gas');
-    assert.equal(scoreDrive(clean, 'careful', 1).grade, 'S');
   }
-  state().newGame('운전 검증', 'EUR');
-  assert.equal(state().upgradeCar('handling'), false, 'Upgrades require a driver level');
-  state().beginDrive('careful', '테스트');
-  const runId = state().driveRun.id, initialWallet = state().wallet.EUR;
-  state().settleDrive(runId);
-  assert.equal(state().wallet.EUR, initialWallet, 'Unfinished run pays nothing');
-  state().saveDrive(runId, clean);
-  await useGame.persist.rehydrate();
-  assert.equal(state().driveRun.state.finished, true, 'Finished checkpoint survives reload');
-  state().settleDrive(runId);
-  const rewardWallet = state().wallet.EUR, rewardXp = state().driverXp;
-  assert.ok(rewardWallet > initialWallet && driverLevel(rewardXp) >= 2);
-  state().settleDrive(runId); state().saveDrive(runId, createDrive(1));
-  assert.equal(state().wallet.EUR, rewardWallet, 'Settlement is idempotent');
-  assert.equal(state().driverXp, rewardXp);
-  assert.ok(state().driveRun.result);
-  assert.equal(state().driveBestScores.paris, clean.score, 'City personal best is saved independently of the recent history');
-  state().endDrive();
-  assert.equal(state().upgradeCar('handling'), true);
-  assert.equal(state().wallet.EUR, rewardWallet - 35);
-  assert.equal(state().carUpgrades.handling, 1);
-  await useGame.persist.rehydrate();
-  assert.equal(state().carUpgrades.handling, 1, 'Purchased upgrade survives reload');
-  assert.equal(state().driveBestScores.paris, clean.score, 'City personal best survives reload');
-  useGame.setState({ driveHistory: [] });
-  state().beginDrive('scenic', '기록 유지 검증');
-  const secondRun = state().driveRun.id;
-  state().saveDrive(secondRun, { ...clean, score: 1 }); state().settleDrive(secondRun);
-  assert.equal(state().driveBestScores.paris, clean.score, 'A lower score never erases a personal best after history expires');
-  state().endDrive();
+  assert.equal(dayComparison(4).cheaper, 'single');
+  assert.equal(dayComparison(5).cheaper, 'day');
+  assert.equal(dayComparison(3).single, 7.65);
+  const React = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { default: MetroJourney } = await server.ssrLoadModule('/src/ui/MetroJourney.tsx');
+  const markup = renderToStaticMarkup(React.createElement(MetroJourney, { onJournal() {} }));
+  assert.ok(markup.includes('Palais Royal') && markup.includes('Navigo Semaine'));
+  assert.ok(markup.includes('paris-metro-palais-royal.webp'), 'Initial scene shows its real station photograph');
+  await checkEnglish(server, useGame);
   assert.equal(DISCOVERY_MISSIONS.length, CITIES.length * 2);
   assert.equal(new Set(MISSIONS.map((m) => m.id)).size, MISSIONS.length);
   const positions = new Set();
@@ -148,20 +106,15 @@ try {
   assert.equal(state().travelling, null);
   // Backward compatibility with v1 saves that predate the album fields.
   const old = JSON.parse(saved.get('carnet-save-v1'));
+  old.state.driveRun = { id: 123 }; old.state.carUpgrades = { boost: 3 };
   delete old.state.snapshots; delete old.state.visitedPois; delete old.state.tastedFoods;
-  delete old.state.driverXp; delete old.state.carUpgrades; delete old.state.driveRun;
-  delete old.state.driveBestScores;
   state().reset();
   saved.set('carnet-save-v1', JSON.stringify(old));
   await useGame.persist.rehydrate();
   assert.equal(state().cityId, 'boulogne');
   assert.deepEqual(state().snapshots, []);
   assert.deepEqual(state().visitedPois, []);
-  assert.equal(state().driverXp, 0);
-  assert.equal(state().driveRun, null);
-  assert.deepEqual(state().driveBestScores, {});
-  assert.deepEqual(state().carUpgrades, upgrades);
-  console.log('PASS: 20 driving courses, skilled versus passive controls, rewards, upgrades, resume and legacy saves.');
+  assert.equal('driveRun' in state(), false, 'Retired game state is absent');
   // Validate audio envelopes and teardown with a minimal Web Audio graph.
   const liveOscillators = new Set(), peaks = [];
   const param = () => ({ value: 0, setValueAtTime(v) { peaks.push(v); }, exponentialRampToValueAtTime(v) { peaks.push(v); }, setTargetAtTime(v) { peaks.push(v); } });
@@ -175,14 +128,11 @@ try {
     createBufferSource() { return { ...node(), start() { this.onended?.(); } }; }
   };
   const sound = await server.ssrLoadModule('/src/audio.ts');
-  sound.startEngine(); sound.startEngine(); sound.setEngineIntensity(1);
-  for (const event of ['lane', 'film', 'combo', 'boost', 'bump', 'zone', 'warning', 'start', 'finish', 'drift', 'near', 'perfect', 'countdown']) sound.sfxDrive(event, 8);
   sound.setMuted(true); sound.setMuted(false);
-  sound.setDriveMusicEnabled(false); sound.setDriveMusicEnabled(true);
-  sound.stopEngine(); sound.stopEngine(); sound.stopAmbient();
+  sound.stopAmbient();
   await new Promise((resolve) => setTimeout(resolve, 800));
-  assert.equal(liveOscillators.size, 0, 'Engine and ambient oscillators stop after leaving the drive');
+  assert.equal(liveOscillators.size, 0, 'Ambient oscillators stop after leaving the journal');
   assert.ok(peaks.every(Number.isFinite), 'Audio envelopes must contain finite values');
-  console.log('PASS: driving sound events, mute/music switches and oscillator teardown.');
+  console.log('PASS: ambient audio teardown and legacy saves.');
   console.log(`PASS: ${CITIES.length} cities, ${MISSIONS.length} missions, ${Object.keys(PHOTOS).length} local photos; price choices, travel, collection, persistence and duplicate rewards.`);
 } finally { await server.close(); }

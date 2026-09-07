@@ -1,3 +1,4 @@
+import { translateDisplay as display } from '../i18n';
 import { useEffect, useRef } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import type { Map as MLMap, Marker } from 'maplibre-gl';
@@ -37,6 +38,7 @@ export default function CityMap({ cityId, highlightId, routeFromId, readOnly, on
   const mapRef = useRef<MLMap | null>(null);
   const markers = useRef<Record<string, Marker>>({});
   const visitedPois = useGame((s) => s.visitedPois);
+  const lang = useGame((s) => s.lang);
   const city = cityById(cityId);
   const isParis = cityId === 'paris';
 
@@ -84,7 +86,8 @@ export default function CityMap({ cityId, highlightId, routeFromId, readOnly, on
       const el = document.createElement('div');
       const visited = visitedPois.includes(`${cityId}:${p.id}`);
       el.className = `poi-pin${p.id === highlightId ? ' target' : ''}${p.id === routeFromId ? ' origin' : ''}${visited ? ' visited' : ''}`;
-      el.innerHTML = `<div class="dot"></div><div class="lbl">${p.name.replace(/\s*\([^)]*\)/g, '')}</div>`;
+      el.innerHTML = '<div class="dot"></div><div class="lbl"></div>';
+      el.querySelector('.lbl')!.textContent = display(p.name).replace(/\s*\([^)]*\)/g, '');
       if (!readOnly && onSelectPoi) {
         el.style.cursor = 'pointer';
         el.addEventListener('click', (ev) => { ev.stopPropagation(); onSelectPoi(p.id); });
@@ -102,8 +105,9 @@ export default function CityMap({ cityId, highlightId, routeFromId, readOnly, on
       const el = markers.current[p.id]?.getElement();
       if (!el) continue;
       el.classList.toggle('visited', visitedPois.includes(`${cityId}:${p.id}`));
+      el.querySelector('.lbl')!.textContent = display(p.name).replace(/\s*\([^)]*\)/g, '');
     }
-  }, [visitedPois, cityId, city.pois]);
+  }, [visitedPois, cityId, city.pois, lang]);
 
   return <div className="city-map" ref={ref} />;
 }
