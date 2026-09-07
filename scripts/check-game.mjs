@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'vite';
+import { checkDriving } from './check-driving.mjs';
 
 // Exercise the actual TypeScript modules with an isolated, in-memory save slot.
 const saved = new Map();
@@ -8,6 +9,7 @@ globalThis.localStorage = { getItem: (k) => saved.get(k) ?? null, setItem: (k, v
 globalThis.window = { localStorage: globalThis.localStorage };
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' });
 try {
+  await checkDriving(server);
   const { CITIES, edgesFrom } = await server.ssrLoadModule('/src/data/cities.ts');
   const { MISSIONS, DISCOVERY_MISSIONS } = await server.ssrLoadModule('/src/data/missions.ts');
   const { CARDS } = await server.ssrLoadModule('/src/data/cards.ts');
@@ -64,12 +66,20 @@ try {
   assert.equal(state().wallet.EUR, rewardWallet, 'Settlement is idempotent');
   assert.equal(state().driverXp, rewardXp);
   assert.ok(state().driveRun.result);
+  assert.equal(state().driveBestScores.paris, clean.score, 'City personal best is saved independently of the recent history');
   state().endDrive();
   assert.equal(state().upgradeCar('handling'), true);
   assert.equal(state().wallet.EUR, rewardWallet - 35);
   assert.equal(state().carUpgrades.handling, 1);
   await useGame.persist.rehydrate();
   assert.equal(state().carUpgrades.handling, 1, 'Purchased upgrade survives reload');
+  assert.equal(state().driveBestScores.paris, clean.score, 'City personal best survives reload');
+  useGame.setState({ driveHistory: [] });
+  state().beginDrive('scenic', '기록 유지 검증');
+  const secondRun = state().driveRun.id;
+  state().saveDrive(secondRun, { ...clean, score: 1 }); state().settleDrive(secondRun);
+  assert.equal(state().driveBestScores.paris, clean.score, 'A lower score never erases a personal best after history expires');
+  state().endDrive();
   assert.equal(DISCOVERY_MISSIONS.length, CITIES.length * 2);
   assert.equal(new Set(MISSIONS.map((m) => m.id)).size, MISSIONS.length);
   const positions = new Set();
@@ -140,6 +150,7 @@ try {
   const old = JSON.parse(saved.get('carnet-save-v1'));
   delete old.state.snapshots; delete old.state.visitedPois; delete old.state.tastedFoods;
   delete old.state.driverXp; delete old.state.carUpgrades; delete old.state.driveRun;
+  delete old.state.driveBestScores;
   state().reset();
   saved.set('carnet-save-v1', JSON.stringify(old));
   await useGame.persist.rehydrate();
@@ -148,6 +159,7 @@ try {
   assert.deepEqual(state().visitedPois, []);
   assert.equal(state().driverXp, 0);
   assert.equal(state().driveRun, null);
+  assert.deepEqual(state().driveBestScores, {});
   assert.deepEqual(state().carUpgrades, upgrades);
   console.log('PASS: 20 driving courses, skilled versus passive controls, rewards, upgrades, resume and legacy saves.');
   // Validate audio envelopes and teardown with a minimal Web Audio graph.
@@ -164,7 +176,7 @@ try {
   };
   const sound = await server.ssrLoadModule('/src/audio.ts');
   sound.startEngine(); sound.startEngine(); sound.setEngineIntensity(1);
-  for (const event of ['lane', 'film', 'combo', 'boost', 'bump', 'zone', 'warning', 'start', 'finish']) sound.sfxDrive(event, 8);
+  for (const event of ['lane', 'film', 'combo', 'boost', 'bump', 'zone', 'warning', 'start', 'finish', 'drift', 'near', 'perfect', 'countdown']) sound.sfxDrive(event, 8);
   sound.setMuted(true); sound.setMuted(false);
   sound.setDriveMusicEnabled(false); sound.setDriveMusicEnabled(true);
   sound.stopEngine(); sound.stopEngine(); sound.stopAmbient();

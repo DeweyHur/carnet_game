@@ -109,13 +109,17 @@ function glide(from: number, to: number, duration: number, peak = .10) {
   osc.onended = () => { osc.disconnect(); gain.disconnect(); };
 }
 
-export function sfxDrive(event: 'lane' | 'film' | 'combo' | 'boost' | 'bump' | 'zone' | 'warning' | 'start' | 'finish', combo = 0) {
+export function sfxDrive(event: 'lane' | 'film' | 'combo' | 'boost' | 'bump' | 'zone' | 'warning' | 'start' | 'finish' | 'drift' | 'near' | 'perfect' | 'countdown', combo = 0) {
   if (muted) return;
   const bell = (notes: number[], peak = .12, gap = .075) => notes.forEach((f, i) => {
     tone(f, { type: 'sine', dur: .22, attack: .008, peak, delay: i * gap });
     tone(f * 2, { type: 'sine', dur: .09, peak: peak * .13, delay: i * gap });
   });
   switch (event) {
+    case 'countdown': tone(523.25, { type: 'sine', dur: .1, peak: .08 }); break;
+    case 'drift': noiseBurst({ dur: .32, peak: .024, filterFreq: 2200, type: 'bandpass' }); glide(650, 490, .24, .025); break;
+    case 'near': noiseBurst({ dur: .14, peak: .04, filterFreq: 1300, type: 'bandpass' }); bell([880, 1174.66], .07, .04); break;
+    case 'perfect': glide(180, 1100, .4, .085); bell([1046.5, 1567.98], .08, .09); noiseBurst({ dur: .35, peak: .035, filterFreq: 1800, type: 'bandpass' }); break;
     case 'lane': glide(420, 650, .07, .035); break;
     case 'film': { const root = [659.25, 783.99, 880, 1046.5][Math.min(3, Math.floor(combo / 4))]; bell([root, root * 1.5], .13, .055); break; }
     case 'combo': bell([783.99, 1046.5, 1318.5], .12, .065); break;

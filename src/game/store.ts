@@ -72,6 +72,7 @@ export interface GameState {
   carUpgrades: CarUpgrades;
   driveRun: DriveRun | null;
   driveHistory: { id: number; cityId: string; day: number; result: DriveResult }[];
+  driveBestScores: Record<string, number>;
   driveRewardedKeys: string[];
 
   // actions
@@ -116,7 +117,7 @@ const fresh = (): Data => ({
   unlocked: ['idf'], visited: ['paris'], cards: [], articles: [], stamps: [], collectibles: [], letters: [],
   completed: [], active: null, guesses: [], fxLost: 0, log: [], finalShown: false, voyageShown: false, travelling: null, paused: false,
   snapshots: [], visitedPois: [], tastedFoods: [], theoStartDay: null, theoRace: [], muted: false,
-  driverXp: 0, driveSerial: 0, carUpgrades: { handling: 0, boost: 0, bumper: 0 }, driveRun: null, driveHistory: [], driveRewardedKeys: [],
+  driverXp: 0, driveSerial: 0, carUpgrades: { handling: 0, boost: 0, bumper: 0 }, driveRun: null, driveHistory: [], driveBestScores: {}, driveRewardedKeys: [],
 });
 
 let logId = 1;
@@ -155,6 +156,7 @@ export const useGame = create<GameState>()(
         set({ driverXp: s.driverXp + result.xp, wallet: { ...s.wallet, EUR: Math.round((s.wallet.EUR + result.earned) * 100) / 100 },
           driveRun: { ...run, result }, minute: s.minute + (run.missionKey ? 0 : 15),
           driveHistory: [...s.driveHistory.slice(-49), { id, cityId: run.cityId, day: s.day, result }],
+          driveBestScores: { ...s.driveBestScores, [run.cityId]: Math.max(s.driveBestScores[run.cityId] ?? 0, result.score, ...s.driveHistory.filter((entry) => entry.cityId === run.cityId).map((entry) => entry.result.score)) },
           driveRewardedKeys: run.missionKey && !replay ? [...s.driveRewardedKeys, run.missionKey] : s.driveRewardedKeys });
         get().addLog(`드라이브 ${result.grade} · +€${result.earned} · 운전 경험치 +${result.xp}${driverLevel(s.driverXp + result.xp) > driverLevel(s.driverXp) ? ' · 레벨 업!' : ''}`, 'money');
         sfxDrive(result.arrived ? 'finish' : 'bump');
