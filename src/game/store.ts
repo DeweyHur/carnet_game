@@ -5,6 +5,7 @@ import { CITIES, cityById } from '../data/cities';
 import { cardById } from '../data/cards';
 import { MISSIONS, missionById, FINAL_LETTER } from '../data/missions';
 import { CARD_FEE, FX_EUR, FX_CHANNELS, foodPrice, gradeArticle, quote, toEur, type FxChannel, type Grade } from './economy';
+import { setSoundEnabled, sfx } from './audio';
 
 export const START_WEEKDAY = 2; // 2026-09-08 화요일
 export const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -49,9 +50,21 @@ export interface GameState {
   finalShown: boolean;
   travelling: { edge: Edge; arriveMinute: number } | null;
   paused: boolean;
+  /** 프롤로그(오프닝 연출)를 봤는가 */
+  prologueDone: boolean;
+  /** 효과음 on/off */
+  sound: boolean;
+  /** 대사 한 글자당 ms (0 = 즉시 표시) */
+  textSpeed: number;
+  /** 첫인사를 나눈 도시 안내인들 (cityId) */
+  metGuides: string[];
 
   // actions
   setPaused: (p: boolean) => void;
+  setSound: (on: boolean) => void;
+  meetGuide: (cityId: string) => void;
+  setTextSpeed: (ms: number) => void;
+  finishPrologue: () => void;
   newGame: (name: string, home: Currency) => void;
   reset: () => void;
   addLog: (text: string, kind?: LogEntry['kind']) => void;
@@ -75,7 +88,7 @@ export const weekdayOf = (day: number) => (START_WEEKDAY + day - 1) % 7;
 export const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
 const parseHm = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
 
-type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'payEur' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused';
+type Actions = 'meetGuide' | 'setSound' | 'setTextSpeed' | 'finishPrologue' | 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'payEur' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused';
 type Data = Omit<GameState, Actions>;
 const fresh = (): Data => ({
   started: false, playerName: '', home: 'KRW', day: 1, minute: 9 * 60, cityId: 'paris',
@@ -83,6 +96,7 @@ const fresh = (): Data => ({
   stamina: 100, reputation: 0, debt: 0,
   unlocked: ['idf'], visited: ['paris'], cards: [], articles: [], stamps: [], collectibles: [], letters: [],
   completed: [], active: null, guesses: [], fxLost: 0, log: [], finalShown: false, travelling: null, paused: false,
+  prologueDone: false, sound: true, textSpeed: 26, metGuides: [],
 });
 
 let logId = 1;
@@ -94,11 +108,31 @@ export const useGame = create<GameState>()(
 
       newGame: (name, home) => {
         const base = fresh();
-        set({ ...base, started: true, playerName: name || '신입 작가', home,
+        const { sound, textSpeed } = get();
+        set({ ...base, sound, textSpeed, started: true, prologueDone: false, playerName: name || '신입 작가', home,
           wallet: { EUR: 0, KRW: 0, GBP: 0, CHF: 0, [home]: Math.round(2000 * FX_EUR[home]) } as Record<Currency, number> });
         get().addLog('《Carnet》 편집부에 첫 출근. 예산 €2,000 상당 (자국 통화).', 'story');
       },
-      reset: () => set({ ...fresh() }),
+      reset: () => { const { sound, textSpeed } = get(); set({ ...fresh(), sound, textSpeed }); },
+
+      setSound: (on) => { setSoundEnabled(on); set({ sound: on }); },
+      setTextSpeed: (ms) => set({ textSpeed: ms }),
+
+      meetGuide: (cityId) => {
+        const s = get();
+        if (s.metGuides.includes(cityId)) return;
+        set({ metGuides: [...s.metGuides, cityId] });
+        get().addLog(`${cityById(cityId).guide.name}와(과) 인사했다 — 수첩 「사람들」에 적어 둔다.`, 'story');
+      },
+
+      /** 프롤로그가 끝나면 첫 미션 「사진 상자」가 강제로 시작된다. */
+      finishPrologue: () => {
+        set({ prologueDone: true });
+        const s = get();
+        if (!s.completed.includes('paris-opening') && !s.active) {
+          set({ active: { missionId: 'paris-opening', step: 0, wrong: 0 }, paused: false });
+        }
+      },
 
       addLog: (text, kind = 'info') => set((s) => ({ log: [...s.log.slice(-40), { id: logId++, text, kind }] })),
 
@@ -112,6 +146,7 @@ export const useGame = create<GameState>()(
           w.EUR = Math.round((w.EUR - eur) * 100) / 100;
           set({ wallet: w });
           get().addLog(`${label}: −€${eur.toFixed(2)} (현금)`, 'money');
+          sfx.coin();
           return true;
         }
         // 부족분은 카드 결제(자국 통화 계좌에서 인출, 수수료 1.5%)
@@ -252,11 +287,12 @@ export const useGame = create<GameState>()(
             case 'card': {
               if (!s.cards.includes(step.cardId)) {
                 set({ cards: [...s.cards, step.cardId] });
+                sfx.card();
                 get().addLog(`사실 카드 수집: ${cardById(step.cardId).text.slice(0, 40)}…`, 'card');
               }
               break;
             }
-            case 'letter': set({ letters: [...s.letters, { ...step, day: s.day }] }); break;
+            case 'letter': set({ letters: [...s.letters, { ...step, day: s.day }] }); sfx.letter(); break;
             case 'unlock': {
               const u = Array.from(new Set([...s.unlocked, ...step.regions]));
               set({ unlocked: u });
@@ -265,7 +301,7 @@ export const useGame = create<GameState>()(
             }
             case 'collect': set({ collectibles: [...s.collectibles, step.item] }); get().addLog(`수집품: ${step.item}`, 'card'); break;
             case 'stamp': {
-              if (!s.stamps.some((x) => x.cityId === m.cityId)) set({ stamps: [...s.stamps, { cityId: m.cityId, day: s.day }] });
+              if (!s.stamps.some((x) => x.cityId === m.cityId)) { set({ stamps: [...s.stamps, { cityId: m.cityId, day: s.day }] }); sfx.stamp(); }
               break;
             }
             case 'move': {
@@ -274,6 +310,7 @@ export const useGame = create<GameState>()(
               break;
             }
             case 'say': set({ minute: s.minute + 2 }); break;
+            case 'message': set({ minute: s.minute + 3 }); break;
             default: break;
           }
         }
@@ -297,6 +334,7 @@ export const useGame = create<GameState>()(
         if (!a) return;
         const step = missionById(a.missionId).steps[a.step];
         const cardId = step && 'cardId' in step ? step.cardId : undefined;
+        if (correct) sfx.correct(); else sfx.wrong();
         if (cardId && !get().cards.includes(cardId)) {
           set({ cards: [...get().cards, cardId] });
           get().addLog(`사실 카드 수집: ${cardById(cardId).text.slice(0, 40)}…`, 'card');
@@ -328,7 +366,8 @@ export const useGame = create<GameState>()(
       abandonMission: () => set({ active: null, paused: false }),
       setPaused: (p) => set({ paused: p }),
     }),
-    { name: 'carnet-save-v1', partialize: (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => typeof v !== 'function')) as GameState },
+    { name: 'carnet-save-v2', partialize: (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => typeof v !== 'function')) as GameState,
+      onRehydrateStorage: () => (st) => { if (st) setSoundEnabled(st.sound); } },
   ),
 );
 

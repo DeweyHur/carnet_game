@@ -5,6 +5,8 @@ const M = (text: string): Step => ({ t: 'say', who: 'margot', text });
 const G = (text: string): Step => ({ t: 'say', who: 'guide', text });
 const N = (text: string): Step => ({ t: 'say', who: 'narrator', text });
 const ECHO = (name: string, text: string, fiction = false): Step => ({ t: 'say', who: 'echo', name, text, fiction });
+/** 편집부에서 오는 휴대폰 메시지 (얼굴을 마주보지 않는 대사) */
+const MSG = (text: string, subject?: string): Step => ({ t: 'message', from: 'margot', text, subject });
 
 export const MISSIONS: Mission[] = [
   // ─────────────────────────────────────────────────────────────── 파리 오프닝
@@ -32,7 +34,7 @@ export const MISSIONS: Mission[] = [
       { t: 'buy', foodId: 'jambon-beurre', guess: true },
       { t: 'buy', foodId: 'cafe', guess: true },
       G('파리에서 점심 한 끼 = 약 1만 5천 원. 이 숫자를 기억해요. 아미앵에서, 런던에서, 서울에서 어떻게 달라지는지 지갑으로 느끼게 될 거예요.'),
-      M('(메시지) 잘했어요. 이제 진짜 취재. 불로뉴비양쿠르로 가요. 지도에서 도시 핀을 누르고 "이동" 탭. 메트로 9호선이면 돼요.'),
+      MSG('잘했어요. 이제 진짜 취재예요.\n불로뉴비양쿠르로 가요 — 수첩의 「지도」 탭에서 도시 핀을 누르고 "이동". 메트로 9호선이면 돼요.', '첫 출근 · 오후'),
       { t: 'stamp' },
     ],
   },
@@ -58,6 +60,7 @@ export const MISSIONS: Mission[] = [
       { t: 'letter', title: 'L.의 첫 번째 편지', text: '칸은 세계를 사진으로 모으면 사람들이 서로를 덜 미워할 거라고 믿었어. 나는 그게 순진하다고 생각했는데, 유리판을 하나씩 보다 보니 모르겠더라.\n\n북쪽으로 가. 대성당의 도시들. 아미앵에서 시작해. 거기서 세계를 80일에 돌 수 있는지 물어봐.\n\n— L.' },
       { t: 'unlock', regions: ['nord', 'centre'], note: '프랑스 북부(아미앵·루앙·랭스·릴)와 루아르·중부(샤르트르·오를레앙)가 지도에서 열렸다.' },
       { t: 'collect', item: '오토크롬 복제본: 일본 정원, 1910년대' },
+      MSG('편지 봤어요. 북쪽이라니… L.답네요.\n대성당 도시들은 기차 요금이 만만치 않아요. 미리 예약하면 반값이니까 전날 밤에 표를 끊어 두세요. 그 차액이 당신 저녁값이에요.', 'L.의 편지 이후'),
       { t: 'stamp' },
     ],
   },
