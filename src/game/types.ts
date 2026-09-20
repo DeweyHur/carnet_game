@@ -24,6 +24,8 @@ export interface Poi {
   hours?: string; // 표시용 "09:00-18:00"
   note?: string;
   sourceId?: string;
+  /** 실제 사진이 생기면 그림 대신 쓰인다 (public/ 경로 또는 URL) */
+  imageUrl?: string;
 }
 
 export type VenueTier = 'market' | 'bistro' | 'restaurant' | 'shop';
@@ -38,6 +40,8 @@ export interface Food {
   stamina: number; // 회복량
   origin: string; // 기원 이야기(한 문장)
   sourceId: string;
+  /** 실제 사진이 생기면 그림 대신 쓰인다 */
+  imageUrl?: string;
 }
 
 /** 안내인 초상의 생김새. 없으면 이름 해시로 자동 생성된다. */

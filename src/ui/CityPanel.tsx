@@ -4,15 +4,16 @@ import { missionById } from '../data/missions';
 import { useGame, WEEKDAYS, weekdayOf, clock } from '../game/store';
 import { coffeeIndex, foodPrice, VENUE_NAME, fmt, FX_EUR } from '../game/economy';
 import { Price } from './common';
+import Illus from './Illus';
 import type { Edge } from '../game/types';
 
 const MODE_NAME: Record<Edge['mode'], string> = { metro: '메트로', rer: 'RER', transilien: '트랑실리앙', ter: 'TER', tgv: 'TGV', intercites: 'Intercités', eurostar: '유로스타', bus: '버스' };
 const MISSION_TYPE: Record<string, string> = { main: '메인', city: '도시 이야기', echo: '인물(메아리)', food: '미식', transport: '이동', tutorial: '튜토리얼' };
 
-interface Props { cityId: string; onClose: () => void; initialTab?: Tab }
+interface Props { cityId: string; onClose?: () => void; initialTab?: Tab; /** 대시보드 칸 안에 붙여 쓰기 */ inline?: boolean }
 type Tab = 'places' | 'transport' | 'food' | 'missions';
 
-export default function CityPanel({ cityId, onClose, initialTab }: Props) {
+export default function CityPanel({ cityId, onClose, initialTab, inline }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? 'missions');
   const s = useGame();
   const city = cityById(cityId);
@@ -25,11 +26,11 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
   const edges = here ? edgesFrom(cityId) : edgesFrom(s.cityId).filter((e) => e.to === cityId);
 
   return (
-    <div className="panel">
+    <div className={`panel${inline ? " inline" : ""}`}>
       <div className="panel-head">
         <h2><span className="tier">{city.tier}</span>{city.names.ko}<small>{city.names.fr}</small></h2>
         <div className="meta">{REGIONS[city.region].name} · 인구 {city.population.toLocaleString()} · 물가지수 {city.priceIndex.toFixed(2)} (파리=1) · ☕ 내 커피 지표 ×{coffeeIndex(city).toFixed(1)}{locked ? ' · 🔒 잠김' : ''}{here ? ' · 현재 위치' : ''}</div>
-        <button className="close" onClick={onClose}>×</button>
+        {onClose && <button className="close" onClick={onClose}>×</button>}
       </div>
       <div className="tabs">
         {(['missions', 'places', 'transport', 'food'] as Tab[]).map((t) => (
@@ -71,8 +72,9 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
         {tab === 'places' && city.pois.map((p) => {
           const closed = p.closedDays?.includes(wd);
           return (
-            <div className="row" key={p.id}>
-              <div>
+            <div className="row illus-row" key={p.id}>
+              <Illus kind="place" id={p.type} imageUrl={p.imageUrl} alt={p.name} className="sm" />
+              <div className="grow">
                 <div className="n">{p.name}</div>
                 <div className={`s${closed ? ' closed' : ''}`}>{p.hours ?? '상시'}{p.closedDays?.length ? ` · ${p.closedDays.map((d) => WEEKDAYS[d]).join('·')} 휴관` : ''}{closed ? ` — 오늘(${WEEKDAYS[wd]}) 휴관` : ''}</div>
                 {p.note && <div className="s">{p.note}</div>}
@@ -117,8 +119,9 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
               const pf = paris.foods.find((x) => x.id === f.id);
               const ratio = pf ? price / foodPrice(pf, paris) : null;
               return (
-                <div className="row" key={f.id}>
-                  <div>
+                <div className="row illus-row" key={f.id}>
+                  <Illus kind="food" id={f.id} imageUrl={f.imageUrl} alt={f.name} className="sm" />
+                  <div className="grow">
                     <div className="n">{f.name} <span className="tag">{VENUE_NAME[f.venue]}</span>{ratio !== null && ratio < 0.97 && <span className="tag cheap">파리 대비 {Math.round((1 - ratio) * 100)}% 저렴</span>}{ratio !== null && ratio > 1.03 && <span className="tag dear">파리보다 비쌈</span>}</div>
                     <div className="s">{f.nameLocal} · {f.origin}</div>
                   </div>

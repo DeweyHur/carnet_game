@@ -9,6 +9,7 @@ import Dialogue from './Dialogue';
 import { foodPrice, fmt, FX_EUR, type Grade } from '../game/economy';
 import { primeAudio, sfx } from '../game/audio';
 import GuideIntro from './GuideIntro';
+import Illus from './Illus';
 import Portrait from './Portrait';
 import { useTypewriter } from './useTypewriter';
 import { BASE_EXPRESSION, inferExpression, type Expression } from '../game/expression';
@@ -242,6 +243,7 @@ function Visit({ step, gp }: { step: Extract<Step, { t: 'visit' }>; gp: GP }) {
     <>
       <Stage>
         <div className="q">📍 {poi.name}</div>
+        <div className="illus-wide"><Illus kind="place" id={poi.type} imageUrl={poi.imageUrl} alt={poi.name} /></div>
         <div className="row" style={{ borderBottom: 'none' }}>
           <div className="s">{poi.hours ?? '상시'}{poi.closedDays?.length ? ` · ${poi.closedDays.map((d) => WEEKDAYS[d]).join('·')} 휴관` : ''} · 관람 약 {step.minutes}분 · 지금 {clock(g.minute)}, {WEEKDAYS[wd]}요일{poi.note ? ` · ${poi.note}` : ''}</div>
           <Price eur={poi.feeEur} />
@@ -274,6 +276,7 @@ function Buy({ step, gp }: { step: Extract<Step, { t: 'buy' }>; gp: GP }) {
     <>
       <Stage>
         <div className="q">🥐 {food.name} <span className="tag">{food.nameLocal}</span></div>
+        <div className="illus-wide"><Illus kind="food" id={food.id} imageUrl={food.imageUrl} alt={food.name} /></div>
         {bought === null ? (
           <>
             {step.guess ? (

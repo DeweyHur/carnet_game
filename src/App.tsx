@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import Home from './ui/Home';
-import Scene from './ui/Scene';
 import Intro from './ui/Intro';
 import Prologue from './ui/Prologue';
+import { IllusDefs } from './ui/Illus';
 import { useGame, clock } from './game/store';
 import { cityById } from './data/cities';
 
@@ -26,6 +26,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <IllusDefs />
       <Home />
       {travelling && (
         <div className="travel-overlay">
@@ -35,9 +36,8 @@ export default function App() {
         </div>
       )}
       <div className="log">{recent.map((e) => <div className={`e ${e.kind}`} key={e.id}>{e.text}</div>)}</div>
-      <Scene />
       {finalOpen && last && (
-        <div className="vn modal" onClick={() => setFinalOpen(false)}>
+        <div className="overlay" onClick={() => setFinalOpen(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="mission-tag">프랑스 북부·중부 완주</div>
             <div className="letter"><h3>✉ {last.title}</h3>{last.text}</div>
