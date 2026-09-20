@@ -5,6 +5,9 @@ import CityPanel from './ui/CityPanel';
 import Scene from './ui/Scene';
 import Notebook from './ui/Notebook';
 import Intro from './ui/Intro';
+import Prologue from './ui/Prologue';
+import Satchel from './ui/Satchel';
+import { IllusDefs } from './ui/Illus';
 import { useGame, clock } from './game/store';
 import { cityById } from './data/cities';
 import Journey from './ui/Journey';
@@ -32,6 +35,7 @@ export default function App() {
 function JournalApp() {
   const t = useT();
   const started = useGame((s) => s.started);
+  const prologueDone = useGame((s) => s.prologueDone);
   const cityId = useGame((s) => s.cityId);
   const travelling = useGame((s) => s.travelling);
   const log = useGame((s) => s.log);
@@ -65,11 +69,14 @@ function JournalApp() {
   }, [travelling]);
 
   if (!started) return <Intro />;
+  if (!prologueDone) return <Prologue />;
   const recent = log.slice(-1);
   const last = letters[letters.length - 1];
 
   return (
-    <div className={`app${mapMode ? ' map-mode' : ''}`}>
+    <div className={`app with-satchel${mapMode ? ' map-mode' : ''}`}>
+      <IllusDefs />
+      <Satchel />
       {display(mapMode && <Suspense fallback={<div className="map-loading">{t('여행 지도를 펼치는 중…')}</div>}><MapView onSelect={(id) => setSelected(id)} selected={selected} /></Suspense>)}
       <Hud onNotebook={() => { sfxPage(); setNotebook(true); }} onCity={() => setSelected(cityId)} />
       <Journey key={`journey-${selected ?? cityId}`} selected={selected} onSelect={setSelected} onAlbum={() => { sfxPage(); setNotebook(true); }} mapMode={mapMode} onMap={() => setMapMode((m) => !m)} />

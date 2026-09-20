@@ -1,5 +1,5 @@
 import { translateDisplay as display } from '../i18n';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useGame, WEEKDAYS, weekdayOf, clock } from '../game/store';
 import { missionById } from '../data/missions';
 import { cityById } from '../data/cities';
@@ -12,6 +12,25 @@ import { photoById, placePhoto } from '../data/photos';
 import TravelPhoto from './TravelPhoto';
 import CityMap from './CityMap';
 import { useT, weekdayLabel, dayLabel } from '../i18n';
+import GuideIntro from './GuideIntro';
+import Portrait from './Portrait';
+import { useTypewriter } from './useTypewriter';
+import { primeAudio, sfx } from '../game/audio';
+import { BASE_EXPRESSION, inferExpression, type Expression } from '../game/expression';
+import type { GuideLook } from '../game/types';
+
+/** 이 스텝에서 도시 안내인이 입을 여는가 — 첫 만남 카드를 띄울 시점 */
+function speaksGuide(step: Step): boolean {
+  switch (step.t) {
+    case 'say': return step.who === 'guide';
+    case 'card': return step.who === 'guide';
+    case 'quiz': return (step.who ?? 'guide') === 'guide';
+    case 'exchange':
+    case 'visit':
+    case 'buy': return true;
+    default: return false;
+  }
+}
 
 /** step 배열에서 dir 방향으로 가장 가까운 'visit' 스텝의 poiId를 찾는다 (다음 목적지 / 직전 출발지 추론용). */
 function nearestVisitPoiId(steps: Step[], from: number, dir: 1 | -1): string | undefined {
@@ -27,6 +46,7 @@ export default function Scene() {
   const t = useT();
   const active = useGame((s) => s.active);
   const paused = useGame((s) => s.paused);
+  const metGuides = useGame((s) => s.metGuides);
   if (!active || paused) return null;
   const m = missionById(active.missionId);
   const step = m.steps[active.step];
@@ -35,6 +55,8 @@ export default function Scene() {
   const pct = Math.round((active.step / m.steps.length) * 100);
   const backdrop = step.t === 'visit' ? placePhoto(city.id, step.poiId) : step.t === 'photo' ? photoById(step.photoId) : photoById(city.id);
   const stagePoi = step.t === 'visit' ? city.pois.find((p) => p.id === step.poiId) : undefined;
+  // 이 도시의 안내인이 처음 말을 거는 순간이면, 대사보다 먼저 인물 카드를 보여준다
+  const meeting = speaksGuide(step) && !metGuides.includes(m.cityId);
   const showMap = (step.t === 'visit' && !!stagePoi?.coord) || step.t === 'move';
   // 'move' 스텝은 보통 바로 다음 'visit' 스텝의 장소로 걸어가는 구간이다. 목적지·직전 장소를 추론해
   // 지도에 도보 동선(점선)을 그려 "미션도 그에 맞게" 요청을 반영한다.
@@ -52,7 +74,9 @@ export default function Scene() {
         <div className="progress"><i style={{ width: `${pct}%` }} /></div>
         <div className="mission-tag">{display(city.names.ko)} · 「{display(m.title)}」 · {display(active.step + 1)}/{display(m.steps.length)}</div>
         <button className="pause-scene" onClick={() => useGame.getState().setPaused(true)}>{t('잠시 접기 ×')}</button>
-        <StepView key={`${m.id}-${active.step}`} step={step} guideName={city.guide.name} guideRole={city.guide.archetype} guideColor={city.guide.color} />
+        {meeting
+          ? <GuideIntro cityId={m.cityId} />
+          : <StepView key={`${m.id}-${active.step}`} step={step} guideName={city.guide.name} guideRole={city.guide.archetype} guideColor={city.guide.color} guideMood={city.guide.mood} guideLook={city.guide.look} />}
       </div>
     </div>
   );
@@ -65,18 +89,20 @@ function Who({ who, name, role }: { who: Speaker; name?: string; role?: string }
   return <div className="who">{display(label[who])}<span className="role">{display(roleTxt[who])}</span></div>;
 }
 
-function StepView({ step, guideName, guideRole, guideColor }: { step: Step; guideName: string; guideRole: string; guideColor: string }) {
+function StepView({ step, guideName, guideRole, guideColor, guideMood, guideLook }: { step: Step; guideName: string; guideRole: string; guideColor: string; guideMood?: Expression; guideLook?: GuideLook }) {
   const g = useGame();
   const t = useT();
   const next = g.nextStep;
   const city = cityById(g.cityId);
+  /** 안내인은 도시가 정한 기본 표정을, 나머지는 스텝이 지정한 표정을 쓴다 */
+  const moodOf = (who: Speaker, override?: Expression) => override ?? (who === 'guide' ? guideMood : undefined);
 
   switch (step.t) {
     case 'say':
       return (
         <>
           <div className="speaker">
-            <Avatar who={step.who} name={step.who === 'guide' ? guideName : step.name} color={guideColor} />
+            <Portrait who={step.who} name={step.who === 'guide' ? guideName : step.name} color={guideColor} look={step.who === 'guide' ? guideLook : undefined} expression={inferExpression(step.text, moodOf(step.who, step.mood) ?? BASE_EXPRESSION[step.who])} size={104} />
             <div className="speech">
               <Who who={step.who} name={step.who === 'guide' ? guideName : step.name} role={guideRole} />
               <div className={`txt${step.who === 'narrator' ? ' narr' : ''}`}>{display(step.text)}</div>
@@ -92,7 +118,7 @@ function StepView({ step, guideName, guideRole, guideColor }: { step: Step; guid
         <>
           {display(step.text && (
             <div className="speaker">
-              <Avatar who={step.who ?? 'narrator'} name={guideName} color={guideColor} />
+              <Portrait who={step.who ?? 'narrator'} name={guideName} color={guideColor} look={guideLook} expression={inferExpression(step.text ?? '', moodOf(step.who ?? 'narrator', step.mood) ?? BASE_EXPRESSION[step.who ?? 'narrator'])} size={104} />
               <div className="speech"><Who who={step.who ?? 'narrator'} name={guideName} role={guideRole} /><div className={`txt${!step.who || step.who === 'narrator' ? ' narr' : ''}`}>{display(step.text)}</div></div>
             </div>
           ))}
@@ -101,6 +127,7 @@ function StepView({ step, guideName, guideRole, guideColor }: { step: Step; guid
         </>
       );
     }
+
     case 'quiz': return <Quiz step={step} />;
     case 'photo': return <Photo step={step} />;
     case 'order': return <Order step={step} />;
@@ -128,7 +155,9 @@ function StepView({ step, guideName, guideRole, guideColor }: { step: Step; guid
         </>
       );
     }
+    case 'message': return <Message step={step} />;
     case 'article': return <Article baseFee={step.baseFee} />;
+
     case 'letter':
       return (
         <>
@@ -136,6 +165,7 @@ function StepView({ step, guideName, guideRole, guideColor }: { step: Step; guid
           <div className="scene-actions"><span className="hint">{t('수첩 › 편지에 보관됩니다')}</span><button className="btn" onClick={next}>{t('접어 넣기 ▸')}</button></div>
         </>
       );
+
     case 'unlock':
       return (
         <>
@@ -360,5 +390,44 @@ function Article({ baseFee }: { baseFee: number }) {
         </>
       ))}
     </>
+  );
+}
+
+/** 편집부에서 오는 휴대폰 메시지 — 얼굴을 마주보는 대사가 아니라 화면 너머의 목소리 */
+function Message({ step }: { step: Extract<Step, { t: 'message' }> }) {
+  const t = useT();
+  const g = useGame();
+  const sound = useGame((s) => !s.muted);
+  const speed = useGame((s) => s.textSpeed);
+  const { shown, done, skip } = useTypewriter(t(step.text), { speed, voice: 'margot', sound, animate: speed > 0 });
+  const label = t(step.from === 'margot' ? '마고 뒤랑' : step.from === 'theo' ? '테오' : 'L.');
+  const role = t(step.from === 'margot' ? '《Carnet》 편집장' : step.from === 'theo' ? '라이벌 작가' : '발신인 불명');
+  const expression = done ? inferExpression(step.text, BASE_EXPRESSION[step.from]) : BASE_EXPRESSION[step.from];
+
+  useEffect(() => { primeAudio(); sfx.buzz(); const t = window.setTimeout(() => sfx.notify(), 260); return () => window.clearTimeout(t); }, []);
+
+  return (
+    <div className="vn-center" onClick={() => { if (!done) skip(); }}>
+      <div className="phone">
+        <div className="phone-bar"><span>{display(clock(g.minute))}</span><span className="notch" /><span>{display(dayLabel(g.lang, g.day))} ▮▮▯</span></div>
+        <div className="phone-head">
+          <Portrait who={step.from} talking={!done} expression={expression} size={40} framed={false} />
+          <div className="who"><b>{display(label)}</b><small>{display(role)}</small></div>
+          <span className="back">‹</span>
+        </div>
+        <div className="phone-body">
+          <div className="day-sep">{t(step.subject ?? '오늘')}</div>
+          <div className="bubble in">
+            {display(shown)}<span className="caret" style={{ opacity: done ? 0 : 1 }}>▏</span>
+            <span className="stamp">{display(clock(g.minute))}</span>
+          </div>
+          {!done && <div className="typing"><i /><i /><i /></div>}
+        </div>
+        <div className="phone-foot">
+          <button className="btn sm ghost" onClick={(e) => { e.stopPropagation(); skip(); }} disabled={done}>{t('전부 보기')}</button>
+          <button className="btn red sm" onClick={(e) => { e.stopPropagation(); primeAudio(); sfx.advance(); g.nextStep(); }} disabled={!done}>{t('주머니에 넣는다 ▸')}</button>
+        </div>
+      </div>
+    </div>
   );
 }

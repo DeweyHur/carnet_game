@@ -6,7 +6,8 @@ export async function checkRail(server,assertRender) {
   const {initialRailState,railReducer,railProgress,restoreRailState}=await server.ssrLoadModule('/src/game/railJourney.ts');
   const props={dispatch(){},paused:false,onPause(){},saveError:false,onMetro(){}};
   let state=initialRailState();
-  assert.equal(new Set(RAIL_TRIPS.map(t=>t.id)).size,8);
+  // 노선이 늘어도 깨지지 않도록 개수 상수 대신 id 유일성을 확인한다 (21개 도시 확장 이후).
+  assert.equal(new Set(RAIL_TRIPS.map(t=>t.id)).size,RAIL_TRIPS.length,'Rail trip ids are unique');
   assert.deepEqual(restoreRailState('{broken'),initialRailState());
   assert.deepEqual(railReducer(state,{type:'select',id:'missing'}),state);
   for(const trip of RAIL_TRIPS) {
@@ -40,12 +41,12 @@ export async function checkRail(server,assertRender) {
       assert.deepEqual(restoreRailState(JSON.stringify(state)),state);
     }
   }
-  assert.equal(Object.values(state.trips).filter(p=>p.stamped).length,8);
+  assert.equal(Object.values(state.trips).filter(p=>p.stamped).length,RAIL_TRIPS.length,'Every rail city ends stamped');
   const replay=railReducer(state,{type:'replay'});
   assert.equal(railProgress(replay).stamped,true,'Replay keeps the city stamp');
   assert.equal(railProgress(replay).badge,true,'Replay keeps the discovery badge');
   const damaged=restoreRailState(JSON.stringify({selected:'nice',trips:{nice:{phase:'complete',step:999,choices:[0,99,1],leg:99}}}));
   assert.equal(railProgress(damaged).phase,'walk');assert.deepEqual(railProgress(damaged).choices,[0]);assert.equal(railProgress(damaged).step,1);
   assertRender(RailJourneyView,{...props,state,saveError:true,paused:true},'rail/storage-failure');
-  console.log('PASS: 8 rail cities, 64 complete choice paths, required connection, discovery rewards and save recovery.');
+  console.log(`PASS: ${RAIL_TRIPS.length} rail cities, ${RAIL_TRIPS.length * 8} complete choice paths, required connection, discovery rewards and save recovery.`);
 }

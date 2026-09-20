@@ -15,10 +15,10 @@ import { useT, weekdayLabel } from '../i18n';
 const MODE_NAME: Record<Edge['mode'], string> = { metro: '메트로', rer: 'RER', transilien: '트랑실리앙', ter: 'TER', tgv: 'TGV', intercites: 'Intercités', eurostar: '유로스타', bus: '버스' };
 const MISSION_TYPE: Record<string, string> = { main: '메인', city: '도시 이야기', echo: '인물(메아리)', food: '미식', transport: '이동', tutorial: '튜토리얼' };
 
-interface Props { cityId: string; onClose: () => void; initialTab?: Tab }
+interface Props { cityId: string; onClose?: () => void; initialTab?: Tab; /** 대시보드 칸 안에 붙여 쓰기 */ inline?: boolean }
 type Tab = 'places' | 'transport' | 'food' | 'missions';
 
-export default function CityPanel({ cityId, onClose, initialTab }: Props) {
+export default function CityPanel({ cityId, onClose, initialTab, inline }: Props) {
   const t = useT();
   const [tab, setTab] = useState<Tab>(initialTab ?? 'missions');
   const s = useGame();
@@ -41,7 +41,7 @@ export default function CityPanel({ cityId, onClose, initialTab }: Props) {
   };
 
   return (
-    <div className="panel">
+    <div className={`panel${inline ? " inline" : ""}`}>
       <div className="panel-head">
         <h2><span className="tier">{display(city.tier)}</span>{display(city.names.ko)}<small>{display(city.names.fr)}</small></h2>
         <div className="meta">{t(REGIONS[city.region].name)}{display(locked ? ` · 🔒 ${t('잠김')}` : '')}{display(here ? ` · ${t('현재 위치')}` : '')}

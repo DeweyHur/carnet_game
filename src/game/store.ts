@@ -8,6 +8,8 @@ import { MISSIONS, missionById, FINAL_LETTER, EPILOGUE_LETTER } from '../data/mi
 import { CARD_FEE, FX_EUR, FX_CHANNELS, cityCurrency, convert, foodPrice, fmt, gradeArticle, quote, toEur, type FxChannel, type Grade } from './economy';
 import { theoArrivalDay } from './rival';
 import { sfxArrive, sfxCard, sfxCash, sfxCorrect, sfxDepart, sfxDoor, sfxLose, sfxStamp, sfxWin, sfxWrong, setMuted as setAudioMuted } from '../audio';
+// 대사 타이핑 블립은 별도 모듈(캐릭터별 음색). 음소거 상태를 함께 따라간다.
+import { setSoundEnabled as setBlipEnabled } from './audio';
 
 export const START_WEEKDAY = 2; // 2026-09-08 화요일
 export const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -66,11 +68,20 @@ export interface GameState {
   theoStartDay: number | null;
   theoRace: RaceResult[];
   muted: boolean;
+  /** 프롤로그(오프닝 연출)를 봤는가 */
+  prologueDone: boolean;
+  /** 대사 한 글자당 ms (0 = 즉시 표시) */
+  textSpeed: number;
+  /** 첫인사를 나눈 도시 안내인들 (cityId) */
+  metGuides: string[];
 
   // actions
   setPaused: (p: boolean) => void;
   setLang: (l: Locale) => void;
   setMuted: (m: boolean) => void;
+  setTextSpeed: (ms: number) => void;
+  finishPrologue: () => void;
+  meetGuide: (cityId: string) => void;
   capturePhoto: (photoId: string) => void;
   newGame: (name: string, home: Currency) => void;
   reset: () => void;
@@ -95,7 +106,7 @@ export const weekdayOf = (day: number) => (START_WEEKDAY + day - 1) % 7;
 export const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
 const parseHm = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
 
-type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'pay' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused' | 'setLang' | 'setMuted' | 'capturePhoto';
+type Actions = 'newGame' | 'reset' | 'addLog' | 'spendMinutes' | 'pay' | 'exchange' | 'buyFood' | 'visitPoi' | 'sleep' | 'travel' | 'arrive' | 'startMission' | 'currentStep' | 'nextStep' | 'answer' | 'submitArticle' | 'abandonMission' | 'setPaused' | 'setLang' | 'setMuted' | 'capturePhoto' | 'setTextSpeed' | 'finishPrologue' | 'meetGuide';
 type Data = Omit<GameState, Actions>;
 const fresh = (): Data => ({
   started: false, lang: 'ko', playerName: '', home: 'KRW', day: 1, minute: 9 * 60, cityId: 'paris',
@@ -104,6 +115,7 @@ const fresh = (): Data => ({
   unlocked: ['idf'], visited: ['paris'], cards: [], articles: [], stamps: [], collectibles: [], letters: [],
   completed: [], active: null, guesses: [], fxLost: 0, log: [], finalShown: false, voyageShown: false, travelling: null, paused: false,
   snapshots: [], visitedPois: [], tastedFoods: [], theoStartDay: null, theoRace: [], muted: false,
+  prologueDone: false, textSpeed: 26, metGuides: [],
 });
 
 let logId = 1;
@@ -115,11 +127,11 @@ export const useGame = create<GameState>()(
 
       newGame: (name, home) => {
         const base = fresh();
-        set({ ...base, lang: get().lang, started: true, playerName: name || '신입 작가', home,
+        set({ ...base, lang: get().lang, textSpeed: get().textSpeed, started: true, prologueDone: false, playerName: name || '신입 작가', home,
           wallet: { EUR: 0, KRW: 0, GBP: 0, CHF: 0, [home]: Math.round(2000 * FX_EUR[home]) } as Record<Currency, number> });
         get().addLog('《Carnet》 편집부에 첫 출근. 예산 €2,000 상당 (자국 통화).', 'story');
       },
-      reset: () => set({ ...fresh(), lang: get().lang }),
+      reset: () => set({ ...fresh(), lang: get().lang, textSpeed: get().textSpeed }),
 
       capturePhoto: (photoId) => {
         const s = get();
@@ -302,7 +314,7 @@ export const useGame = create<GameState>()(
               }
               break;
             }
-            case 'letter': set({ letters: [...s.letters, { ...step, day: s.day }] }); break;
+            case 'letter': set({ letters: [...s.letters, { ...step, day: s.day }] }); sfxWin(); break;
             case 'unlock': {
               const u = Array.from(new Set([...s.unlocked, ...step.regions]));
               const patch: Partial<Data> = { unlocked: u };
@@ -341,6 +353,7 @@ export const useGame = create<GameState>()(
               break;
             }
             case 'say': set({ minute: s.minute + 2 }); break;
+            case 'message': set({ minute: s.minute + 3 }); break;
             default: break;
           }
         }
@@ -409,13 +422,32 @@ export const useGame = create<GameState>()(
       abandonMission: () => set({ active: null, paused: false }),
       setPaused: (p) => set({ paused: p }),
       setLang: (l) => set({ lang: l }),
-      setMuted: (m) => { setAudioMuted(m); set({ muted: m }); },
+      setMuted: (m) => { setAudioMuted(m); setBlipEnabled(!m); set({ muted: m }); },
+      setTextSpeed: (ms) => set({ textSpeed: ms }),
+
+      /** 프롤로그가 끝나면 첫 미션 「사진 상자」가 강제로 시작된다. */
+      finishPrologue: () => {
+        set({ prologueDone: true });
+        const s = get();
+        if (!s.completed.includes('paris-opening') && !s.active) {
+          set({ active: { missionId: 'paris-opening', step: 0, wrong: 0 }, paused: false });
+        }
+      },
+
+      /** 도시 안내인과 첫인사 — 수첩 「사람들」에 남는다. */
+      meetGuide: (cityId) => {
+        const s = get();
+        if (s.metGuides.includes(cityId)) return;
+        set({ metGuides: [...s.metGuides, cityId] });
+        get().addLog(`${cityById(cityId).guide.name}와(과) 인사했다 — 수첩 「사람들」에 적어 둔다.`, 'story');
+      },
     }),
     { name: 'carnet-save-v1', merge: (persisted, current) => {
       const saved = persisted && typeof persisted === 'object' ? persisted as Record<string, unknown> : {};
       const allowed = new Set(Object.keys(fresh()));
       return { ...current, ...Object.fromEntries(Object.entries(saved).filter(([key]) => allowed.has(key))) };
-    }, partialize: (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => typeof v !== 'function')) as GameState },
+    }, partialize: (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => typeof v !== 'function')) as GameState,
+      onRehydrateStorage: () => (st) => { if (st) setBlipEnabled(!st.muted); } },
   ),
 );
 

@@ -14,7 +14,7 @@ export const CITIES: City[] = [
     coord: [2.3522, 48.8566], population: 2100000, priceIndex: 1.0, hostelEur: 45,
     heritage: ['UNESCO: 파리 센 강변(1991)'],
     blurb: '루테티아라는 갈로로마 도시에서 시작해 2천 년을 쌓아 올린 도시. 《Carnet》 편집부는 2구 파사주 안쪽에 있다.',
-    guide: { name: '엘렌', archetype: '박물관 도슨트', color: '#b56b45',
+    guide: { name: '엘렌', archetype: '박물관 도슨트', color: '#b56b45', mood: 'warm', look: { style: 'updo', hair: '#4a3628', skin: '#e9c9a6', glasses: true },
       intro: '시테코의 도슨트. "돈은 숫자가 아니라 이야기예요. 지폐 한 장에 나라 하나가 들어 있죠."' },
     pois: [
       { id: 'carnet-office', name: '《Carnet》 편집부 (2구, 창작 장소)', type: 'office', feeEur: 0, note: '마고 편집장이 있는 곳. 미션 배정과 원고 송고.', coord: [2.3391, 48.8675] },
@@ -39,7 +39,7 @@ export const CITIES: City[] = [
     names: { ko: '불로뉴비양쿠르', fr: 'Boulogne-Billancourt', en: 'Boulogne-Billancourt' },
     coord: [2.24, 48.8352], population: 121000, priceIndex: 0.95, hostelEur: 50,
     blurb: '센 강 서쪽, 르노 공장이 있던 섬과 알베르 칸의 정원이 있는 도시. L.의 사진 상자가 가리키는 첫 좌표.',
-    guide: { name: '카림', archetype: '사서(아카이브 담당)', color: '#4f6d7a',
+    guide: { name: '카림', archetype: '사서(아카이브 담당)', color: '#4f6d7a', mood: 'thinking', look: { style: 'short', hair: '#1c1a18', skin: '#b98456', glasses: true },
       intro: '알베르 칸 박물관의 아카이브 담당. "7만 2천 장의 유리판을 하나씩 스캔하다 보면, 세상이 한때 얼마나 조용했는지 알게 돼요."' },
     pois: [
       { id: 'albert-kahn', name: '알베르 칸 박물관·정원', type: 'museum', feeEur: 8, closedDays: [1], hours: '11:00-19:00', note: '2022년 재개관(건축: 구마 겐고).', sourceId: 'src:albert-kahn-musee', coord: [2.2264, 48.8386] },
@@ -57,7 +57,7 @@ export const CITIES: City[] = [
     names: { ko: '생드니', fr: 'Saint-Denis', en: 'Saint-Denis' },
     coord: [2.3583, 48.9362], population: 113000, priceIndex: 0.9, hostelEur: 38,
     blurb: '고딕 건축이 태어난 대성당과 프랑스 왕들의 묘역. 화·금·일에는 일드프랑스에서 가장 큰 시장이 선다.',
-    guide: { name: '파티마', archetype: '시장 상인', color: '#c0392b',
+    guide: { name: '파티마', archetype: '시장 상인', color: '#c0392b', mood: 'smile', look: { style: 'veil', hair: '#2b2320', skin: '#8d5f3c', scarf: '#d9a441' },
       intro: '생드니 시장의 향신료 가판대 주인. "왕들은 저기 누워 있고, 우리는 여기서 장사를 하죠. 천 년째."' },
     pois: [
       { id: 'basilica', name: '생드니 대성당 (왕실 묘역)', type: 'cathedral', feeEur: 11, hours: '10:00-18:15', sourceId: 'src:saint-denis', coord: [2.3597, 48.9354] },
@@ -75,7 +75,7 @@ export const CITIES: City[] = [
     names: { ko: '아르장퇴유', fr: 'Argenteuil', en: 'Argenteuil' },
     coord: [2.2478, 48.9472], population: 110000, priceIndex: 0.9, hostelEur: 40,
     blurb: '모네가 1871년부터 1878년까지 살며 센 강의 돛단배를 그린 곳. 한때 파리 식탁의 아스파라거스 산지.',
-    guide: { name: '루이', archetype: '미술 학생', color: '#5b8c5a',
+    guide: { name: '루이', archetype: '미술 학생', color: '#5b8c5a', mood: 'smile', look: { style: 'messy', hair: '#6e5a3c', skin: '#f0d3b0' },
       intro: '파리 미술학교 학생, 주말마다 강가에서 스케치. "모네가 여기서 본 빛은 지금도 같은 각도로 떨어져요."' },
     pois: [
       { id: 'musee-argenteuil', name: '아르장퇴유 박물관', type: 'museum', feeEur: 0, closedDays: [1, 2], hours: '수–일', sourceId: 'src:musee-argenteuil', coord: [2.2467, 48.9478] },
@@ -93,7 +93,7 @@ export const CITIES: City[] = [
     names: { ko: '몽트뢰유', fr: 'Montreuil', en: 'Montreuil' },
     coord: [2.4436, 48.8638], population: 111000, priceIndex: 0.9, hostelEur: 40,
     blurb: '복숭아를 키우던 돌담(murs à pêches)과 멜리에스가 1897년 세운 영화 스튜디오의 도시.',
-    guide: { name: '가스파르', archetype: '농부(담장 정원사)', color: '#8e6c3a',
+    guide: { name: '가스파르', archetype: '농부(담장 정원사)', color: '#8e6c3a', mood: 'warm', look: { style: 'beret', hair: '#8a7a62', skin: '#d6a878', stubble: true, hat: '#4f5d3a' },
       intro: '복숭아 담장 보존회의 정원사. "담이 햇빛을 저장했어요. 그래서 파리 북쪽에서 복숭아가 됐죠."' },
     pois: [
       { id: 'murs', name: '복숭아 담장 (murs à pêches)', type: 'heritage', feeEur: 0, hours: '주말 개방', closedDays: [1, 2, 3, 4, 5], sourceId: 'src:murs-peches', coord: [2.4531, 48.859] },
@@ -113,7 +113,7 @@ export const CITIES: City[] = [
     coord: [2.1301, 48.8049], population: 84000, priceIndex: 0.98, hostelEur: 55,
     heritage: ['UNESCO: 베르사유 궁전과 정원(1979)'],
     blurb: '루이 14세의 사냥 별장이 유럽 절대왕정의 무대가 된 곳. 1919년 거울의 방에서 1차대전을 끝내는 조약이 서명됐다.',
-    guide: { name: '오딜', archetype: '시계공', color: '#6c5b7b',
+    guide: { name: '오딜', archetype: '시계공', color: '#6c5b7b', mood: 'serious', look: { style: 'bob', hair: '#3a3330', skin: '#e6c39c', glasses: true },
       intro: '궁전 시계 복원 기술자. "거울의 방 시계는 1919년 6월 28일 오후 3시를 지나갔어요. 그날도 그냥 째깍거렸죠."' },
     pois: [
       { id: 'chateau', name: '베르사유 궁전 — 거울의 방', type: 'palace', feeEur: 21, closedDays: [1], hours: '09:00-18:30', sourceId: 'src:versailles-chateau', coord: [2.1204, 48.8049] },
@@ -132,7 +132,7 @@ export const CITIES: City[] = [
     coord: [1.4894, 48.4469], population: 38000, priceIndex: 0.8, hostelEur: 35,
     heritage: ['UNESCO: 샤르트르 대성당(1979)'],
     blurb: '보스 평원 위로 두 첨탑이 먼저 보이는 순례 도시. 12~13세기 스테인드글라스의 푸른빛이 "샤르트르 블루"다.',
-    guide: { name: '베르나르', archetype: '사서', color: '#2e5c8a',
+    guide: { name: '베르나르', archetype: '사서', color: '#2e5c8a', mood: 'serious', look: { style: 'short', hair: '#9a9086', skin: '#e6c39c', glasses: true },
       intro: '교구 도서관 사서. "1194년 불이 났을 때 사람들은 절망 대신 더 큰 성당을 지었어요. 30년 만에."' },
     pois: [
       { id: 'chartres-cath', name: '샤르트르 대성당', type: 'cathedral', feeEur: 0, hours: '08:30-19:30', sourceId: 'src:chartres', coord: [1.4868, 48.4474] },
@@ -151,7 +151,7 @@ export const CITIES: City[] = [
     coord: [2.2957, 49.8942], population: 135000, priceIndex: 0.82, hostelEur: 32,
     heritage: ['UNESCO: 아미앵 대성당(1981)'],
     blurb: '프랑스 최대 규모의 고딕 대성당, 쥘 베른이 20년 가까이 산 집, 그리고 300헥타르의 수상정원.',
-    guide: { name: '노에미', archetype: '뱃사공', color: '#3a7d7b',
+    guide: { name: '노에미', archetype: '뱃사공', color: '#3a7d7b', mood: 'warm', look: { style: 'updo', hair: '#5a3a22', skin: '#d6a878', scarf: '#2f5d8a' },
       intro: '오르티요나주(수상정원)의 뱃사공. "대성당 정면은 오후 빛이 좋아요. 배는 아침이 좋고요."' },
     pois: [
       { id: 'amiens-cath', name: '아미앵 대성당', type: 'cathedral', feeEur: 0, hours: '08:30-18:30', sourceId: 'src:amiens-cath', coord: [2.3018, 49.8942] },
@@ -174,7 +174,7 @@ export const CITIES: City[] = [
     coord: [4.0317, 49.2583], population: 180000, priceIndex: 0.85, hostelEur: 36,
     heritage: ['UNESCO: 랭스 대성당·생레미 수도원·토 궁전(1991)', 'UNESCO: 샹파뉴 언덕·메종·저장고(2015)'],
     blurb: '프랑스 왕들이 대관식을 올린 대성당, 1945년 5월 7일 독일이 항복문서에 서명한 학교 건물, 그리고 지하 백 킬로미터의 샴페인 저장고.',
-    guide: { name: '셀린', archetype: '양조가', color: '#a67c52',
+    guide: { name: '셀린', archetype: '양조가', color: '#a67c52', mood: 'wry', look: { style: 'bob', hair: '#7a4a2a', skin: '#e9c9a6' },
       intro: '샴페인 메종의 셀러 마스터. "지하 저장고는 로마 시대 채석장이에요. 돌을 파낸 자리에 병을 채웠죠."' },
     pois: [
       { id: 'reims-cath', name: '랭스 대성당', type: 'cathedral', feeEur: 0, hours: '07:30-19:15', sourceId: 'src:reims-cath', coord: [4.0347, 49.2531] },
@@ -194,7 +194,7 @@ export const CITIES: City[] = [
     names: { ko: '루앙', fr: 'Rouen', en: 'Rouen' },
     coord: [1.0993, 49.4432], population: 112000, priceIndex: 0.84, hostelEur: 34,
     blurb: '잔 다르크가 1431년 화형당한 광장, 14세기 대시계, 모네가 서른 번 넘게 그린 대성당 정면.',
-    guide: { name: '마르셀', archetype: '시계공', color: '#7a5c3e',
+    guide: { name: '마르셀', archetype: '시계공', color: '#7a5c3e', mood: 'thinking', look: { style: 'short', hair: '#8a7a62', skin: '#e6c39c', glasses: true, stubble: true },
       intro: '대시계(Gros-Horloge) 관리인. "1389년부터 돌아가는 기계예요. 바늘은 하나뿐이죠 — 그때는 시(時)면 충분했어요."' },
     pois: [
       { id: 'historial', name: '잔 다르크 역사관', type: 'museum', feeEur: 11, closedDays: [1], hours: '10:00-19:00', sourceId: 'src:historial', coord: [1.0964, 49.4408] },
@@ -215,7 +215,7 @@ export const CITIES: City[] = [
     names: { ko: '릴', fr: 'Lille', en: 'Lille' },
     coord: [3.0573, 50.6292], population: 235000, priceIndex: 0.88, hostelEur: 36,
     blurb: '플랑드르의 상업 도시. 1652년 구 증권거래소, 1890년 드골이 태어난 집, 9월 첫 주말의 거대한 벼룩시장.',
-    guide: { name: '야신', archetype: '택시기사', color: '#2c3e50',
+    guide: { name: '야신', archetype: '택시기사', color: '#2c3e50', mood: 'wry', look: { style: 'cap', hair: '#1c1a18', skin: '#8d5f3c', stubble: true, hat: '#2c3e50' },
       intro: '릴 토박이 택시기사. "브라드리 주말엔 운전을 못 해요. 길이 전부 홍합 껍데기로 덮이니까."' },
     pois: [
       { id: 'pba', name: '릴 순수미술관', type: 'museum', feeEur: 7, closedDays: [2], hours: '10:00-18:00', sourceId: 'src:pba-lille', coord: [3.0625, 50.6301] },
@@ -235,7 +235,7 @@ export const CITIES: City[] = [
     names: { ko: '오를레앙', fr: 'Orléans', en: 'Orléans' },
     coord: [1.9039, 47.9029], population: 116000, priceIndex: 0.83, hostelEur: 34,
     blurb: '1429년 5월 8일 잔 다르크가 포위를 푼 루아르 강의 도시. 매년 그날을 축제로 기억한다.',
-    guide: { name: '클레르', archetype: '역무원', color: '#8a3b5c',
+    guide: { name: '클레르', archetype: '역무원', color: '#8a3b5c', mood: 'smile', look: { style: 'cap', hair: '#33261c', skin: '#f0d3b0', hat: '#3a3f54' },
       intro: '오를레앙 역의 역무원. "5월 8일엔 기차가 붐벼요. 6백 년째 같은 날을 축하하러 오니까."' },
     pois: [
       { id: 'maison-jeanne', name: '잔 다르크의 집', type: 'museum', feeEur: 6, closedDays: [1], hours: '10:00-18:00', sourceId: 'src:siege-orleans', coord: [1.9111, 47.9036] },

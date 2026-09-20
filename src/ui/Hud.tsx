@@ -27,6 +27,12 @@ export default function Hud({ onNotebook, onCity }: Props) {
       <div className="chip"><div className="k">{t('체력')}</div><div className={`bar${s.stamina < 30 ? ' low' : ''}`}><i style={{ width: `${s.stamina}%` }} /></div></div>
       <div className="hud-spacer" />
       <LanguageSwitch />
+      <select className="hud-btn speed" value={s.textSpeed} aria-label={t('대사 속도')} onChange={(e) => s.setTextSpeed(Number(e.target.value))}>
+        <option value={44}>{t('대사 느리게')}</option>
+        <option value={26}>{t('대사 보통')}</option>
+        <option value={12}>{t('대사 빠르게')}</option>
+        <option value={0}>{t('대사 즉시')}</option>
+      </select>
       <button className="hud-btn icon" aria-label={display(s.muted ? t('소리 켜기') : t('소리 끄기'))} onClick={() => s.setMuted(!s.muted)}>{display(s.muted ? '🔇' : '🔊')}</button>
       <button className="hud-btn badge" data-n={unread || ''} onClick={onNotebook}>{t('수첩 · 여권 · 지갑')}</button>
     </div>

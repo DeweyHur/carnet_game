@@ -1,3 +1,5 @@
+import type { Expression } from './expression';
+
 // ─── 카르네(Carnet) 핵심 데이터 타입 ─────────────────────────────────────────
 // 기획서 4장 "도시 데이터 스키마"를 프로토타입 규모로 축약한 것.
 
@@ -24,6 +26,8 @@ export interface Poi {
   sourceId?: string;
   /** [lon, lat] — 도시 내부 지도에서의 실제 위치. 없으면 도시 중심 부근에 표시. */
   coord?: [number, number];
+  /** 실제 사진이 생기면 그림 대신 쓰인다 (public/ 경로 또는 URL) */
+  imageUrl?: string;
 }
 
 export type VenueTier = 'market' | 'bistro' | 'restaurant' | 'shop';
@@ -38,6 +42,25 @@ export interface Food {
   stamina: number; // 회복량
   origin: string; // 기원 이야기(한 문장)
   sourceId: string;
+  /** 실제 사진이 생기면 그림 대신 쓰인다 */
+  imageUrl?: string;
+}
+
+/** 안내인 초상의 생김새. 없으면 이름 해시로 자동 생성된다. */
+export type HairStyle = 'short' | 'bob' | 'messy' | 'updo' | 'beret' | 'cap' | 'veil';
+
+export interface GuideLook {
+  style: HairStyle;
+  hair: string;
+  skin: string;
+  glasses?: boolean;
+  /** 목에 두른 스카프 색 */
+  scarf?: string;
+  /** 목에 건 카메라 */
+  camera?: boolean;
+  stubble?: boolean;
+  /** 모자·베레 색 (기본값은 안내인 색) */
+  hat?: string;
 }
 
 export interface Guide {
@@ -45,6 +68,10 @@ export interface Guide {
   archetype: string;
   intro: string;
   color: string; // 아바타 배경색
+  /** 이 도시 안내인의 기본 표정 */
+  mood?: Expression;
+  /** 생김새 — 직업·나이에 맞춰 도시 데이터가 정한다 */
+  look?: GuideLook;
 }
 
 export interface City {
@@ -101,8 +128,10 @@ export interface FactCard {
 export type Speaker = 'margot' | 'guide' | 'L' | 'theo' | 'echo' | 'narrator' | 'player';
 
 export type Step =
-  | { t: 'say'; who: Speaker; text: string; name?: string; fiction?: boolean }
-  | { t: 'card'; cardId: string; who?: Speaker; text?: string }
+  | { t: 'say'; who: Speaker; text: string; name?: string; fiction?: boolean; mood?: Expression }
+  | { t: 'card'; cardId: string; who?: Speaker; text?: string; mood?: Expression }
+  /** 편집부에서 오는 휴대폰 메시지 — 얼굴 대신 메신저 화면으로 나온다 */
+  | { t: 'message'; from: Speaker; text: string; subject?: string }
   | { t: 'quiz'; who?: Speaker; q: string; options: string[]; answer: number; cardId: string; explain?: string }
   | { t: 'photo'; photoId: string; hint: string; options: string[]; answer: number; cardId?: string }
   | { t: 'visit'; poiId: string; minutes: number }
