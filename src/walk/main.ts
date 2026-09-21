@@ -69,7 +69,6 @@ let places: Place[] = [];
 let avatar: Marker;
 const markers = new Map<string, Marker>();
 let openPlace: Place | null = null;
-let lastTap = { id: '', at: 0 };
 
 const fmtClock = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.floor(m % 60)).padStart(2, '0')}`;
 const line = (coords: LngLat[]) => ({ type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: coords } });
@@ -151,17 +150,10 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
   map.on('click', (e) => {
     if (!S.started || S.finished) return;
     if (openPlace) { closeCard('pass'); return; }
-    // 색칠된 건물을 눌렀나? — 걷는 중에는 짧게 두 번(더블탭) 눌러야 멈춘다. 한 번은 방향 바꾸기.
+    // 색칠된 건물을 눌렀나? 걷는 중이면 멈춰서 바라본다.
     const hit = map.queryRenderedFeatures(e.point, { layers: ['hl'] })[0];
     const pl = hit && places.find((p) => p.id === hit.properties?.pid);
-    const walking = S.path.length > 1;
-    if (pl && dist(S.pos, pl.pos) <= NEAR) {
-      const now = performance.now();
-      if (!walking || (lastTap.id === pl.id && now - lastTap.at < 450)) { lastTap = { id: '', at: 0 }; openCard(pl); return; }
-      lastTap = { id: pl.id, at: now };
-      toast(`${pl.emoji} ${pl.name} — 한 번 더 누르면 멈춰서 봅니다`);
-      return;
-    }
+    if (pl && dist(S.pos, pl.pos) <= NEAR) { openCard(pl); return; }
     walkTo([e.lngLat.lng, e.lngLat.lat], null);
   });
 }
@@ -270,6 +262,7 @@ const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + 540) % 360
 
 /** 3인칭 시점의 한 프레임: 카메라를 내 뒤·위에 놓고 진행 방향을 본다. 걷기 시작 후 blendSecs 동안은 원래 카메라에서 서서히 넘어온다. */
 function eyeFrame(bearing: number) {
+  if (!Number.isFinite(bearing)) bearing = S.heading || 0;
   const target = map.calculateCameraOptionsFromCameraLngLatAltRotation(offset(S.pos, bearing + 180, EYE.back), EYE.alt, bearing, EYE.pitch, 0); // roll을 빼면 NaN이 들어가 행렬이 깨진다
   const t = Math.min(1, (performance.now() - walkStartedAt) / 1000 / EYE.blendSecs);
   if (t >= 1 || !camFrom) { map.jumpTo(target); return; }
@@ -327,12 +320,17 @@ function frame(t: number) {
   lastT = t;
   if (S.path.length > 1 && !openPlace && !S.finished) {
     let move = WALK_MPS * TIME_SCALE * dt;
-    while (move > 0 && S.seg + 1 < S.path.length) {
+    let guard = 0;
+    while (move > 0 && S.seg + 1 < S.path.length && guard++ < 200) {
       const next = S.path[S.seg + 1];
       const d = dist(S.pos, next);
       if (d > 0.3) S.heading = bearing(S.pos, next);
       if (d <= move) { S.pos = next; S.seg++; move -= d; S.walked += d; S.clock += d / WALK_MPS / 60; }
       else { const k = move / d; S.pos = [S.pos[0] + (next[0] - S.pos[0]) * k, S.pos[1] + (next[1] - S.pos[1]) * k]; S.walked += move; S.clock += move / WALK_MPS / 60; move = 0; }
+    }
+    if (!Number.isFinite(S.pos[0]) || !Number.isFinite(S.pos[1])) { // 좌표가 깨지면 마지막 멀쩡한 노드로 되돌린다
+      S.pos = S.path[Math.min(S.seg, S.path.length - 1)] ?? graph.nodes[nearestNode(graph, START)];
+      S.path = []; toast('길을 잃었어요. 다시 골라 주세요.'); camera('look');
     }
     S.trail.push(S.pos);
     avatar.setLngLat(S.pos);
@@ -574,5 +572,6 @@ $('#end').addEventListener('click', finish);
 $('#again').addEventListener('click', () => location.reload());
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openPlace) closeCard('pass'); });
 if (import.meta.env.DEV) (window as unknown as { __walk: unknown }).__walk = { S, walkTo, openCard, finish, places: () => places, graph: () => graph, map: () => map };
+window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();
