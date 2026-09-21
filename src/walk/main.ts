@@ -11,6 +11,10 @@ import { CAT_INFO, TASTE_OF, parsePlaces, parseWays } from './places';
 import type { Place, Taste } from './places';
 import { loadElements } from './data';
 import * as sfx from './sound';
+import { menuFor } from './content';
+import type { Dish } from './content';
+import { openMenu, openVisit } from './inside';
+import type { Shot } from './inside';
 
 maplibregl.setWorkerUrl(workerUrl);
 
@@ -22,7 +26,7 @@ const WALK_MPS = 1.35; // 실제 보행 속도
 const TIME_SCALE = 9; // 화면에서는 9배속으로 걷는다
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
-interface Visit { place: Place; at: number; mins: number; cost: number }
+interface Visit { place: Place; at: number; mins: number; cost: number; dishes?: Dish[]; seen?: number; total?: number }
 const S = {
   pos: START as LngLat,
   node: 0,
@@ -38,6 +42,7 @@ const S = {
   saved: new Set<string>(),
   visits: [] as Visit[],
   legs: [] as ('place' | 'wander')[],
+  shots: [] as Shot[],
   trail: [START] as LngLat[],
   started: false,
   finished: false,
@@ -209,7 +214,7 @@ function arrive() {
 
 function hud() {
   $('#clock').textContent = fmtClock(S.clock);
-  $('#money').textContent = `€${S.money}`;
+  $('#money').textContent = `€${Number.isInteger(S.money) ? S.money : S.money.toFixed(2)}`;
   $('#walked').textContent = S.walked < 1000 ? `${Math.round(S.walked)} m` : `${(S.walked / 1000).toFixed(1)} km`;
   $('#found').textContent = `${S.seen.size}곳 발견`;
   if (S.clock >= 19 * 60 && !S.finished) hint('해가 기울어요. 슬슬 하루를 마쳐도 좋아요.');
@@ -239,20 +244,15 @@ function openCard(p: Place) {
   $('#card-name').textContent = p.name;
   $('#card-cat').textContent = `${info.label}${p.tags.cuisine ? ' · ' + p.tags.cuisine.replace(/[;_]/g, ' ') : ''}${p.known ? ' · 오기 전부터 알던 곳' : ''}`;
   $('#card-blurb').textContent = p.blurb ?? (p.tags['description'] || '지나가다 눈에 들어온 곳. 아직 아는 게 없다.');
-  $('#card-meta').textContent = `약 ${mins}분 · ${cost ? `€${cost} 안팎` : '무료'}${p.tags.opening_hours ? ' · ' + p.tags.opening_hours : ''}`;
+  const hasMenu = !!menuFor(p);
+  $('#card-meta').textContent = `${hasMenu ? '들어가서 메뉴를 보고 고른다' : `약 ${mins}분 · ${cost ? `입장 €${cost} 안팎` : '무료'}`}${p.tags.opening_hours ? ' · ' + p.tags.opening_hours : ''}`;
   const go = $<HTMLButtonElement>('#card-go');
   if (visited) { go.textContent = '이미 다녀왔어요'; go.disabled = true; }
-  else if (near) { go.textContent = `${info.verb}`; go.disabled = cost > S.money; if (go.disabled) go.textContent = '돈이 모자라요'; }
+  else if (near) { go.textContent = hasMenu ? '들어가서 메뉴를 본다' : info.verb; go.disabled = !hasMenu && cost > S.money; if (go.disabled) go.textContent = '돈이 모자라요'; }
   else { go.textContent = `여기로 걸어간다 (도보 ${Math.max(1, Math.round((d * 1.3) / WALK_MPS / 60))}분쯤)`; go.disabled = false; }
   go.onclick = () => {
     if (!near) { openPlace = null; $('#card').classList.remove('on'); walkTo(p.pos, p); return; }
-    S.visits.push({ place: p, at: S.clock, mins, cost });
-    S.clock += mins;
-    S.money -= cost;
-    markers.get(p.id)?.getElement().classList.add('visited');
-    sfx.enter();
-    toast(`${p.emoji} ${mins}분 머물렀어요`);
-    closeCard('enter');
+    void goInside(p, cost);
   };
   const save = $<HTMLButtonElement>('#card-save');
   save.textContent = S.saved.has(p.id) ? '♥ 찜함' : '♡ 찜';
@@ -263,6 +263,31 @@ function openCard(p: Place) {
   };
   $('#card-pass').onclick = () => closeCard('pass');
   $('#card').classList.add('on');
+}
+
+/** 들어간다: 먹는 곳이면 메뉴판, 아니면 관람 장면. 결과만큼 시간과 돈이 흐른다. */
+async function goInside(p: Place, entry: number) {
+  $('#card').classList.remove('on'); // openPlace는 그대로 둬서 걷기를 멈춰 둔다
+  const at = S.clock;
+  const menu = menuFor(p);
+  if (menu) {
+    const meal = await openMenu(p, menu, S.money);
+    if (!meal) { closeCard('pass'); toast('메뉴만 보고 나왔어요'); return; }
+    S.visits.push({ place: p, at, mins: meal.mins, cost: meal.cost, dishes: meal.dishes });
+    S.clock += meal.mins;
+    S.money = Math.round((S.money - meal.cost) * 100) / 100;
+    toast(`${p.emoji} ${meal.mins}분 · €${meal.cost}`);
+  } else {
+    sfx.enter();
+    const v = await openVisit(p);
+    S.visits.push({ place: p, at, mins: v.mins, cost: entry, seen: v.seen, total: v.total });
+    S.shots.push(...v.shots);
+    S.clock += v.mins;
+    S.money -= entry;
+    toast(`${p.emoji} ${v.mins}분 머물렀어요`);
+  }
+  markers.get(p.id)?.getElement().classList.add('visited');
+  closeCard('enter');
 }
 
 function closeCard(_why: 'enter' | 'pass') {
@@ -287,6 +312,8 @@ function start() {
     hint(vosges ? '지도에서 아무 데나 누르면 그쪽으로 걸어갑니다. 핀은 오기 전부터 알던 곳이에요.' : '지도에서 아무 데나 누르면 그쪽으로 걸어갑니다.');
   }, 2500);
 }
+
+const mode = (xs: string[]) => [...xs.reduce((m, x) => m.set(x, (m.get(x) ?? 0) + 1), new Map<string, number>())].sort((a, b) => b[1] - a[1])[0][0];
 
 function finish() {
   S.finished = true;
@@ -317,11 +344,26 @@ function finish() {
   if (ignored) lines.push(`「${ignored.t}」는 ${ignored.r.seen}곳을 지나쳤지만 한 번도 들여다보지 않았어요.`);
   const surprise = S.visits.filter((v) => !v.place.known);
   if (surprise.length) lines.push(`들어간 ${S.visits.length}곳 중 ${surprise.length}곳은 오기 전엔 몰랐던 곳이에요: ${surprise.map((v) => v.place.name).slice(0, 3).join(', ')}.`);
+  const dishes = S.visits.flatMap((v) => v.dishes ?? []);
+  if (dishes.length >= 2) {
+    const n = (t: string) => dishes.filter((d) => (d.tags as string[]).includes(t)).length;
+    const sweet = n('sweet'); const classic = n('classic'); const trendy = n('trendy'); const street = n('street');
+    if (sweet * 2 >= dishes.length) lines.push(`주문한 ${dishes.length}가지 중 ${sweet}가지가 단것이었어요.`);
+    if (classic >= 2 && classic > trendy * 2) lines.push(`메뉴판에서는 오래된 이름 쪽으로 손이 갔어요: ${dishes.filter((d) => d.tags.includes('classic')).slice(0, 3).map((d) => d.name).join(', ')}.`);
+    else if (trendy >= 2 && trendy >= classic) lines.push('메뉴판에서는 요즘 것, 낯선 조합 쪽을 골랐어요.');
+    if (street * 2 > dishes.length) lines.push('앉아서 먹기보다 들고 걸으며 먹는 쪽이었어요.');
+  }
+  const looked = S.visits.filter((v) => v.total && v.total > 1);
+  if (looked.length >= 2) {
+    const full = looked.filter((v) => v.seen === v.total).length;
+    lines.push(full * 2 >= looked.length ? `둘러본 ${looked.length}곳 중 ${full}곳을 끝까지 봤어요. 한 곳을 깊게 보는 편이네요.` : `둘러본 ${looked.length}곳 중 ${looked.length - full}곳은 중간에 나왔어요. 여러 곳을 가볍게 훑는 편이네요.`);
+  }
+  if (S.shots.length) lines.push(`사진을 ${S.shots.length}장 찍었어요. 가장 많이 찍은 곳은 ${mode(S.shots.map((x) => x.place))}.`);
   if (!lines.length) lines.push('아직 기록이 적어요. 조금 더 걸어 보면 당신이 어디서 멈추는 사람인지 보이기 시작해요.');
 
-  $('#sum-stats').textContent = `${fmtClock(10 * 60)} → ${fmtClock(S.clock)} · ${(S.walked / 1000).toFixed(1)} km · ${S.seen.size}곳 발견 · ${S.visits.length}곳 들어감 · €${80 - S.money} 씀`;
+  $('#sum-stats').textContent = `${fmtClock(10 * 60)} → ${fmtClock(S.clock)} · ${(S.walked / 1000).toFixed(1)} km · ${S.seen.size}곳 발견 · ${S.visits.length}곳 들어감 · €${Math.round((80 - S.money) * 100) / 100} 씀`;
   $('#sum-lines').replaceChildren(...lines.map((s) => { const li = document.createElement('li'); li.textContent = s; return li; }));
-  const stops = [...S.visits.map((v) => ({ p: v.place, note: `${fmtClock(v.at)} · ${v.mins}분${v.cost ? ` · €${v.cost}` : ''}` })),
+  const stops = [...S.visits.map((v) => ({ p: v.place, note: `${fmtClock(v.at)} · ${v.mins}분${v.cost ? ` · €${v.cost}` : ''}${v.dishes ? ` · ${v.dishes.map((d) => d.name).join(', ')}` : ''}` })),
     ...[...S.saved].map((id) => byId.get(id)!).filter((p) => !S.visits.some((v) => v.place.id === p.id)).map((p) => ({ p, note: '찜 — 다음에' }))];
   $('#sum-stops').replaceChildren(...stops.map(({ p, note }) => { const li = document.createElement('li'); li.textContent = `${p.emoji} ${p.name} — ${note}`; return li; }));
   const link = $<HTMLAnchorElement>('#sum-maps');
@@ -332,6 +374,15 @@ function finish() {
     link.href = `https://www.google.com/maps/dir/?${q}`;
     link.hidden = false;
   } else link.hidden = true;
+  $('#sum-shots-wrap').hidden = !S.shots.length;
+  $('#sum-shots').replaceChildren(...S.shots.map((sh) => {
+    const d = document.createElement('div');
+    d.className = 'shot';
+    d.style.backgroundImage = `url("${sh.src}")`;
+    d.style.backgroundPosition = `${Math.round(sh.x * 100)}% 50%`;
+    d.title = `${sh.place} — ${sh.credit}`;
+    return d;
+  }));
   $('#summary').classList.add('on');
   if (S.trail.length > 1) {
     const b = S.trail.reduce((bb, c) => bb.extend(c), new maplibregl.LngLatBounds(S.trail[0], S.trail[0]));

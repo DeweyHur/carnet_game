@@ -27,6 +27,8 @@
       <div class="acts"><button id="card-go" class="primary"></button><button id="card-save"></button><button id="card-pass">지나친다</button></div>
     </section>
 
+    <section id="inside"></section>
+
     <section id="intro">
       <div class="tunnel">
         <p class="line">Ⓜ 1 · Saint-Paul</p>
@@ -45,11 +47,12 @@
         <p id="sum-stats"></p>
         <h3>걷는 걸 지켜보니</h3>
         <ul id="sum-lines"></ul>
+        <div id="sum-shots-wrap" hidden><h3>오늘 찍은 사진</h3><div id="sum-shots"></div></div>
         <h3>들른 곳 · 찜한 곳</h3>
         <ol id="sum-stops"></ol>
         <a id="sum-maps" target="_blank" rel="noopener">이 동선을 구글 지도로 열기 ↗</a>
         <button id="again">다시 걷기</button>
-        <p class="fine">가격·소요 시간은 프로토타입용 대략값입니다. 지도 © OpenStreetMap contributors.</p>
+        <p class="fine">가격·소요 시간은 프로토타입용 대략값입니다. 지도 © OpenStreetMap contributors. 사진은 위키미디어 공용의 자유 라이선스 사진이며 작가·라이선스는 각 사진에 표시됩니다.</p>
       </div>
     </section>
     <script type="module" src="/src/walk/main.ts"></script>

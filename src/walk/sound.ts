@@ -52,3 +52,14 @@ export const spot = () => { tone(880, 0, 0.12, 0.05); tone(1175, 0.07, 0.16, 0.0
 export const spotBig = () => { tone(659, 0, 0.25, 0.07); tone(831, 0.09, 0.25, 0.07); tone(988, 0.18, 0.4, 0.07); };
 export const enter = () => { tone(523, 0, 0.18, 0.07); tone(784, 0.1, 0.3, 0.07); };
 export const heart = () => tone(1318, 0, 0.2, 0.06);
+
+/** 건물 안으로 들어가면 거리 소음이 멀어진다 */
+export function inside(on: boolean) {
+  if (!ctx || !ambience) return;
+  ambience.gain.cancelScheduledValues(ctx.currentTime);
+  ambience.gain.linearRampToValueAtTime(on ? 0.035 : 0.16, ctx.currentTime + 0.8);
+}
+export const pageTurn = () => tone(240, 0, 0.09, 0.05, 'triangle');
+export const tick = () => tone(1500, 0, 0.04, 0.04, 'square');
+export const shutter = () => { tone(2200, 0, 0.03, 0.09, 'square'); tone(900, 0.05, 0.05, 0.08, 'square'); };
+export const served = () => { tone(1568, 0, 0.5, 0.05); tone(2093, 0.12, 0.7, 0.04); };
