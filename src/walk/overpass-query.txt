@@ -1,0 +1,12 @@
+[out:json][timeout:60][bbox:48.8520,2.3530,48.8625,2.3700];
+way["highway"~"^(pedestrian|footway|living_street|residential|tertiary|secondary|primary|unclassified|steps|path)$"];
+out geom;
+(
+  nwr["name"]["tourism"~"^(museum|gallery|attraction|artwork|viewpoint)$"];
+  nwr["name"]["historic"];
+  nwr["name"]["leisure"~"^(park|garden)$"];
+  nwr["name"]["amenity"~"^(restaurant|fast_food|cafe|bar|pub|ice_cream|place_of_worship|library|theatre|arts_centre)$"];
+  nwr["name"]["shop"~"^(bakery|pastry|confectionery|chocolate|cheese|deli|wine|tea|coffee|spices|books|antiques|art|second_hand|music|stationery)$"];
+  nwr["name"="Place des Vosges"];
+);
+out center tags;
