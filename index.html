@@ -2,13 +2,56 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="실제 파리 지하철 노선을 한 정거장씩 따라가세요. 역 사진, 환승 안내, 산책 코스와 나비고 교통비 절약 정보를 담은 여행 수첩." />
-    <title>Carnet — 한 정거장씩, 파리 여행</title>
+    <meta name="description" content="가기 전에 파리를 미리 걸어 보세요. 실제 마레 지구의 골목을 걷다 보면 가게와 명소가 눈에 들어오고, 하루가 끝나면 그 동선이 그대로 여행 계획이 됩니다." />
+    <meta property="og:title" content="Carnet — 걸어서 짜는 파리 여행" />
+    <meta property="og:description" content="질문 대신 발걸음으로. 마레 지구를 걸으며 나만의 파리를 발견하세요." />
+    <meta name="theme-color" content="#0b0a09" />
+    <title>Carnet — 걸어서 짜는 파리 여행</title>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <div id="map"></div>
+
+    <div id="hud">
+      <div class="chips"><b id="clock">10:00</b><span id="money">€80</span><span id="walked">0 m</span><span id="found">0곳 발견</span></div>
+      <button id="end">하루 마치기</button>
+    </div>
+    <div id="toast"></div>
+    <div id="hint"></div>
+
+    <section id="card">
+      <div class="head"><div id="card-emoji"></div><div><h2 id="card-name"></h2><p id="card-cat"></p></div></div>
+      <p id="card-blurb"></p>
+      <p id="card-meta"></p>
+      <div class="acts"><button id="card-go" class="primary"></button><button id="card-save"></button><button id="card-pass">지나친다</button></div>
+    </section>
+
+    <section id="intro">
+      <div class="tunnel">
+        <p class="line">Ⓜ 1 · Saint-Paul</p>
+        <h1>파리, 마레 지구<br />오전 10시</h1>
+        <p class="sub">가 보려던 곳이 세 군데 있습니다. 나머지는 걸어 봐야 압니다.</p>
+        <button id="go" disabled>지도를 펴는 중…</button>
+        <p id="status"></p>
+        <p class="classic"><a href="/classic.html">예전 Carnet(기자·미션 버전) 열기</a></p>
+      </div>
+    </section>
+
+    <section id="summary">
+      <div class="sheet">
+        <p class="eyebrow">오늘의 기록</p>
+        <h2>마레에서의 하루</h2>
+        <p id="sum-stats"></p>
+        <h3>걷는 걸 지켜보니</h3>
+        <ul id="sum-lines"></ul>
+        <h3>들른 곳 · 찜한 곳</h3>
+        <ol id="sum-stops"></ol>
+        <a id="sum-maps" target="_blank" rel="noopener">이 동선을 구글 지도로 열기 ↗</a>
+        <button id="again">다시 걷기</button>
+        <p class="fine">가격·소요 시간은 프로토타입용 대략값입니다. 지도 © OpenStreetMap contributors.</p>
+      </div>
+    </section>
+    <script type="module" src="/src/walk/main.ts"></script>
   </body>
 </html>
