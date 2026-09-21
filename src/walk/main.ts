@@ -2,6 +2,7 @@
 // 질문하지 않는다. 어디로 걸었고, 어디서 멈췄고, 무엇을 지나쳤는지만 기록한다.
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource, Map as MlMap, Marker, StyleSpecification } from 'maplibre-gl';
+import type { Feature } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import './walk.css';
@@ -30,13 +31,14 @@ const CAM_LOOK = { zoom: 17.0, pitch: 48 };
 // 시선 모드: 카메라를 눈높이(1.7m)에 두고 거의 수평으로 본다. 걷기 시작하면 위에서 내려와 눈높이로 붙는다.
 // 3인칭 시점: 카메라를 내 뒤(back m)·위(alt m)에 두고 진행 방향을 내려다본다. 플레이어 모델은 없다.
 // pitch는 84까지만 안정적(그 이상은 MapLibre가 지평선 너머로 중심을 잡아 깨진다)
-const EYE = { alt: 5.5, back: 9, pitch: 76, descendFrom: 45, descendSecs: 1.6 };
+const EYE = { alt: 5.5, back: 9, pitch: 76, blendSecs: 3.2 }; // 걷기 시작하면 지금 카메라에서 이 시점까지 blendSecs 동안 부드럽게
 // 시야: 걷는 동안은 진행 방향 ±FOV° 안, SIGHT m 이내, 지금 걷는 길에서 STREET m 이내의 가게만 보인다.
 const FOV = 70;
 const SIGHT = 60;
 const STREET = 24;
 let eyeMode = (() => { try { return localStorage.getItem('carnet-walk-eye') !== '0'; } catch { return true; } })();
 let walkStartedAt = 0;
+let camFrom: { center: LngLat; zoom: number; pitch: number; bearing: number } | null = null; // 걷기 시작 순간의 카메라
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
 interface Visit { place: Place; at: number; mins: number; cost: number; dishes?: Dish[]; seen?: number; total?: number }
@@ -129,6 +131,9 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
     map.addSource('streets', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: ways } } });
     map.addLayer({ id: 'streets', type: 'line', source: 'streets', paint: { 'line-color': '#fff', 'line-width': 7 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
   }
+  // 눈에 들어온 가게의 건물을 색칠하는 층(아이콘 대신). 건물 폴리곤은 타일에서 찾아 온다.
+  map.addSource('hl', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'hl', type: 'fill-extrusion', source: 'hl', paint: { 'fill-extrusion-color': ['get', 'color'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.92 } });
   map.addSource('vision', { type: 'geojson', data: circle(S.pos, VISION) });
   map.addLayer({ id: 'vision', type: 'fill', source: 'vision', paint: { 'fill-color': '#ffd166', 'fill-opacity': 0.16 } });
   map.addSource('trail', { type: 'geojson', data: line(S.trail) });
@@ -145,8 +150,42 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
   map.on('click', (e) => {
     if (!S.started || S.finished) return;
     if (openPlace) { closeCard('pass'); return; }
+    // 색칠된 건물을 눌렀나?
+    const hit = map.queryRenderedFeatures(e.point, { layers: ['hl'] })[0];
+    const pl = hit && places.find((p) => p.id === hit.properties?.pid);
+    if (pl) { openCard(pl); return; }
     walkTo([e.lngLat.lng, e.lngLat.lat], null);
   });
+}
+
+const CAT_COLOR: Record<string, string> = { eat: '#e4572e', bakery: '#e08a2e', sweet: '#e0669c', gourmet: '#c9822c', cafe: '#b5651d', bar: '#8e3b8e', museum: '#5b4bd6', sight: '#3f7fc4', park: '#3a9d5d', shop: '#2f9e9e' };
+const buildingOf = new Map<string, Feature | null>(); // place id → 건물 폴리곤(없으면 null)
+const litIds = new Set<string>();
+
+/** 그 자리의 건물 폴리곤을 타일에서 찾는다(화면에 그려진 것만 찾을 수 있다). */
+function findBuilding(p: Place): Feature | null {
+  if (buildingOf.has(p.id)) return buildingOf.get(p.id)!;
+  const layers = (map.getStyle().layers ?? []).filter((l) => l.type === 'fill-extrusion' && l.id !== 'hl').map((l) => l.id);
+  if (!layers.length) { buildingOf.set(p.id, null); return null; }
+  const pt = map.project(p.pos);
+  if (pt.x < 0 || pt.y < 0 || pt.x > map.getCanvas().clientWidth || pt.y > map.getCanvas().clientHeight) return null; // 아직 화면 밖 — 다음에 다시
+  let f = map.queryRenderedFeatures(pt, { layers })[0];
+  if (!f) {
+    // 문 앞 점이 길 위에 찍힌 경우: 주변 몇 m 안의 건물을 찾는다
+    const r = 10;
+    f = map.queryRenderedFeatures([[pt.x - r, pt.y - r], [pt.x + r, pt.y + r]], { layers })[0];
+  }
+  if (!f || (f.geometry.type !== 'Polygon' && f.geometry.type !== 'MultiPolygon')) { buildingOf.set(p.id, null); return null; }
+  const h = Number(f.properties?.render_height ?? f.properties?.height ?? 12) || 12;
+  const feat: Feature = { type: 'Feature', geometry: f.geometry, properties: { pid: p.id, color: CAT_COLOR[p.cat] ?? '#e4572e', h: h + 0.6 } };
+  buildingOf.set(p.id, feat);
+  return feat;
+}
+
+function paintBuildings() {
+  const feats: Feature[] = [];
+  for (const id of litIds) { const f = buildingOf.get(id); if (f) feats.push(f); }
+  (map.getSource('hl') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: feats });
 }
 
 function showMarker(p: Place, pop: boolean) {
@@ -161,21 +200,27 @@ function showMarker(p: Place, pop: boolean) {
 }
 
 function look() {
+  let changed = false;
   for (const p of places) {
     const vis = inSight(p);
     const m = markers.get(p.id);
     if (!vis) {
       // 시야에서 벗어나면 지도에서도 사라진다(알던 곳의 핀과 이미 들어간 곳은 남는다)
       if (m && !p.known && !S.visits.some((v) => v.place.id === p.id)) m.getElement().classList.add('off');
+      if (litIds.delete(p.id)) changed = true;
       continue;
     }
-    if (m) { m.getElement().classList.remove('off'); }
+    // 보이는 곳: 건물이 있으면 건물을 색칠하고, 없으면(광장·길가 노점 등) 아이콘으로
+    const b = findBuilding(p);
+    if (b) { if (!litIds.has(p.id)) { litIds.add(p.id); changed = true; } if (m && !p.known) m.getElement().classList.add('off'); }
+    else if (m) m.getElement().classList.remove('off');
     if (S.seen.has(p.id)) continue;
     S.seen.set(p.id, S.clock);
-    if (m) m.getElement().classList.add('pop', 'found');
-    else showMarker(p, true);
+    if (!b) { if (m) m.getElement().classList.add('pop', 'found'); else showMarker(p, true); }
+    else if (p.known && m) m.getElement().classList.add('found');
     if (p.curated) { sfx.spotBig(); toast(`${p.emoji} ${p.name}`); } else sfx.spot();
   }
+  if (changed) paintBuildings();
 }
 
 function walkTo(dest: LngLat, target: Place | null) {
@@ -200,7 +245,12 @@ function camera(mode: 'walk' | 'look') {
   camMode = mode;
   const c = mode === 'walk' ? CAM_WALK : CAM_LOOK;
   // 걷는 동안은 frame()이 매 프레임 카메라를 잡고 있으므로 거기서 서서히 당긴다. 멈춰 있을 때만 easeTo.
-  if (mode === 'walk') { walkStartedAt = performance.now(); if (eyeMode) { map.setCenterClampedToGround(false); avatar.getElement().classList.add('hidden'); } }
+  if (mode === 'walk') {
+    walkStartedAt = performance.now();
+    const c0 = map.getCenter();
+    camFrom = { center: [c0.lng, c0.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() };
+    if (eyeMode) { map.stop(); map.setCenterClampedToGround(false); avatar.getElement().classList.add('hidden'); }
+  }
   if (mode === 'look') {
     map.setCenterClampedToGround(true);
     avatar.getElement().classList.remove('hidden');
@@ -208,15 +258,23 @@ function camera(mode: 'walk' | 'look') {
   }
 }
 
-const smooth = (a: number, b: number, t: number) => a + (b - a) * (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + 540) % 360) - 180) * t;
 
-/** 시선 모드의 한 프레임: 카메라를 내 위치·눈높이에 놓고 진행 방향을 본다 */
+/** 3인칭 시점의 한 프레임: 카메라를 내 뒤·위에 놓고 진행 방향을 본다. 걷기 시작 후 blendSecs 동안은 원래 카메라에서 서서히 넘어온다. */
 function eyeFrame(bearing: number) {
-  const t = Math.min(1, (performance.now() - walkStartedAt) / 1000 / EYE.descendSecs);
-  const alt = smooth(EYE.descendFrom, EYE.alt, t);
-  const pitch = smooth(CAM_WALK.pitch, EYE.pitch, t);
-  const back = smooth(0, EYE.back, t);
-  map.jumpTo(map.calculateCameraOptionsFromCameraLngLatAltRotation(offset(S.pos, bearing + 180, back), alt, bearing, pitch, 0)); // roll을 빼면 NaN이 들어가 행렬이 깨진다
+  const target = map.calculateCameraOptionsFromCameraLngLatAltRotation(offset(S.pos, bearing + 180, EYE.back), EYE.alt, bearing, EYE.pitch, 0); // roll을 빼면 NaN이 들어가 행렬이 깨진다
+  const t = Math.min(1, (performance.now() - walkStartedAt) / 1000 / EYE.blendSecs);
+  if (t >= 1 || !camFrom) { map.jumpTo(target); return; }
+  const w = t * t * (3 - 2 * t); // smoothstep
+  const tc = target.center as maplibregl.LngLat;
+  map.jumpTo({
+    center: [camFrom.center[0] + (tc.lng - camFrom.center[0]) * w, camFrom.center[1] + (tc.lat - camFrom.center[1]) * w],
+    zoom: camFrom.zoom + ((target.zoom ?? camFrom.zoom) - camFrom.zoom) * w,
+    pitch: camFrom.pitch + ((target.pitch ?? camFrom.pitch) - camFrom.pitch) * w,
+    bearing: lerpAngle(camFrom.bearing, target.bearing ?? camFrom.bearing, w),
+    elevation: (target.elevation ?? 0) * w,
+    roll: 0,
+  });
 }
 
 /** p에서 방위 brg 쪽으로 m미터 이동한 점 */
@@ -276,12 +334,19 @@ function frame(t: number) {
     const cur = map.getBearing();
     const diff = ((S.heading - cur + 540) % 360) - 180;
     const k = Math.min(1, dt * 1.6);
-    const nb = cur + diff * Math.min(1, dt * (eyeMode ? 2.2 : 1.2));
+    const nb = cur + diff * Math.min(1, dt * (eyeMode ? 1.5 : 1.2));
     if (eyeMode) eyeFrame(nb);
     else map.jumpTo({ center: S.pos, bearing: nb, zoom: map.getZoom() + (CAM_WALK.zoom - map.getZoom()) * k, pitch: map.getPitch() + (CAM_WALK.pitch - map.getPitch()) * k });
     stepAcc += dt;
     if (stepAcc > 0.34) { stepAcc = 0; leftFoot = !leftFoot; sfx.step(leftFoot); }
     if (S.seg + 1 >= S.path.length) arrive();
+  }
+  else if (S.path.length > 1 && openPlace && eyeMode && !S.finished) {
+    // 걷다가 건물을 눌러 멈춘 상태: 그 건물 쪽으로 천천히 고개를 돌린다
+    const want = bearing(S.pos, openPlace.pos);
+    const cur = map.getBearing();
+    const diff = ((want - cur + 540) % 360) - 180;
+    eyeFrame(cur + diff * Math.min(1, dt * 2));
   }
   lookAcc += dt;
   if (lookAcc > 0.12 && S.started) { lookAcc = 0; look(); hud(); }
@@ -487,7 +552,14 @@ eyeBtn.addEventListener('click', () => {
   eyeMode = !eyeMode;
   try { localStorage.setItem('carnet-walk-eye', eyeMode ? '1' : '0'); } catch { /* 무시 */ }
   paintEye();
-  if (camMode === 'walk') { walkStartedAt = performance.now() - (eyeMode ? 0 : EYE.descendSecs * 1000); map.setCenterClampedToGround(!eyeMode); avatar.getElement().classList.toggle('hidden', eyeMode); if (!eyeMode) map.jumpTo({ center: S.pos, elevation: 0, zoom: CAM_WALK.zoom, pitch: CAM_WALK.pitch }); }
+  if (camMode === 'walk') {
+    const c0 = map.getCenter();
+    camFrom = { center: [c0.lng, c0.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() };
+    walkStartedAt = performance.now();
+    map.setCenterClampedToGround(!eyeMode);
+    avatar.getElement().classList.toggle('hidden', eyeMode);
+    if (!eyeMode) map.easeTo({ center: S.pos, elevation: 0, zoom: CAM_WALK.zoom, pitch: CAM_WALK.pitch, roll: 0, duration: 1500 });
+  }
 });
 $('#end').addEventListener('click', finish);
 $('#again').addEventListener('click', () => location.reload());
