@@ -1,6 +1,8 @@
 // 장소 안에서 벌어지는 일: 관람 장면(사진·순간들)과 메뉴.
 // 가격은 전부 대략값이고, 큐레이션하지 않은 가게의 메뉴는 "그 종류의 가게에서 흔한 메뉴"다(실제 메뉴 아님).
 import type { Cat, Place } from './places';
+import { RICH } from './marais';
+import { CUISINE_MENUS, genericMoments } from './generic';
 
 // ───────── 사진 후보 ─────────
 const PLACE_PHOTOS: [RegExp, string[]][] = [
@@ -27,6 +29,9 @@ const PLACE_PHOTOS: [RegExp, string[]][] = [
 export function placePhotoRefs(p: Place): string[] {
   const hit = PLACE_PHOTOS.find(([re]) => re.test(p.name));
   if (hit) return hit[1];
+  const rich = RICH.find((r) => r.name === p.name);
+  if (rich?.photos) return rich.photos;
+  if (rich?.moments?.[0]?.photo) return rich.moments[0].photo;
   const wp = p.tags.wikipedia; // OSM의 wikipedia=fr:제목
   return wp ? [/^[a-z]{2}:/.test(wp) ? wp : `en:${wp}`] : [];
 }
@@ -100,32 +105,13 @@ const MOMENTS: [RegExp, Moment[]][] = [
   ]],
 ];
 
-const GENERIC_MOMENTS: Partial<Record<Cat, Moment[]>> = {
-  museum: [
-    { text: '표를 끊고 첫 전시실로. 발소리가 울린다.', mins: 20 },
-    { text: '한 작품 앞에서 걸음이 멈춘다. 설명을 끝까지 읽는다.', mins: 25 },
-    { text: '기념품 가게를 지나 출구로.', mins: 10 },
-  ],
-  sight: [
-    { text: '잠깐 걸음을 멈추고 올려다본다.', mins: 5 },
-    { text: '한 바퀴 둘러본다. 안내판은 프랑스어뿐이다.', mins: 7 },
-  ],
-  park: [
-    { text: '철문을 지나 자갈길로 들어선다.', mins: 4 },
-    { text: '초록색 철제 벤치에 앉는다. 비둘기, 유모차, 신문 읽는 노인.', mins: 11 },
-  ],
-  shop: [
-    { text: '문에 달린 종이 울린다. 주인이 "봉주르" 하고 고개만 든다.', mins: 4 },
-    { text: '천천히 한 바퀴. 뭔가 하나를 들었다 놓는다.', mins: 8 },
-  ],
-  gourmet: [
-    { text: '문을 열자 냄새부터 다르다.', mins: 4 },
-    { text: '진열장을 끝에서 끝까지 본다. 가격표를 보고 조용히 내려놓는다.', mins: 8 },
-  ],
-};
 
 export function momentsFor(p: Place): Moment[] {
-  return MOMENTS.find(([re]) => re.test(p.name))?.[1] ?? GENERIC_MOMENTS[p.cat] ?? GENERIC_MOMENTS.sight!;
+  const hand = MOMENTS.find(([re]) => re.test(p.name))?.[1];
+  if (hand) return hand;
+  const rich = RICH.find((r) => r.name === p.name);
+  if (rich?.moments) return rich.moments;
+  return genericMoments(p);
 }
 
 // ───────── 먹기: 메뉴 ─────────
@@ -242,11 +228,13 @@ const BY_CAT: Partial<Record<Cat, Dish[]>> = {
 export function menuFor(p: Place): Menu | null {
   const cur = CURATED_MENUS.find(([re]) => re.test(p.name));
   if (cur) return { dishes: cur[1], exact: true, note: '이 집에서 유명한 것들. 가격은 대략입니다.' };
-  if (p.cat === 'eat') {
-    const c = (p.tags.cuisine ?? '').toLowerCase();
-    const dishes = BY_CUISINE.find(([re]) => re.test(c))?.[1] ?? BISTRO;
-    return { dishes, exact: false };
-  }
+  const rich = RICH.find((r) => r.name === p.name);
+  if (rich?.dishes) return { dishes: rich.dishes, exact: !!rich.menuNote, note: rich.menuNote ?? GENERIC_MENU_NOTE };
+  if (rich?.moments) return null; // 볼거리로 쓴 곳
+  const c = (p.tags.cuisine ?? '').toLowerCase();
+  const byCuisine = c ? (CUISINE_MENUS.find(([re]) => re.test(c))?.[1] ?? BY_CUISINE.find(([re]) => re.test(c))?.[1]) : undefined;
+  if (byCuisine) return { dishes: byCuisine, exact: false };
+  if (p.cat === 'eat') return { dishes: BISTRO, exact: false };
   const dishes = BY_CAT[p.cat];
   return dishes ? { dishes, exact: false } : null;
 }

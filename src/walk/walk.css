@@ -24,6 +24,7 @@ button:disabled { opacity:.5; cursor:default; }
 
 .pl { display:flex; align-items:center; gap:6px; padding:3px; border-radius:999px; background:#fff; box-shadow:0 2px 6px #0005; transform-origin:bottom center; }
 .pl .em { width:26px; height:26px; display:grid; place-items:center; font-size:16px; line-height:1; }
+.pl.minor { opacity:.75; } .pl.minor .em { width:20px; height:20px; font-size:12px; }
 .pl.curated { z-index:2; padding:4px 12px 4px 4px; background:var(--paper); outline:2px solid #e4b23a; }
 .pl.curated .em { width:32px; height:32px; font-size:21px; }
 .pl .nm { font-size:13px; font-weight:700; white-space:nowrap; }

@@ -1,5 +1,6 @@
 // 장소 데이터: OSM 태그 → 게임 카테고리, 그리고 손으로 고른 마레 지구 장소들.
 import type { LngLat } from './graph';
+import { RICH } from './marais';
 
 export type Cat = 'eat' | 'cafe' | 'bar' | 'bakery' | 'sweet' | 'gourmet' | 'museum' | 'sight' | 'park' | 'shop';
 export type Taste = '먹기' | '카페·바' | '문화·역사' | '산책·쉼' | '가게 구경';
@@ -36,6 +37,8 @@ export interface Place {
   blurb?: string;
   mins?: number;
   cost?: number;
+  /** 명판·벽화처럼 건물이 아닌 것 — 건물을 색칠하지 않고 작은 아이콘만 */
+  minor?: boolean;
   tags: Record<string, string>;
 }
 
@@ -98,8 +101,12 @@ const CURATED: Curated[] = [
 const GENERIC: [string, RegExp, Cat, string][] = [
   ['tourism', /^museum$/, 'museum', '🏛️'],
   ['tourism', /^gallery$/, 'museum', '🖼️'],
-  ['tourism', /^(attraction|artwork|viewpoint)$/, 'sight', '✨'],
-  ['historic', /./, 'sight', '🏰'],
+  ['tourism', /^artwork$/, 'sight', '🎨'],
+  ['tourism', /^(attraction|viewpoint)$/, 'sight', '✨'],
+  ['historic', /^(memorial|monument)$/, 'sight', '🪧'],
+  ['historic', /^(manor|castle|building|city_gate|tower)$/, 'sight', '🏰'],
+  ['historic', /./, 'sight', '🏛️'],
+  ['amenity', /^fountain$/, 'sight', '⛲'],
   ['leisure', /^(park|garden)$/, 'park', '🌳'],
   ['amenity', /^restaurant$/, 'eat', '🍽️'],
   ['amenity', /^fast_food$/, 'eat', '🥙'],
@@ -133,6 +140,7 @@ export function parseWays(els: OverpassElement[]): LngLat[][] {
 export function parsePlaces(els: OverpassElement[]): Place[] {
   const out: Place[] = [];
   const usedCurated = new Set<Curated>();
+  const usedRich = new Set<(typeof RICH)[number]>();
   for (const e of els) {
     const tags = e.tags;
     if (!tags?.name || tags.highway) continue;
@@ -146,9 +154,17 @@ export function parsePlaces(els: OverpassElement[]): Place[] {
       out.push({ id: `${e.type}${e.id}`, pos: [lon, lat], curated: true, tags, ...pick(cur) });
       continue;
     }
+    const rich = RICH.find((r) => r.match.test(tags.name));
+    if (rich) {
+      if (usedRich.has(rich)) continue;
+      usedRich.add(rich);
+      out.push({ id: `${e.type}${e.id}`, pos: [lon, lat], curated: true, tags, name: rich.name, cat: rich.cat, emoji: rich.emoji, blurb: rich.blurb, mins: rich.mins, cost: rich.cost });
+      continue;
+    }
     const g = GENERIC.find(([k, re]) => tags[k] !== undefined && re.test(tags[k]));
     if (!g) continue;
-    out.push({ id: `${e.type}${e.id}`, name: tags.name, pos: [lon, lat], cat: g[2], emoji: g[3], curated: false, tags });
+    const minor = tags.historic === 'memorial' || tags.historic === 'monument' || tags.tourism === 'artwork';
+    out.push({ id: `${e.type}${e.id}`, name: tags.name, pos: [lon, lat], cat: g[2], emoji: g[3], curated: false, minor, tags });
   }
   for (const cur of CURATED) {
     if (!usedCurated.has(cur)) out.push({ id: `cur-${cur.name}`, pos: cur.pos, curated: true, tags: {}, ...pick(cur) });

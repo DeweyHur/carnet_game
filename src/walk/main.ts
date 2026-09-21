@@ -13,6 +13,7 @@ import type { Place, Taste } from './places';
 import { loadElements } from './data';
 import * as sfx from './sound';
 import { menuFor } from './content';
+import { describe } from './generic';
 import type { Dish } from './content';
 import { openMenu, openVisit } from './inside';
 import type { Shot } from './inside';
@@ -191,7 +192,7 @@ function paintBuildings() {
 function showMarker(p: Place, pop: boolean) {
   if (markers.has(p.id)) return;
   const el = document.createElement('button');
-  el.className = `pl ${p.curated ? 'curated' : ''} ${p.known ? 'known' : ''} ${pop ? 'pop' : ''}`;
+  el.className = `pl ${p.curated ? 'curated' : ''} ${p.known ? 'known' : ''} ${p.minor ? 'minor' : ''} ${pop ? 'pop' : ''}`;
   el.innerHTML = `<span class="em">${p.emoji}</span>${p.curated ? `<span class="nm"></span>` : ''}`;
   if (p.curated) el.querySelector('.nm')!.textContent = p.name;
   el.title = p.name;
@@ -211,7 +212,7 @@ function look() {
       continue;
     }
     // 보이는 곳: 건물이 있으면 건물을 색칠하고, 없으면(광장·길가 노점 등) 아이콘으로
-    const b = findBuilding(p);
+    const b = p.minor ? null : findBuilding(p);
     if (b) { if (!litIds.has(p.id)) { litIds.add(p.id); changed = true; } if (m && !p.known) m.getElement().classList.add('off'); }
     else if (m) m.getElement().classList.remove('off');
     if (S.seen.has(p.id)) continue;
@@ -399,7 +400,7 @@ function openCard(p: Place) {
   $('#card-emoji').textContent = p.emoji;
   $('#card-name').textContent = p.name;
   $('#card-cat').textContent = `${info.label}${p.tags.cuisine ? ' · ' + p.tags.cuisine.replace(/[;_]/g, ' ') : ''}${p.known ? ' · 오기 전부터 알던 곳' : ''}`;
-  $('#card-blurb').textContent = p.blurb ?? (p.tags['description'] || '지나가다 눈에 들어온 곳. 아직 아는 게 없다.');
+  $('#card-blurb').textContent = p.blurb ?? describe(p);
   const hasMenu = !!menuFor(p);
   $('#card-meta').textContent = `${hasMenu ? '들어가서 메뉴를 보고 고른다' : `약 ${mins}분 · ${cost ? `입장 €${cost} 안팎` : '무료'}`}${p.tags.opening_hours ? ' · ' + p.tags.opening_hours : ''}`;
   const go = $<HTMLButtonElement>('#card-go');
