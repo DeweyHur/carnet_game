@@ -27,6 +27,10 @@ const TIME_SCALE = 9; // 화면에서는 9배속으로 걷는다
 // 카메라: 걸을 때는 바짝 당겨 골목이 보이게, 멈추면 물러나 어디로 갈지 고르게
 const CAM_WALK = { zoom: 18.6, pitch: 64 };
 const CAM_LOOK = { zoom: 17.0, pitch: 48 };
+// 시선 모드: 카메라를 눈높이(1.7m)에 두고 거의 수평으로 본다. 걷기 시작하면 위에서 내려와 눈높이로 붙는다.
+const EYE = { alt: 1.7, pitch: 83, descendFrom: 45, descendSecs: 1.6 }; // pitch는 84까지만 안정적(그 이상은 MapLibre가 지평선 너머로 중심을 잡아 깨진다)
+let eyeMode = (() => { try { return localStorage.getItem('carnet-walk-eye') !== '0'; } catch { return true; } })();
+let walkStartedAt = 0;
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
 interface Visit { place: Place; at: number; mins: number; cost: number; dishes?: Dish[]; seen?: number; total?: number }
@@ -92,7 +96,7 @@ async function boot() {
     S.pos = graph.nodes[S.node];
     S.trail = [S.pos];
 
-    map = new maplibregl.Map({ container: 'map', style: st.style, center: S.pos, zoom: 18.4, pitch: 25, bearing: -20, attributionControl: { compact: true }, maxPitch: 70 });
+    map = new maplibregl.Map({ container: 'map', style: st.style, center: S.pos, zoom: 18.4, pitch: 25, bearing: -20, attributionControl: { compact: true }, maxPitch: 85, maxZoom: 24 });
     map.on('load', () => {
       dressMap(st.fallback, ways);
       status.textContent = '';
@@ -106,6 +110,8 @@ async function boot() {
 
 function dressMap(fallback: boolean, ways: LngLat[][]) {
   const layers = map.getStyle().layers ?? [];
+  // 눈높이에서 지평선 위가 비지 않게 하늘을 칠한다
+  map.setSky({ 'sky-color': '#a9c9ec', 'horizon-color': '#efe3d2', 'fog-color': '#efe3d2', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.9 });
   // 기본 지도의 가게·명소 라벨을 끈다. 걸어가서 봐야 보인다.
   for (const l of layers) if ('source-layer' in l && l['source-layer'] === 'poi') map.setLayoutProperty(l.id, 'visibility', 'none');
   if (!fallback && !layers.some((l) => l.type === 'fill-extrusion')) {
@@ -181,7 +187,22 @@ function camera(mode: 'walk' | 'look') {
   camMode = mode;
   const c = mode === 'walk' ? CAM_WALK : CAM_LOOK;
   // 걷는 동안은 frame()이 매 프레임 카메라를 잡고 있으므로 거기서 서서히 당긴다. 멈춰 있을 때만 easeTo.
-  if (mode === 'look') map.easeTo({ zoom: c.zoom, pitch: c.pitch, duration: 1300, easing: (t) => 1 - Math.pow(1 - t, 3) });
+  if (mode === 'walk') { walkStartedAt = performance.now(); if (eyeMode) { map.setCenterClampedToGround(false); avatar.getElement().classList.add('hidden'); } }
+  if (mode === 'look') {
+    map.setCenterClampedToGround(true);
+    avatar.getElement().classList.remove('hidden');
+    map.easeTo({ center: S.pos, zoom: c.zoom, pitch: c.pitch, elevation: 0, duration: 1300, easing: (t) => 1 - Math.pow(1 - t, 3) });
+  }
+}
+
+const smooth = (a: number, b: number, t: number) => a + (b - a) * (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+
+/** 시선 모드의 한 프레임: 카메라를 내 위치·눈높이에 놓고 진행 방향을 본다 */
+function eyeFrame(bearing: number) {
+  const t = Math.min(1, (performance.now() - walkStartedAt) / 1000 / EYE.descendSecs);
+  const alt = smooth(EYE.descendFrom, EYE.alt, t);
+  const pitch = smooth(CAM_WALK.pitch, EYE.pitch, t);
+  map.jumpTo(map.calculateCameraOptionsFromCameraLngLatAltRotation(S.pos, alt, bearing, pitch, 0)); // roll을 빼면 NaN이 들어가 행렬이 깨진다
 }
 
 let lastT = 0;
@@ -208,7 +229,9 @@ function frame(t: number) {
     const cur = map.getBearing();
     const diff = ((S.heading - cur + 540) % 360) - 180;
     const k = Math.min(1, dt * 1.6);
-    map.jumpTo({ center: S.pos, bearing: cur + diff * Math.min(1, dt * 1.2), zoom: map.getZoom() + (CAM_WALK.zoom - map.getZoom()) * k, pitch: map.getPitch() + (CAM_WALK.pitch - map.getPitch()) * k });
+    const nb = cur + diff * Math.min(1, dt * (eyeMode ? 2.2 : 1.2));
+    if (eyeMode) eyeFrame(nb);
+    else map.jumpTo({ center: S.pos, bearing: nb, zoom: map.getZoom() + (CAM_WALK.zoom - map.getZoom()) * k, pitch: map.getPitch() + (CAM_WALK.pitch - map.getPitch()) * k });
     stepAcc += dt;
     if (stepAcc > 0.34) { stepAcc = 0; leftFoot = !leftFoot; sfx.step(leftFoot); }
     if (S.seg + 1 >= S.path.length) arrive();
@@ -410,9 +433,18 @@ function finish() {
 }
 
 $('#go').addEventListener('click', start);
+const eyeBtn = $<HTMLButtonElement>('#eye');
+const paintEye = () => { eyeBtn.textContent = eyeMode ? '👁 시선' : '🚁 위에서'; eyeBtn.title = eyeMode ? '걸을 때 눈높이에서 본다 (누르면 위에서 보기)' : '걸을 때 위에서 본다 (누르면 눈높이)'; };
+paintEye();
+eyeBtn.addEventListener('click', () => {
+  eyeMode = !eyeMode;
+  try { localStorage.setItem('carnet-walk-eye', eyeMode ? '1' : '0'); } catch { /* 무시 */ }
+  paintEye();
+  if (camMode === 'walk') { walkStartedAt = performance.now() - (eyeMode ? 0 : EYE.descendSecs * 1000); map.setCenterClampedToGround(!eyeMode); avatar.getElement().classList.toggle('hidden', eyeMode); if (!eyeMode) map.jumpTo({ center: S.pos, elevation: 0, zoom: CAM_WALK.zoom, pitch: CAM_WALK.pitch }); }
+});
 $('#end').addEventListener('click', finish);
 $('#again').addEventListener('click', () => location.reload());
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openPlace) closeCard('pass'); });
-if (import.meta.env.DEV) (window as unknown as { __walk: unknown }).__walk = { S, walkTo, openCard, finish, places: () => places, graph: () => graph };
+if (import.meta.env.DEV) (window as unknown as { __walk: unknown }).__walk = { S, walkTo, openCard, finish, places: () => places, graph: () => graph, map: () => map };
 requestAnimationFrame(frame);
 void boot();
