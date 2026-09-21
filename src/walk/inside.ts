@@ -132,10 +132,11 @@ export function openVisit(p: Place): Promise<VisitResult> {
     let gen = 0;
     cam.hidden = true;
     /** 순간에 사진이 있으면 그 사진으로, 없으면 장소 대표 사진으로 */
-    const showPhoto = (refs: string[]) => {
+    const showPhoto = (refs: string[], fallback = true) => {
       const my = ++gen;
       void findPhoto(refs).then(async (ph) => {
-        if (!ph) { if (refs !== placePhotoRefs(p)) showPhoto(placePhotoRefs(p)); return; }
+        // 순간 사진이 없으면 장소 대표 사진으로 한 번만 대체한다(대표 사진도 없으면 그림으로 남는다 — 무한 재귀 금지)
+        if (!ph) { if (fallback) showPhoto(placePhotoRefs(p), false); return; }
         if (my !== gen || !(await preload(ph)) || my !== gen) return;
         if (photo?.src === ph.src) return;
         photo = ph;
