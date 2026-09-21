@@ -1,4 +1,4 @@
-// Carnet 걷기 프로토타입 — "걷다가 눈에 들어온다"가 재미있는지 확인하기 위한 실험.
+// Carnet 걷기 게임(메인 페이지) — "걷다가 눈에 들어온다"가 재미있는지 확인하기 위한 실험.
 // 질문하지 않는다. 어디로 걸었고, 어디서 멈췄고, 무엇을 지나쳤는지만 기록한다.
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource, Map as MlMap, Marker, StyleSpecification } from 'maplibre-gl';
@@ -344,6 +344,6 @@ $('#go').addEventListener('click', start);
 $('#end').addEventListener('click', finish);
 $('#again').addEventListener('click', () => location.reload());
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openPlace) closeCard('pass'); });
-(window as unknown as { __walk: unknown }).__walk = { S, walkTo, openCard, finish, places: () => places, graph: () => graph };
+if (import.meta.env.DEV) (window as unknown as { __walk: unknown }).__walk = { S, walkTo, openCard, finish, places: () => places, graph: () => graph };
 requestAnimationFrame(frame);
 void boot();

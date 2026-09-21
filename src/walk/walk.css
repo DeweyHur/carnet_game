@@ -61,3 +61,5 @@ button:disabled { opacity:.5; cursor:default; }
 #sum-maps { display:inline-block; margin:22px 0 10px; color:var(--blue); font-weight:700; }
 #again { display:block; } .fine { font-size:12px; color:#9a8f80; margin-top:22px; }
 @media (max-width:700px) { #summary { inset:auto 0 0 0; width:100vw; max-height:62vh; translate:0 100%; border-radius:20px 20px 0 0; } }
+
+.classic { margin-top:26px; font-size:12px; } .classic a { color:#8d8373; }
