@@ -31,21 +31,25 @@ async function json(url: string): Promise<any> { // eslint-disable-line @typescr
   } finally { clearTimeout(timer); }
 }
 
-/** ref: 'local:paris:carnavalet' | 'Place des Vosges'(영어 위키백과) | 'fr:Village Saint-Paul' */
+/** ref: 'local:paris:carnavalet' | 'file:<공용 파일명>' | 'Place des Vosges'(영어 위키백과) | 'fr:Village Saint-Paul' */
 async function resolve(ref: string): Promise<Photo | null> {
   if (ref.startsWith('local:')) {
     const m = LOCAL[ref.slice(6)];
     return m ? { src: m.src, width: m.width, height: m.height, credit: `${m.author} · ${m.license}`, sourceUrl: m.sourceUrl } : null;
   }
-  const mt = /^([a-z]{2}):(.+)$/.exec(ref);
-  const lang = mt ? mt[1] : 'en';
-  const page = mt ? mt[2] : ref;
-  const summary = await json(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(page.replace(/ /g, '_'))}`);
-  const original: string | undefined = summary?.originalimage?.source;
-  if (!original) return null;
-  const path = new URL(original).pathname;
-  const parts = path.split('/');
-  const filename = decodeURIComponent(path.includes('/thumb/') ? parts[parts.length - 2] : parts[parts.length - 1]).replace(/_/g, ' ');
+  let filename: string;
+  if (ref.startsWith('file:')) filename = ref.slice(5);
+  else {
+    const mt = /^([a-z]{2}):(.+)$/.exec(ref);
+    const lang = mt ? mt[1] : 'en';
+    const page = mt ? mt[2] : ref;
+    const summary = await json(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(page.replace(/ /g, '_'))}`);
+    const original: string | undefined = summary?.originalimage?.source;
+    if (!original) return null;
+    const path = new URL(original).pathname;
+    const parts = path.split('/');
+    filename = decodeURIComponent(path.includes('/thumb/') ? parts[parts.length - 2] : parts[parts.length - 1]).replace(/_/g, ' ');
+  }
   const q = new URLSearchParams({ action: 'query', format: 'json', origin: '*', redirects: '1', prop: 'imageinfo', iiprop: 'url|size|extmetadata', iiurlwidth: '1600', titles: `File:${filename}` });
   const data = await json(`https://commons.wikimedia.org/w/api.php?${q}`);
   const pages = data?.query?.pages ?? {};
@@ -53,7 +57,7 @@ async function resolve(ref: string): Promise<Photo | null> {
   if (!info) return null;
   const meta = info.extmetadata ?? {};
   const license = strip(meta.LicenseShortName?.value ?? '');
-  if (!/cc by|cc0|public domain|^pd/i.test(license)) return null; // 재사용이 분명한 것만
+  if (!/cc by|cc0|public domain|^pd|licence ouverte/i.test(license)) return null; // 재사용이 분명한 것만
   const author = strip(meta.Artist?.value ?? '') || 'Wikimedia Commons';
   return {
     src: info.thumburl ?? info.url,

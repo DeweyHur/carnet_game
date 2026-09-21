@@ -24,6 +24,9 @@ const VISION = 45; // m — 이 안에 들어와야 가게가 "눈에 띈다"
 const NEAR = 70; // m — 이 안에 있어야 들어갈 수 있다
 const WALK_MPS = 1.35; // 실제 보행 속도
 const TIME_SCALE = 9; // 화면에서는 9배속으로 걷는다
+// 카메라: 걸을 때는 바짝 당겨 골목이 보이게, 멈추면 물러나 어디로 갈지 고르게
+const CAM_WALK = { zoom: 18.6, pitch: 64 };
+const CAM_LOOK = { zoom: 17.0, pitch: 48 };
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
 interface Visit { place: Place; at: number; mins: number; cost: number; dishes?: Dish[]; seen?: number; total?: number }
@@ -169,6 +172,16 @@ function walkTo(dest: LngLat, target: Place | null) {
   S.legs.push(target ? 'place' : 'wander');
   (map.getSource('route') as GeoJSONSource).setData(line(S.path));
   hint('');
+  camera('walk');
+}
+
+let camMode: 'walk' | 'look' | '' = '';
+function camera(mode: 'walk' | 'look') {
+  if (camMode === mode) return;
+  camMode = mode;
+  const c = mode === 'walk' ? CAM_WALK : CAM_LOOK;
+  // 걷는 동안은 frame()이 매 프레임 카메라를 잡고 있으므로 거기서 서서히 당긴다. 멈춰 있을 때만 easeTo.
+  if (mode === 'look') map.easeTo({ zoom: c.zoom, pitch: c.pitch, duration: 1300, easing: (t) => 1 - Math.pow(1 - t, 3) });
 }
 
 let lastT = 0;
@@ -194,7 +207,8 @@ function frame(t: number) {
     (map.getSource('route') as GeoJSONSource).setData(line([S.pos, ...S.path.slice(S.seg + 1)]));
     const cur = map.getBearing();
     const diff = ((S.heading - cur + 540) % 360) - 180;
-    map.jumpTo({ center: S.pos, bearing: cur + diff * Math.min(1, dt * 1.2) });
+    const k = Math.min(1, dt * 1.6);
+    map.jumpTo({ center: S.pos, bearing: cur + diff * Math.min(1, dt * 1.2), zoom: map.getZoom() + (CAM_WALK.zoom - map.getZoom()) * k, pitch: map.getPitch() + (CAM_WALK.pitch - map.getPitch()) * k });
     stepAcc += dt;
     if (stepAcc > 0.34) { stepAcc = 0; leftFoot = !leftFoot; sfx.step(leftFoot); }
     if (S.seg + 1 >= S.path.length) arrive();
@@ -209,6 +223,7 @@ function arrive() {
   (map.getSource('route') as GeoJSONSource).setData(line([]));
   const t = S.target;
   S.target = null;
+  camera('look');
   if (t) openCard(t);
 }
 
@@ -251,7 +266,7 @@ function openCard(p: Place) {
   else if (near) { go.textContent = hasMenu ? '들어가서 메뉴를 본다' : info.verb; go.disabled = !hasMenu && cost > S.money; if (go.disabled) go.textContent = '돈이 모자라요'; }
   else { go.textContent = `여기로 걸어간다 (도보 ${Math.max(1, Math.round((d * 1.3) / WALK_MPS / 60))}분쯤)`; go.disabled = false; }
   go.onclick = () => {
-    if (!near) { openPlace = null; $('#card').classList.remove('on'); walkTo(p.pos, p); return; }
+    if (!near) { openPlace = null; go.blur(); $('#card').classList.remove('on'); walkTo(p.pos, p); return; }
     void goInside(p, cost);
   };
   const save = $<HTMLButtonElement>('#card-save');
@@ -267,6 +282,7 @@ function openCard(p: Place) {
 
 /** 들어간다: 먹는 곳이면 메뉴판, 아니면 관람 장면. 결과만큼 시간과 돈이 흐른다. */
 async function goInside(p: Place, entry: number) {
+  (document.activeElement as HTMLElement | null)?.blur();
   $('#card').classList.remove('on'); // openPlace는 그대로 둬서 걷기를 멈춰 둔다
   const at = S.clock;
   const menu = menuFor(p);
@@ -292,6 +308,7 @@ async function goInside(p: Place, entry: number) {
 
 function closeCard(_why: 'enter' | 'pass') {
   openPlace = null;
+  (document.activeElement as HTMLElement | null)?.blur(); // 화면 밖으로 밀려난 버튼에 포커스가 남아 문서가 스크롤되는 것 방지
   $('#card').classList.remove('on');
   hud();
 }
@@ -305,7 +322,8 @@ function start() {
   intro.classList.add('rise');
   setTimeout(() => {
     intro.classList.add('gone');
-    map.easeTo({ zoom: 17.7, pitch: 62, bearing: 35, duration: 2600 });
+    map.easeTo({ zoom: CAM_LOOK.zoom, pitch: CAM_LOOK.pitch, bearing: 35, duration: 2600 });
+    camMode = 'look';
     S.started = true;
     $('#hud').classList.add('on');
     const vosges = places.find((p) => p.known && p.cat === 'park');

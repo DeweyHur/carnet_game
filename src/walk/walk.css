@@ -1,6 +1,6 @@
 :root { --ink:#1f1b16; --paper:#fbf7ef; --accent:#e4572e; --blue:#2d6cdf; font-family: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; }
 * { box-sizing: border-box; }
-html, body { margin:0; height:100%; background:#111; color:var(--ink); overflow:hidden; }
+html, body { margin:0; height:100%; background:#111; color:var(--ink); overflow:clip; } /* clip: 포커스 이동으로도 문서가 스크롤되지 않게 */
 #map { position:absolute; inset:0; }
 button { font:inherit; cursor:pointer; border:0; border-radius:999px; padding:10px 16px; background:#fff; color:var(--ink); box-shadow:0 1px 4px #0003; }
 button.primary { background:var(--accent); color:#fff; font-weight:700; }
@@ -71,6 +71,8 @@ button:disabled { opacity:.5; cursor:default; }
 .pano { position:absolute; inset:0; overflow:hidden; cursor:grab; touch-action:none; background:radial-gradient(circle at 50% 38%, #3a3226, #0b0a09 75%); }
 .pano:active { cursor:grabbing; }
 .pano-img { position:absolute; left:0; top:0; max-width:none; user-select:none; -webkit-user-drag:none; animation:fadein .9s; }
+.pano-img.out { animation:fadeout .9s forwards; }
+@keyframes fadeout { to { opacity:0; } }
 .pano-fallback { position:absolute; inset:0; display:grid; place-items:center; font-size:120px; opacity:.55; }
 .pano.has-photo .pano-fallback { display:none; }
 .pano::after { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(#0008, #0000 22%, #0000 50%, #000c 100%); }

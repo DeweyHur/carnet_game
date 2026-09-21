@@ -66,13 +66,16 @@ class Pano {
   }
 
   setPhoto(p: Photo) {
+    const old = this.img;
     const img = el('img', 'pano-img');
     img.src = p.src;
     img.alt = '';
     img.draggable = false;
     this.img = img;
     this.box.prepend(img);
+    this.layout();
     this.box.classList.add('has-photo');
+    if (old) { old.classList.add('out'); setTimeout(() => old.remove(), 900); }
   }
 
   /** 다음 순간으로 넘어갈 때 시선을 사진의 다른 부분으로 옮긴다 */
@@ -126,15 +129,24 @@ export function openVisit(p: Place): Promise<VisitResult> {
     sfx.inside(true);
 
     let photo: Photo | null = null;
+    let gen = 0;
     cam.hidden = true;
-    void findPhoto(placePhotoRefs(p)).then(async (ph) => {
-      if (!ph || !(await preload(ph))) return;
-      photo = ph;
-      pano.setPhoto(ph);
-      credit.textContent = `사진 ${ph.credit}`;
-      credit.href = ph.sourceUrl;
-      cam.hidden = false;
-    });
+    /** 순간에 사진이 있으면 그 사진으로, 없으면 장소 대표 사진으로 */
+    const showPhoto = (refs: string[]) => {
+      const my = ++gen;
+      void findPhoto(refs).then(async (ph) => {
+        if (!ph) { if (refs !== placePhotoRefs(p)) showPhoto(placePhotoRefs(p)); return; }
+        if (my !== gen || !(await preload(ph)) || my !== gen) return;
+        if (photo?.src === ph.src) return;
+        photo = ph;
+        pano.setPhoto(ph);
+        credit.textContent = `사진 ${ph.credit}`;
+        credit.href = ph.sourceUrl;
+        cam.hidden = false;
+      });
+    };
+    // 다음 순간의 사진을 미리 받아 둔다
+    for (const m of moments) if (m.photo) void findPhoto(m.photo).then((ph) => ph && preload(ph));
 
     let i = 0;
     let mins = 0;
@@ -147,7 +159,8 @@ export function openVisit(p: Place): Promise<VisitResult> {
       caption.textContent = m.text;
       caption.classList.add('in');
       [...dots.children].forEach((d, k) => d.classList.toggle('on', k <= i));
-      pano.lookAt(moments.length === 1 ? 0.5 : 0.12 + (0.76 * i) / (moments.length - 1));
+      showPhoto(m.photo ?? placePhotoRefs(p));
+      pano.lookAt(m.photo ? 0.5 : moments.length === 1 ? 0.5 : 0.12 + (0.76 * i) / (moments.length - 1));
       const last = i === moments.length - 1;
       more.textContent = last ? '다 봤다, 나간다' : '더 본다';
       leave.hidden = last;

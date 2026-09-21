@@ -7,19 +7,21 @@ const PLACE_PHOTOS: [RegExp, string[]][] = [
   [/보주 광장/, ['Place des Vosges']],
   [/위고의 집/, ['Maison de Victor Hugo']],
   [/카르나발레/, ['local:paris:carnavalet', 'Musée Carnavalet']],
-  [/피카소/, ['Musée Picasso']],
-  [/팔라펠/, ["L'As du Fallafel", 'Rue des Rosiers']],
-  [/핀켈슈타인|셰 마리안/, ['Rue des Rosiers']],
+  [/피카소/, ['file:Courtyard of the Musée National Picasso-Paris.jpg', 'Musée Picasso']],
+  [/팔라펠/, ["file:L'As du Fallafel, Jewish Quarter, Paris 2015.jpg", "L'As du Fallafel", 'Rue des Rosiers']],
+  [/핀켈슈타인/, ['file:Paris-Sacha Finkelsztajn-104-Rue des Rosiers 27-2017-gje.jpg', 'Rue des Rosiers']],
+  [/셰 마리안/, ['file:Chez Marianne (Le Marais Paris) 01.jpg', 'Rue des Rosiers']],
+  [/포체토/, ['file:Pozzetto Gelato Caffe Salato, 16 rue Vieille-du-Temple, Paris 2019.jpg']],
   [/오텔 드 쉴리/, ['Hôtel de Sully']],
   [/생폴 생루이/, ['Saint-Paul-Saint-Louis']],
   [/빌라주 생폴/, ['fr:Village Saint-Paul']],
   [/필리프 오귀스트/, ['Wall of Philip II Augustus']],
   [/쇼아/, ['Mémorial de la Shoah']],
   [/오텔 드 상스/, ['Hôtel de Sens']],
-  [/코냑 제/, ['Musée Cognacq-Jay']],
+  [/코냑 제/, ['file:Cognacq-Jay hôtel de Donon.jpg', 'Musée Cognacq-Jay']],
   [/로지에 정원/, ['fr:Jardin des Rosiers – Joseph-Migneret']],
-  [/마리아주 프레르/, ['Mariage Frères']],
-  [/역사 도서관/, ['Bibliothèque historique de la ville de Paris', 'fr:Hôtel de Lamoignon']],
+  [/마리아주 프레르/, ['file:Mariage Freres 30 rue du Bourg Tibourg Interieur.jpg', 'Mariage Frères']],
+  [/역사 도서관/, ["file:Hôtel d'Angoulème Lamoignon - février 2019.jpg", 'fr:Hôtel de Lamoignon']],
 ];
 
 export function placePhotoRefs(p: Place): string[] {
@@ -30,71 +32,71 @@ export function placePhotoRefs(p: Place): string[] {
 }
 
 // ───────── 관람: 순간들 ─────────
-export interface Moment { text: string; mins: number }
+export interface Moment { text: string; mins: number; photo?: string[] }
 
 const MOMENTS: [RegExp, Moment[]][] = [
   [/보주 광장/, [
-    { text: '아케이드 그늘에서 광장으로 나선다. 사방이 같은 높이, 같은 붉은 벽돌이다.', mins: 4 },
+    { text: '아케이드 그늘에서 광장으로 나선다. 사방이 같은 높이, 같은 붉은 벽돌이다.', mins: 4, photo: ['file:Paris 3e Place des Vosges Arcades 896.jpg']},
     { text: '잔디 위에 사람들이 아무렇게나 누워 있다. 분수 소리가 네 군데서 들린다.', mins: 8 },
-    { text: '한 바퀴 돌아 아케이드 아래로. 화랑 쇼윈도와 첼로 소리.', mins: 8 },
+    { text: '한 바퀴 돌아 아케이드 아래로. 화랑 쇼윈도와 첼로 소리.', mins: 8, photo: ['file:Paris Place des Vosges 570.jpg']},
   ]],
   [/오텔 드 쉴리/, [
-    { text: '큰길의 소음이 문 하나로 끊긴다. 자갈 깔린 안뜰, 벽마다 사계절 조각.', mins: 3 },
-    { text: '두 번째 안뜰은 정원이다. 회양목 사이로 오랑주리가 보인다.', mins: 4 },
+    { text: '큰길의 소음이 문 하나로 끊긴다. 자갈 깔린 안뜰, 벽마다 사계절 조각.', mins: 3, photo: ['file:Hôtel de Sully, cour intérieure.jpg']},
+    { text: '두 번째 안뜰은 정원이다. 회양목 사이로 오랑주리가 보인다.', mins: 4, photo: ['file:Hôtel de Sully 07.jpg']},
     { text: '정원 구석, 눈에 잘 안 띄는 문. 밀고 나가면 보주 광장 아케이드 한복판이다.', mins: 3 },
   ]],
   [/위고의 집/, [
-    { text: '삐걱이는 계단을 올라 3층. 붉은 다마스크 벽지의 응접실.', mins: 10 },
-    { text: '위고가 직접 디자인한 중국풍 방. 글만 쓴 사람이 아니었다.', mins: 12 },
-    { text: '서서 글을 쓰던 높은 책상. 창밖으로 보주 광장이 내려다보인다.', mins: 12 },
+    { text: '삐걱이는 계단을 올라 3층. 붉은 다마스크 벽지의 응접실.', mins: 10, photo: ['file:Paris Maison de Victor Hugo Innen 6.jpg']},
+    { text: '위고가 직접 디자인한 중국풍 방. 글만 쓴 사람이 아니었다.', mins: 12, photo: ['file:Maison de Victor Hugo Salon chinois 271220120 01.jpg']},
+    { text: '서서 글을 쓰던 높은 책상. 창밖으로 보주 광장이 내려다보인다.', mins: 12, photo: ['file:Maison de Victor Hugo Paris 27122012 Chambre.jpg']},
   ]],
   [/카르나발레/, [
-    { text: '첫 방부터 옛 파리의 가게 간판들이 천장까지 걸려 있다. 가위, 열쇠, 검은 고양이.', mins: 20 },
-    { text: '방마다 다른 시대의 파리. 혁명기의 방에는 바스티유 돌로 깎은 모형이 있다.', mins: 30 },
-    { text: '프루스트의 침실을 통째로 옮겨 놓은 방. 코르크 벽.', mins: 15 },
-    { text: '안뜰 정원으로 나온다. 기하학 무늬 화단 한가운데 벤치.', mins: 10 },
+    { text: '첫 방부터 옛 파리의 가게 간판들이 천장까지 걸려 있다. 가위, 열쇠, 검은 고양이.', mins: 20, photo: ['file:Salle des enseignes 03684.jpg']},
+    { text: '방마다 다른 시대의 파리. 혁명기의 방에는 바스티유 돌로 깎은 모형이 있다.', mins: 30, photo: ['file:Salle de la révolution du musée Carnavalet, 3ème arrondissement, Paris. PH10631.jpg']},
+    { text: '프루스트의 침실을 통째로 옮겨 놓은 방. 코르크 벽.', mins: 15, photo: ['file:Chambre de Marcel Proust -Musée Carnavalet- Paris.jpg']},
+    { text: '안뜰 정원으로 나온다. 기하학 무늬 화단 한가운데 벤치.', mins: 10, photo: ['file:Jardin du musée Carnavalet 2.jpg']},
   ]],
   [/피카소/, [
-    { text: '입구의 큰 계단부터 본다. 17세기 소금세 징수인의 저택이다.', mins: 10 },
-    { text: '청색 시대에서 입체주의로. 방을 옮길 때마다 다른 사람이 그린 것 같다.', mins: 40 },
-    { text: '꼭대기 층, 피카소가 모았던 남의 그림들. 세잔, 마티스.', mins: 25 },
-    { text: '정원 쪽 테라스에서 숨을 돌린다.', mins: 10 },
+    { text: '입구의 큰 계단부터 본다. 17세기 소금세 징수인의 저택이다.', mins: 10, photo: ['file:Paris 3e Hôtel Salé Musée Picasso 116.jpg']},
+    { text: '청색 시대에서 입체주의로. 방을 옮길 때마다 다른 사람이 그린 것 같다.', mins: 40, photo: ['file:Interior of Musée Picasso Paris Aug 2026.jpg']},
+    { text: '꼭대기 층, 피카소가 모았던 남의 그림들. 세잔, 마티스.', mins: 25, photo: ['file:Le salon Jupiter (Musée Picasso, Paris) - Flickr - dalbera.jpg']},
+    { text: '정원 쪽 테라스에서 숨을 돌린다.', mins: 10, photo: ['file:View of courtyard from Musée Picasso Paris Aug 2026.jpg']},
   ]],
   [/생폴 생루이/, [
-    { text: '무거운 문을 밀면 온도가 몇 도 내려간다. 높은 돔 아래로 빛이 떨어진다.', mins: 5 },
-    { text: '입구 쪽 조개 모양 성수반 두 개는 빅토르 위고가 기증한 것이다.', mins: 4 },
-    { text: '왼쪽 통로에 들라크루아의 그림. 아무도 줄 서지 않는다.', mins: 4 },
+    { text: '무거운 문을 밀면 온도가 몇 도 내려간다. 높은 돔 아래로 빛이 떨어진다.', mins: 5, photo: ['file:Paris (75004) Église Saint-Paul-Saint-Louis Intérieur 05.JPG']},
+    { text: '입구 쪽 조개 모양 성수반 두 개는 빅토르 위고가 기증한 것이다.', mins: 4, photo: ['file:Paris (75004) Église Saint-Paul-Saint-Louis Intérieur 08.JPG']},
+    { text: '왼쪽 통로에 들라크루아의 그림. 아무도 줄 서지 않는다.', mins: 4, photo: ['file:Paris (75004) Église Saint-Paul-Saint-Louis Intérieur 09.JPG']},
   ]],
   [/빌라주 생폴/, [
-    { text: '아치 밑을 지나니 안뜰이다. 그 안뜰에서 또 다른 안뜰로 통로가 나 있다.', mins: 6 },
-    { text: '은식기, 낡은 지도, 1950년대 조명. 가게 주인들은 서로 아는 사이 같다.', mins: 10 },
-    { text: '네 번째 안뜰쯤에서 방향을 잃는다. 어느 아치로 나가도 다른 골목이다.', mins: 5 },
+    { text: '아치 밑을 지나니 안뜰이다. 그 안뜰에서 또 다른 안뜰로 통로가 나 있다.', mins: 6, photo: ['file:Village Saint-Paul cour bleue.jpg']},
+    { text: '은식기, 낡은 지도, 1950년대 조명. 가게 주인들은 서로 아는 사이 같다.', mins: 10, photo: ['file:Village Saint-Paul Cour Rabelais.jpg']},
+    { text: '네 번째 안뜰쯤에서 방향을 잃는다. 어느 아치로 나가도 다른 골목이다.', mins: 5, photo: ['file:P1270246 Paris IV Village Saint-Paul rwk.jpg']},
   ]],
   [/필리프 오귀스트/, [
-    { text: '농구 코트 옆으로 800년 된 성벽이 60미터쯤 서 있다. 망루 자리도 남아 있다.', mins: 4 },
-    { text: '아이들이 성벽에 공을 튀긴다. 아무도 대단하게 여기지 않는 게 대단하다.', mins: 3 },
+    { text: '농구 코트 옆으로 800년 된 성벽이 60미터쯤 서 있다. 망루 자리도 남아 있다.', mins: 4, photo: ['file:P1200050 Paris IV enceinte de Philippe-Auguste rwk.jpg']},
+    { text: '아이들이 성벽에 공을 튀긴다. 아무도 대단하게 여기지 않는 게 대단하다.', mins: 3, photo: ['file:P1200054 Paris IV enceinte de Philippe-Auguste tour 1 rwk.jpg']},
   ]],
   [/쇼아/, [
-    { text: '입구 마당의 돌벽에 이름이 빼곡하다. 7만 6천 명. 알파벳 순, 연도별.', mins: 15 },
-    { text: '지하 납골당. 검은 대리석의 다윗의 별 아래 수용소의 재가 묻혀 있다.', mins: 10 },
+    { text: '입구 마당의 돌벽에 이름이 빼곡하다. 7만 6천 명. 알파벳 순, 연도별.', mins: 15, photo: ['file:Wall of names, Memorial of the Shoah, Paris.jpg']},
+    { text: '지하 납골당. 검은 대리석의 다윗의 별 아래 수용소의 재가 묻혀 있다.', mins: 10, photo: ['file:Crypte au Memorial de la Shoah (Paris).jpg']},
     { text: '상설 전시. 파리의 평범한 동네에서 벌어진 일들의 사진과 서류.', mins: 35 },
   ]],
   [/오텔 드 상스/, [
     { text: '뾰족한 망루와 총안. 파리 한복판에 중세 성채가 서 있다.', mins: 4 },
-    { text: '뒤로 돌아가면 자수 놓은 듯한 프랑스식 정원. 벤치는 거의 비어 있다.', mins: 7 },
+    { text: '뒤로 돌아가면 자수 놓은 듯한 프랑스식 정원. 벤치는 거의 비어 있다.', mins: 7, photo: ['file:Jardín Hôtel de Sens. 02.JPG']},
   ]],
   [/코냑 제/, [
-    { text: '사마리텐 백화점 창업주 부부의 수집품. 방 하나하나가 18세기 살롱처럼 꾸며져 있다.', mins: 15 },
-    { text: '부셰, 프라고나르, 그리고 손바닥만 한 코담배갑들.', mins: 20 },
-    { text: '관람객은 나까지 넷. 마룻바닥 소리만 난다.', mins: 10 },
+    { text: '사마리텐 백화점 창업주 부부의 수집품. 방 하나하나가 18세기 살롱처럼 꾸며져 있다.', mins: 15, photo: ['file:Cognacq-Jay musée intérieur XVIIIe.jpg']},
+    { text: '부셰, 프라고나르, 그리고 손바닥만 한 코담배갑들.', mins: 20, photo: ['file:MuséeCognacqJay-SalleWagram.JPG']},
+    { text: '관람객은 나까지 넷. 마룻바닥 소리만 난다.', mins: 10, photo: ['file:Hôtel de Donon cabinet nord.jpg']},
   ]],
   [/로지에 정원/, [
-    { text: '건물 사이 좁은 통로 끝에서 갑자기 초록이 열린다.', mins: 3 },
-    { text: '벤치에 앉는다. 담 너머 로지에 거리의 소음이 멀리서 들린다.', mins: 10 },
+    { text: '건물 사이 좁은 통로 끝에서 갑자기 초록이 열린다.', mins: 3, photo: ['file:Jardin des Rosiers - Joseph Migneret @ Paris (31114987335).jpg']},
+    { text: '벤치에 앉는다. 담 너머 로지에 거리의 소음이 멀리서 들린다.', mins: 10, photo: ['file:Jardin des Rosiers - Joseph Migneret @ Paris (31000836101).jpg']},
   ]],
   [/역사 도서관/, [
-    { text: '육중한 문 안쪽, 코린트식 벽기둥이 선 안뜰. 16세기 저택이다.', mins: 4 },
-    { text: '열람실 창 너머로 고개 숙인 사람들이 보인다.', mins: 4 },
+    { text: '육중한 문 안쪽, 코린트식 벽기둥이 선 안뜰. 16세기 저택이다.', mins: 4, photo: ["file:Hôtel d'Angoulème Lamoignon - février 2019.jpg"]},
+    { text: '열람실 창 너머로 고개 숙인 사람들이 보인다.', mins: 4, photo: ["file:Séeberger - Cour de l'hôtel Lamoignon - Rue Pavée - 24.jpg"]},
   ]],
 ];
 
