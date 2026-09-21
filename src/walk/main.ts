@@ -69,6 +69,7 @@ let places: Place[] = [];
 let avatar: Marker;
 const markers = new Map<string, Marker>();
 let openPlace: Place | null = null;
+let lastTap = { id: '', at: 0 };
 
 const fmtClock = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.floor(m % 60)).padStart(2, '0')}`;
 const line = (coords: LngLat[]) => ({ type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: coords } });
@@ -104,7 +105,7 @@ async function boot() {
     S.pos = graph.nodes[S.node];
     S.trail = [S.pos];
 
-    map = new maplibregl.Map({ container: 'map', style: st.style, center: S.pos, zoom: 18.4, pitch: 25, bearing: -20, attributionControl: { compact: true }, maxPitch: 85, maxZoom: 24 });
+    map = new maplibregl.Map({ container: 'map', style: st.style, center: S.pos, zoom: 18.4, pitch: 25, bearing: -20, attributionControl: { compact: true }, maxPitch: 85, maxZoom: 24, clickTolerance: 10 }); // 살짝 끌린 손가락은 클릭으로 치지 않는다
     map.on('load', () => {
       dressMap(st.fallback, ways);
       status.textContent = '';
@@ -150,10 +151,17 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
   map.on('click', (e) => {
     if (!S.started || S.finished) return;
     if (openPlace) { closeCard('pass'); return; }
-    // 색칠된 건물을 눌렀나?
+    // 색칠된 건물을 눌렀나? — 걷는 중에는 짧게 두 번(더블탭) 눌러야 멈춘다. 한 번은 방향 바꾸기.
     const hit = map.queryRenderedFeatures(e.point, { layers: ['hl'] })[0];
     const pl = hit && places.find((p) => p.id === hit.properties?.pid);
-    if (pl) { openCard(pl); return; }
+    const walking = S.path.length > 1;
+    if (pl && dist(S.pos, pl.pos) <= NEAR) {
+      const now = performance.now();
+      if (!walking || (lastTap.id === pl.id && now - lastTap.at < 450)) { lastTap = { id: '', at: 0 }; openCard(pl); return; }
+      lastTap = { id: pl.id, at: now };
+      toast(`${pl.emoji} ${pl.name} — 한 번 더 누르면 멈춰서 봅니다`);
+      return;
+    }
     walkTo([e.lngLat.lng, e.lngLat.lat], null);
   });
 }
@@ -411,6 +419,7 @@ function openCard(p: Place) {
     markers.get(p.id)?.getElement().classList.toggle('saved', S.saved.has(p.id));
     save.textContent = S.saved.has(p.id) ? '♥ 찜함' : '♡ 찜';
   };
+  $('#card-pass').textContent = S.path.length > 1 ? '지나치고 계속 걷는다' : '지나친다';
   $('#card-pass').onclick = () => closeCard('pass');
   $('#card').classList.add('on');
 }
