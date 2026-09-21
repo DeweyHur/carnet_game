@@ -29,6 +29,7 @@ button:disabled { opacity:.5; cursor:default; }
 .pl .nm { font-size:13px; font-weight:700; white-space:nowrap; }
 .pl.known:not(.found) { outline:2px dashed var(--blue); opacity:.9; }
 .pl.pop { animation:pop .5s cubic-bezier(.2,1.6,.4,1); }
+.pl.off { opacity:0; pointer-events:none; transition:opacity .35s; }
 .pl.visited { filter:grayscale(.2); outline:2px solid #3a9d5d; }
 .pl.saved::after { content:'♥'; color:var(--accent); font-size:13px; margin:0 4px 0 -2px; }
 @keyframes pop { from { transform:scale(0) translateY(10px); } to { transform:scale(1); } }

@@ -28,7 +28,13 @@ const TIME_SCALE = 9; // 화면에서는 9배속으로 걷는다
 const CAM_WALK = { zoom: 18.6, pitch: 64 };
 const CAM_LOOK = { zoom: 17.0, pitch: 48 };
 // 시선 모드: 카메라를 눈높이(1.7m)에 두고 거의 수평으로 본다. 걷기 시작하면 위에서 내려와 눈높이로 붙는다.
-const EYE = { alt: 1.7, pitch: 83, descendFrom: 45, descendSecs: 1.6 }; // pitch는 84까지만 안정적(그 이상은 MapLibre가 지평선 너머로 중심을 잡아 깨진다)
+// 3인칭 시점: 카메라를 내 뒤(back m)·위(alt m)에 두고 진행 방향을 내려다본다. 플레이어 모델은 없다.
+// pitch는 84까지만 안정적(그 이상은 MapLibre가 지평선 너머로 중심을 잡아 깨진다)
+const EYE = { alt: 5.5, back: 9, pitch: 76, descendFrom: 45, descendSecs: 1.6 };
+// 시야: 걷는 동안은 진행 방향 ±FOV° 안, SIGHT m 이내, 지금 걷는 길에서 STREET m 이내의 가게만 보인다.
+const FOV = 70;
+const SIGHT = 60;
+const STREET = 24;
 let eyeMode = (() => { try { return localStorage.getItem('carnet-walk-eye') !== '0'; } catch { return true; } })();
 let walkStartedAt = 0;
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -156,10 +162,17 @@ function showMarker(p: Place, pop: boolean) {
 
 function look() {
   for (const p of places) {
+    const vis = inSight(p);
+    const m = markers.get(p.id);
+    if (!vis) {
+      // 시야에서 벗어나면 지도에서도 사라진다(알던 곳의 핀과 이미 들어간 곳은 남는다)
+      if (m && !p.known && !S.visits.some((v) => v.place.id === p.id)) m.getElement().classList.add('off');
+      continue;
+    }
+    if (m) { m.getElement().classList.remove('off'); }
     if (S.seen.has(p.id)) continue;
-    if (dist(S.pos, p.pos) > VISION) continue;
     S.seen.set(p.id, S.clock);
-    if (markers.has(p.id)) markers.get(p.id)!.getElement().classList.add('pop', 'found');
+    if (m) m.getElement().classList.add('pop', 'found');
     else showMarker(p, true);
     if (p.curated) { sfx.spotBig(); toast(`${p.emoji} ${p.name}`); } else sfx.spot();
   }
@@ -202,7 +215,41 @@ function eyeFrame(bearing: number) {
   const t = Math.min(1, (performance.now() - walkStartedAt) / 1000 / EYE.descendSecs);
   const alt = smooth(EYE.descendFrom, EYE.alt, t);
   const pitch = smooth(CAM_WALK.pitch, EYE.pitch, t);
-  map.jumpTo(map.calculateCameraOptionsFromCameraLngLatAltRotation(S.pos, alt, bearing, pitch, 0)); // roll을 빼면 NaN이 들어가 행렬이 깨진다
+  const back = smooth(0, EYE.back, t);
+  map.jumpTo(map.calculateCameraOptionsFromCameraLngLatAltRotation(offset(S.pos, bearing + 180, back), alt, bearing, pitch, 0)); // roll을 빼면 NaN이 들어가 행렬이 깨진다
+}
+
+/** p에서 방위 brg 쪽으로 m미터 이동한 점 */
+function offset(p: LngLat, brg: number, m: number): LngLat {
+  const r = (brg * Math.PI) / 180;
+  return [p[0] + (Math.sin(r) * m) / (111320 * Math.cos((p[1] * Math.PI) / 180)), p[1] + (Math.cos(r) * m) / 111320];
+}
+
+/** 점 q가 선분 a–b에서 얼마나 떨어져 있나(m) */
+function distToSeg(q: LngLat, a: LngLat, b: LngLat): number {
+  const cos = Math.cos((q[1] * Math.PI) / 180);
+  const ax = (a[0] - q[0]) * cos * 111320, ay = (a[1] - q[1]) * 111320;
+  const bx = (b[0] - q[0]) * cos * 111320, by = (b[1] - q[1]) * 111320;
+  const dx = bx - ax, dy = by - ay;
+  const L = dx * dx + dy * dy;
+  const t = L ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L)) : 0;
+  const x = ax + dx * t, y = ay + dy * t;
+  return Math.sqrt(x * x + y * y);
+}
+
+/** 지금 이 순간 눈에 들어오는 곳인가 */
+function inSight(p: Place): boolean {
+  const d = dist(S.pos, p.pos);
+  if (d > (S.path.length > 1 ? SIGHT : VISION)) return false;
+  if (S.path.length > 1) {
+    const rel = ((bearing(S.pos, p.pos) - S.heading + 540) % 360) - 180;
+    if (Math.abs(rel) > FOV && d > 12) return false;
+    // 지금 걷는 길가에 있는 것만 — 앞으로 갈 몇 구간을 기준으로 잰다
+    let near = false;
+    for (let i = Math.max(0, S.seg - 1); i + 1 < S.path.length && i < S.seg + 8; i++) if (distToSeg(p.pos, S.path[i], S.path[i + 1]) <= STREET) { near = true; break; }
+    if (!near) return false;
+  }
+  return true;
 }
 
 let lastT = 0;
