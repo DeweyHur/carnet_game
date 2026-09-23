@@ -284,13 +284,13 @@ interface PlanOpts { at?: LngLat; only?: Mode }
 
 /** 출발 후보 → 도착 후보 중 가장 빠른 여정. only를 주면 그 수단만 쓴다. */
 export function planJourney(to: DistrictId, from: District, dest: District, opts: PlanOpts = {}): Journey | null {
-  const use = (lk: string) => !opts.only || LINES[lk].mode === opts.only;
+  const allowed = (lk: string) => !opts.only || LINES[lk].mode === opts.only;
   const boardPoints = (d: District) => {
     const out: { k: string; pos: LngLat }[] = [];
-    for (const st of d.stations) for (const l of st.lines) if (use(l)) out.push({ k: key(l, st.name), pos: st.gates[0].pos });
+    for (const st of d.stations) for (const l of st.lines) if (allowed(l)) out.push({ k: key(l, st.name), pos: st.gates[0].pos });
     // 버스는 정류장이 곧 타는 곳 — 지구 안에 있는 정류장을 전부 후보로
     for (const [lk, def] of Object.entries(LINES)) {
-      if (def.mode !== 'bus' || !use(lk)) continue;
+      if (def.mode !== 'bus' || !allowed(lk)) continue;
       for (const st of def.stations) {
         const pos = stopPos(lk, st);
         if (pos && inside(d, pos)) out.push({ k: key(lk, st), pos });
@@ -329,7 +329,7 @@ export function planJourney(to: DistrictId, from: District, dest: District, opts
     };
     if (i > 0) push(key(line, arr[i - 1]), cur.d + pace);
     if (i < arr.length - 1) push(key(line, arr[i + 1]), cur.d + pace);
-    for (const e of L.get(cur.k) ?? []) if (use(split(e.to)[0])) push(e.to, cur.d + e.mins, e.street);
+    for (const e of L.get(cur.k) ?? []) if (allowed(split(e.to)[0])) push(e.to, cur.d + e.mins, e.street);
   }
   if (!best) return null;
 
