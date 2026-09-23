@@ -1,8 +1,9 @@
 // 지하철로 다른 지구에 간다. 로딩 화면이 아니라, 초행자가 실제로 헤매는 자리만 골라 넣었다.
-// 방향(종착역 이름)을 고르고, 환승 통로를 걷고, 어느 출구로 올라올지 고른다.
+// 노선도를 보고 방향을 고르고, 환승 통로를 걷고, 어느 출구로 올라올지 고른다.
 import * as sfx from './sound';
-import { FARE } from './districts';
-import type { District, Exit, Journey, Leg } from './districts';
+import { FARE, journeyMins, rideInfo } from './districts';
+import type { District, Exit, Journey, Leg, Ride } from './districts';
+import { findPhoto } from './photos';
 
 export interface MetroResult { mins: number; cost: number; exit: Exit; wrong: number }
 
@@ -13,21 +14,66 @@ const el = (tag: string, cls?: string, text?: string) => {
   if (text) n.textContent = text;
   return n;
 };
-const badge = (line: string, color: string) => {
-  const b = el('i', 'mline', line);
-  b.style.background = color;
-  b.style.color = line === '1' ? '#1f1b16' : '#fff';
-  return b;
-};
-
-/** 화면 밖으로 밀려난 버튼에 포커스가 남으면 문서가 스크롤돼 요약 패널이 딸려 올라온다 */
+/** 화면 밖으로 밀려난 버튼에 포커스가 남으면 문서가 스크롤된다 */
 const blurActive = () => (document.activeElement as HTMLElement | null)?.blur();
 
 const WRONG_MINS = 7; // 반대 방향 플랫폼에 서서 한 정거장 갔다가 되돌아오기
 
+/** 사진 한 장을 비동기로 채운다. 못 찾으면 자리를 차지하지 않는다. */
+function photoBox(refs: string[] | undefined): HTMLElement {
+  const box = el('div', 'metro-photo');
+  if (!refs?.length) return box;
+  void findPhoto(refs).then((ph) => {
+    if (!ph || !box.isConnected) return;
+    box.style.backgroundImage = `url("${ph.src}")`;
+    box.classList.add('on');
+    box.appendChild(el('small', 'metro-credit', ph.credit));
+  });
+  return box;
+}
+
+/**
+ * 세로 노선도. 위가 stations[0] 방향, 아래가 마지막 역 방향.
+ * 지금 서 있는 역과 내려야 할 역을 표시하고, 필요한 만큼만 잘라 보여 준다.
+ */
+function routeMap(r: Ride, onPick?: (dir: 0 | 1) => void) {
+  const wrap = el('div', 'route');
+  wrap.style.setProperty('--c', r.color);
+  const lo = Math.max(0, Math.min(r.a, r.b) - 1);
+  const hi = Math.min(r.stations.length - 1, Math.max(r.a, r.b) + 1);
+
+  const end = (dir: 0 | 1) => {
+    const name = r.dirs[dir];
+    const cut = dir === 0 ? lo > 0 : hi < r.stations.length - 1;
+    const node = el(onPick ? 'button' : 'div', `term ${onPick ? 'pick' : ''}`);
+    node.appendChild(el('span', 'arrow', dir === 0 ? '↑' : '↓'));
+    const mid = el('span', 'term-mid');
+    mid.appendChild(el('small', '', cut ? `${Math.abs((dir === 0 ? lo : r.stations.length - 1 - hi))}개 역 지나 · direction` : 'direction'));
+    mid.appendChild(el('b', '', name));
+    node.appendChild(mid);
+    if (onPick) (node as HTMLButtonElement).onclick = () => onPick(dir);
+    return node;
+  };
+
+  wrap.appendChild(end(0));
+  const rail = el('div', 'rail');
+  for (let i = lo; i <= hi; i++) {
+    const row = el('div', 'stop');
+    row.dataset.i = String(i);
+    row.appendChild(el('i', 'dot'));
+    row.appendChild(el('span', 'nm', r.stations[i]));
+    if (i === r.a) { row.classList.add('here'); row.appendChild(el('em', 'tag now', '지금 여기')); }
+    if (i === r.b) { row.classList.add('target'); row.appendChild(el('em', 'tag off', '여기서 내린다')); }
+    rail.appendChild(row);
+  }
+  wrap.appendChild(rail);
+  wrap.appendChild(end(1));
+  return { wrap, rail };
+}
+
 /**
  * 역에 내려가서 목적지 지구의 지상까지. 취소하면 null.
- * 도중에 dest 지구 데이터를 미리 받아 두라고 preload를 불러 준다.
+ * 타는 동안 목적지 지구 데이터를 미리 받아 두라고 preload를 불러 준다.
  */
 export function openMetro(from: District, dest: District, j: Journey, preload: () => void): Promise<MetroResult | null> {
   return new Promise((resolve) => {
@@ -36,11 +82,12 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
     let wrong = 0;
     let step = 0;
 
-    const show = (node: HTMLElement) => { root.replaceChildren(node); root.classList.add('on'); };
+    const show = (node: HTMLElement) => { root.replaceChildren(node); root.classList.add('on'); root.scrollTop = 0; };
     const close = (r: MetroResult | null) => { root.classList.remove('on'); root.replaceChildren(); resolve(r); };
 
-    const shell = (line: string, title: string, sub?: string) => {
+    const shell = (line: string, title: string, sub?: string, photo?: string[]) => {
       const w = el('div', 'metro-sheet');
+      w.appendChild(photoBox(photo));
       w.appendChild(el('p', 'metro-eyebrow', line));
       w.appendChild(el('h2', '', title));
       if (sub) w.appendChild(el('p', 'metro-sub', sub));
@@ -49,10 +96,13 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
       w.appendChild(t);
       return w;
     };
+    const bumpRun = (w: HTMLElement) => { const r = w.querySelector('.metro-run'); if (r) r.textContent = `여기까지 ${mins}분`; };
 
     // ── 0. 들어갈까
     const gate = () => {
-      const w = shell(`Ⓜ ${from.station.name}`, `${dest.name}까지 가려면`, `${j.legs.filter((l) => l.kind === 'ride').map((l) => `${l.kind === 'ride' ? l.line : ''}호선`).join(' → ')} · 환승 ${j.legs.filter((l) => l.kind === 'transfer').length}번 · 약 ${j.mins}분`);
+      const lines = j.legs.filter((l) => l.kind === 'ride').map((l) => `${l.line}호선`).join(' → ');
+      const nTransfer = j.legs.filter((l) => l.kind === 'transfer').length;
+      const w = shell(`Ⓜ ${from.station.name}`, `${dest.name}까지 가려면`, `${lines} · 환승 ${nTransfer}번 · 약 ${journeyMins(j)}분`, from.station.photo);
       const ticket = el('div', 'ticket');
       ticket.appendChild(el('b', '', 'Ticket t+'));
       ticket.appendChild(el('span', '', `메트로·전철 1회권 €${FARE.toFixed(2)}`));
@@ -61,68 +111,82 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
       const go = el('button', 'primary', '표를 찍고 내려간다') as HTMLButtonElement;
       go.onclick = () => { blurActive(); sfx.tick(); mins += 3; preload(); next(); };
       const no = el('button', '', '그만둔다');
-      no.onclick = () => close(null);
+      no.onclick = () => { blurActive(); close(null); };
       acts.append(go, no);
       w.appendChild(acts);
       show(w);
     };
 
-    // ── 1~n. 각 구간
-    const leg = (l: Leg) => {
-      if (l.kind === 'transfer') {
-        const w = shell(`${l.at} 환승`, `${l.from}호선에서 ${l.to}호선으로`, l.note);
-        const acts = el('div', 'acts');
-        const go = el('button', 'primary', `통로를 걷는다 (${l.mins}분)`) as HTMLButtonElement;
-        go.onclick = () => {
-          blurActive();
-          go.disabled = true;
-          for (let i = 0; i < 5; i++) sfx.stair(i);
-          mins += l.mins;
-          setTimeout(next, 900);
-        };
-        acts.appendChild(go);
-        w.appendChild(acts);
-        show(w);
-        return;
-      }
-      const w = shell(`${l.from} 승강장`, '어느 방향?', `여기서 ${l.stops}정거장. 파리 지하철은 가는 방향을 종착역 이름으로 적어 둔다.`);
-      const badgeRow = el('div', 'metro-line');
-      badgeRow.append(badge(l.line, l.color), el('span', '', `${l.from} → ${l.to}`));
-      w.appendChild(badgeRow);
-      const picks = el('div', 'dirs');
-      l.dirs.forEach((d, i) => {
-        const b = el('button', 'dir') as HTMLButtonElement;
-        b.appendChild(el('small', '', 'direction'));
-        b.appendChild(el('b', '', d));
-        b.onclick = () => {
-          blurActive();
-          if (i === l.right) {
-            sfx.enter();
-            mins += l.mins;
-            [...picks.children].forEach((c) => ((c as HTMLButtonElement).disabled = true));
-            b.classList.add('ok');
-            const ride = el('p', 'metro-ride', `${l.via}를 지나 ${l.to}. 창밖은 어둡고, 유리에 얼굴이 비친다.`);
-            w.appendChild(ride);
-            setTimeout(next, 1400);
-          } else {
-            wrong++;
-            mins += WRONG_MINS;
-            b.classList.add('bad');
-            const p = w.querySelector('.metro-wrong') ?? w.appendChild(el('p', 'metro-wrong'));
-            p.textContent = `반대 방향이었다. 한 정거장 가서 내려 반대편 승강장으로 건너왔다. (+${WRONG_MINS}분)`;
-            const run = w.querySelector('.metro-run');
-            if (run) run.textContent = `여기까지 ${mins}분`;
+    // ── 환승
+    const transfer = (l: Extract<Leg, { kind: 'transfer' }>) => {
+      const w = shell(`${l.at} 환승`, `${l.from}호선에서 ${l.to}호선으로`, l.note, l.photo);
+      const acts = el('div', 'acts');
+      const go = el('button', 'primary', `통로를 걷는다 (${l.mins}분)`) as HTMLButtonElement;
+      go.onclick = () => {
+        blurActive();
+        go.disabled = true;
+        for (let i = 0; i < 5; i++) sfx.stair(i);
+        mins += l.mins;
+        setTimeout(next, 900);
+      };
+      acts.appendChild(go);
+      w.appendChild(acts);
+      show(w);
+    };
+
+    // ── 타기: 노선도에서 방향을 고른다
+    const ride = (l: Extract<Leg, { kind: 'ride' }>) => {
+      const r = rideInfo(l);
+      const w = shell(`Ⓜ${l.line} · ${l.from} 승강장`, `${l.to}까지 ${r.stops}정거장`,
+        '파리 지하철은 가는 방향을 종착역 이름으로 적어 둔다. 노선도에서 내려야 할 역이 위인지 아래인지 보고 고르면 된다.', l.photo);
+
+      const pick = (dir: 0 | 1) => {
+        blurActive();
+        if (dir !== r.right) {
+          wrong++;
+          mins += WRONG_MINS;
+          bumpRun(w);
+          const p = (w.querySelector('.metro-wrong') as HTMLElement | null) ?? w.appendChild(el('p', 'metro-wrong'));
+          p.textContent = `${r.dirs[dir]} 방향은 반대쪽이다. 한 정거장 가서 내려 반대편 승강장으로 건너왔다. (+${WRONG_MINS}분)`;
+          const b = wrap.querySelectorAll('.term.pick')[dir];
+          b.classList.add('bad');
+          return;
+        }
+        sfx.enter();
+        mins += r.mins;
+        bumpRun(w);
+        for (const b of wrap.querySelectorAll('.term.pick')) (b as HTMLButtonElement).disabled = true;
+        wrap.querySelectorAll('.term.pick')[dir].classList.add('ok');
+        // 한 역씩 지나간다
+        const rows = [...rail.querySelectorAll<HTMLElement>('.stop')];
+        const at = (i: number) => rows.find((x) => Number(x.dataset.i) === i);
+        const stepDir = r.b > r.a ? 1 : -1;
+        let cur = r.a;
+        const tickTo = () => {
+          at(cur)?.classList.remove('here');
+          at(cur)?.querySelector('.tag.now')?.remove();
+          cur += stepDir;
+          const row = at(cur);
+          if (row) {
+            row.classList.add('here', 'passing');
+            if (cur !== r.b) row.appendChild(el('em', 'tag now', '지나간다'));
+            sfx.tick();
           }
+          if (cur !== r.b) setTimeout(tickTo, 700);
+          else setTimeout(next, 1100);
         };
-        picks.appendChild(b);
-      });
-      w.appendChild(picks);
+        setTimeout(tickTo, 500);
+      };
+
+      const { wrap, rail } = routeMap(r, pick);
+      w.appendChild(wrap);
       show(w);
     };
 
     // ── 마지막. 어느 출구로
     const exits = () => {
-      const w = shell(`Ⓜ ${dest.station.name} 도착`, '어느 출구로 올라갈까', '같은 역이라도 출구마다 다른 데로 나온다. 지상에서 보이는 첫 장면이 달라진다.');
+      const w = shell(`Ⓜ ${dest.station.name} 도착`, '어느 출구로 올라갈까',
+        '같은 역이라도 출구마다 다른 데로 나온다. 지상에서 보이는 첫 장면이 달라진다.', dest.station.photo);
       const list = el('div', 'exits');
       for (const x of dest.station.exits) {
         const b = el('button', 'exit') as HTMLButtonElement;
@@ -130,7 +194,7 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
         b.appendChild(el('small', '', x.note));
         b.onclick = () => {
           blurActive();
-          [...list.children].forEach((c) => ((c as HTMLButtonElement).disabled = true));
+          for (const c of list.children) (c as HTMLButtonElement).disabled = true;
           mins += x.mins;
           for (let i = 0; i < 6; i++) sfx.stair(i);
           sfx.surface();
@@ -143,8 +207,9 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
     };
 
     const next = () => {
-      if (step < j.legs.length) { leg(j.legs[step++]); return; }
-      exits();
+      if (step >= j.legs.length) { exits(); return; }
+      const l = j.legs[step++];
+      if (l.kind === 'transfer') transfer(l); else ride(l);
     };
 
     gate();

@@ -18,6 +18,7 @@ export interface Station {
   lines: string[];
   pos: LngLat; // 지상 입구
   exits: Exit[]; // 이 역에 내렸을 때 고를 수 있는 출구
+  photo?: string[]; // 위키미디어 공용 후보(승강장 등)
 }
 
 export interface District {
@@ -45,6 +46,7 @@ export const DISTRICTS: Record<DistrictId, District> = {
     station: {
       name: 'Saint-Paul',
       lines: ['1'],
+      photo: ['file:Station Saint Paul Métro Paris - Paris IV (FR75) - 2025-10-17 - 3.jpg', 'file:St-Paul (1) par Cramos.JPG'],
       pos: [2.3612, 48.8552],
       exits: [
         { label: 'Rue de Rivoli — 생폴 성당 쪽', note: '큰길로 곧장. 성당 정면과 로지에 거리 방향.', pos: [2.3612, 48.8552], mins: 2 },
@@ -63,6 +65,7 @@ export const DISTRICTS: Record<DistrictId, District> = {
     station: {
       name: 'Saint-Michel',
       lines: ['4'],
+      photo: ['file:Saint-Michel-quais-depuis-puits-dacces.jpg'],
       pos: [2.3443, 48.8534],
       exits: [
         { label: 'Place Saint-Michel — 분수 쪽', note: '대천사 분수 앞. 사람이 제일 많고 어디로든 갈 수 있다.', pos: [2.3443, 48.8534], mins: 2 },
@@ -76,39 +79,79 @@ export const DISTRICTS: Record<DistrictId, District> = {
 // ───────── 지하철 ─────────
 export const FARE = 2.55; // 2026년 Île-de-France 메트로·전철 1회권
 
-export type Leg =
-  | { kind: 'ride'; line: string; color: string; from: string; to: string; dirs: [string, string]; right: 0 | 1; stops: number; mins: number; via: string }
-  | { kind: 'transfer'; at: string; from: string; to: string; mins: number; note: string };
+/** 노선의 전체 역 순서. 방향 이름(종착역)·정거장 수·중간 역이 전부 여기서 나온다. */
+export const LINES: Record<string, { color: string; ink: string; stations: string[] }> = {
+  '1': {
+    color: '#ffcd00', ink: '#1f1b16',
+    stations: ['La Défense', 'Esplanade de La Défense', 'Pont de Neuilly', 'Les Sablons', 'Porte Maillot', 'Argentine', 'Charles de Gaulle – Étoile', 'George V', 'Franklin D. Roosevelt', 'Champs-Élysées – Clemenceau', 'Concorde', 'Tuileries', 'Palais Royal – Musée du Louvre', 'Louvre – Rivoli', 'Châtelet', 'Hôtel de Ville', 'Saint-Paul', 'Bastille', 'Gare de Lyon', 'Reuilly – Diderot', 'Nation', 'Porte de Vincennes', 'Saint-Mandé', 'Bérault', 'Château de Vincennes'],
+  },
+  '4': {
+    color: '#bf3283', ink: '#fff',
+    stations: ['Porte de Clignancourt', 'Simplon', 'Marcadet – Poissonniers', 'Château Rouge', 'Barbès – Rochechouart', 'Gare du Nord', "Gare de l'Est", "Château d'Eau", 'Strasbourg – Saint-Denis', 'Réaumur – Sébastopol', 'Étienne Marcel', 'Les Halles', 'Châtelet', 'Cité', 'Saint-Michel', 'Odéon', 'Saint-Germain-des-Prés', 'Saint-Sulpice', 'Saint-Placide', 'Montparnasse – Bienvenüe', 'Vavin', 'Raspail', 'Denfert-Rochereau', 'Mouton-Duvernet', 'Alésia', "Porte d'Orléans", 'Mairie de Montrouge', 'Barbara', 'Bagneux – Lucie Aubrac'],
+  },
+};
 
-export interface Journey {
-  to: DistrictId;
-  mins: number; // 안내에 적히는 대략 시간
-  legs: Leg[];
+export type Leg =
+  | { kind: 'ride'; line: string; from: string; to: string; photo?: string[] }
+  | { kind: 'transfer'; at: string; from: string; to: string; mins: number; note: string; photo?: string[] };
+
+export interface Ride {
+  stations: string[]; // 노선 전체
+  a: number; b: number; // 출발·도착 인덱스
+  dirs: [string, string]; // [위쪽 종착역, 아래쪽 종착역] = stations[0], stations.at(-1)
+  right: 0 | 1; // 맞는 방향
+  stops: number;
+  mins: number;
+  color: string;
+  ink: string;
 }
 
-const LINE_COLOR: Record<string, string> = { '1': '#ffcd00', '4': '#bf3283', '11': '#8d5e2a' };
-const c = (l: string) => LINE_COLOR[l] ?? '#555';
+/** 노선표에서 방향·정거장 수·소요 시간을 계산한다. 손으로 적어 두면 틀린다. */
+export function rideInfo(l: { line: string; from: string; to: string }): Ride {
+  const L = LINES[l.line];
+  const a = L.stations.indexOf(l.from);
+  const b = L.stations.indexOf(l.to);
+  if (a < 0 || b < 0) throw new Error(`${l.line}호선에 없는 역: ${a < 0 ? l.from : l.to}`);
+  const stops = Math.abs(b - a);
+  return {
+    stations: L.stations, a, b,
+    dirs: [L.stations[0], L.stations[L.stations.length - 1]],
+    right: b > a ? 1 : 0,
+    stops,
+    mins: Math.max(2, Math.round(stops * 1.6) + 1),
+    color: L.color, ink: L.ink,
+  };
+}
+
+export interface Journey { to: DistrictId; legs: Leg[] }
+
+const HARP = 'file:2018 Paris Metro harpist at Chatelet station between no. 1 and no. 4 lines.jpg';
+const MP05 = 'file:Rame MP05 Station Gare Lyon Métro Paris Ligne 1 - Paris XII (FR75) - 2025-10-31 - 1.jpg';
 
 export const JOURNEYS: Record<string, Journey> = {
   'marais>saint-germain': {
     to: 'saint-germain',
-    mins: 16,
     legs: [
-      { kind: 'ride', line: '1', color: c('1'), from: 'Saint-Paul', to: 'Châtelet', dirs: ['La Défense', 'Château de Vincennes'], right: 0, stops: 2, mins: 4, via: 'Hôtel de Ville' },
-      { kind: 'transfer', at: 'Châtelet', from: '1', to: '4', mins: 5, note: '1호선에서 4호선까지 통로가 길다. 사람들 사이를 따라 걷는 수밖에 없다.' },
-      { kind: 'ride', line: '4', color: c('4'), from: 'Châtelet', to: 'Saint-Michel', dirs: ['Porte de Clignancourt', 'Bagneux – Lucie Aubrac'], right: 1, stops: 2, mins: 4, via: 'Cité' },
+      { kind: 'ride', line: '1', from: 'Saint-Paul', to: 'Châtelet', photo: [MP05] },
+      { kind: 'transfer', at: 'Châtelet', from: '1', to: '4', mins: 5, photo: [HARP, 'file:St-Paul couloirs par Cramos.JPG'],
+        note: '1호선에서 4호선까지 통로가 길다. 사람들 사이를 따라 걷는 수밖에 없고, 중간에 악기 소리가 들린다.' },
+      { kind: 'ride', line: '4', from: 'Châtelet', to: 'Saint-Michel', photo: ['file:Metro Paris - Ligne 4 - station Chatelet 01.jpg', 'file:MP89cc Ligne 4.jpg'] },
     ],
   },
   'saint-germain>marais': {
     to: 'marais',
-    mins: 16,
     legs: [
-      { kind: 'ride', line: '4', color: c('4'), from: 'Saint-Michel', to: 'Châtelet', dirs: ['Porte de Clignancourt', 'Bagneux – Lucie Aubrac'], right: 0, stops: 2, mins: 4, via: 'Cité' },
-      { kind: 'transfer', at: 'Châtelet', from: '4', to: '1', mins: 5, note: '올라갔다 내려갔다 하는 환승. 표지판의 노란 1호선만 따라간다.' },
-      { kind: 'ride', line: '1', color: c('1'), from: 'Châtelet', to: 'Saint-Paul', dirs: ['La Défense', 'Château de Vincennes'], right: 1, stops: 2, mins: 4, via: 'Hôtel de Ville' },
+      { kind: 'ride', line: '4', from: 'Saint-Michel', to: 'Châtelet', photo: ['file:MP89cc Ligne 4.jpg'] },
+      { kind: 'transfer', at: 'Châtelet', from: '4', to: '1', mins: 5, photo: [HARP, 'file:M4 Châtelet rush hour.jpg'],
+        note: '올라갔다 내려갔다 하는 환승. 표지판의 노란 1호선만 따라간다.' },
+      { kind: 'ride', line: '1', from: 'Châtelet', to: 'Saint-Paul', photo: [MP05] },
     ],
   },
 };
+
+/** 안내에 적히는 대략 시간(표 찍고 내려가는 3분 + 출구 2분 포함) */
+export const journeyMins = (j: Journey) =>
+  5 + j.legs.reduce((n, l) => n + (l.kind === 'transfer' ? l.mins : rideInfo(l).mins), 0);
 
 export const journeyFor = (from: DistrictId, to: DistrictId) => JOURNEYS[`${from}>${to}`];
 export const otherDistrict = (id: DistrictId): DistrictId => (id === 'marais' ? 'saint-germain' : 'marais');
