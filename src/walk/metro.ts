@@ -2,12 +2,12 @@
 // 노선도를 보고 방향을 고르고, 환승 통로를 걷고, 어느 출구로 올라올지 고른다.
 import * as sfx from './sound';
 import { FARE, journeyMins, rideInfo } from './districts';
-import type { District, Exit, Journey, Leg, Ride } from './districts';
+import type { District, Gate, Journey, Leg, Ride } from './districts';
 import { findPhoto } from './photos';
 import { STATION_POS } from './stations';
 import type { LngLat } from './graph';
 
-export interface MetroResult { mins: number; cost: number; exit: Exit; wrong: number }
+export interface MetroResult { mins: number; cost: number; exit: Gate; wrong: number }
 
 /** 지하철을 타는 동안 뒤에 보이는 지도. main.ts가 구현한다. */
 export interface MetroMap {
@@ -16,7 +16,7 @@ export interface MetroMap {
   /** 전동차를 from에서 to까지 ms 동안 움직인다 */
   train(from: LngLat, to: LngLat, ms: number): void;
   /** 출구를 지도에 찍는다. 핀을 누르면 pick(i) */
-  exits(list: Exit[], at: LngLat, pick: (i: number) => void): void;
+  exits(list: Gate[], at: LngLat, pick: (i: number) => void): void;
   markExit(i: number): void;
   clear(): void;
 }
@@ -90,7 +90,7 @@ function routeMap(r: Ride, onPick?: (dir: 0 | 1) => void) {
  * 역에 내려가서 목적지 지구의 지상까지. 취소하면 null.
  * 타는 동안 목적지 지구 데이터를 미리 받아 두라고 preload를 불러 준다.
  */
-export function openMetro(from: District, dest: District, j: Journey, preload: () => void, gis: MetroMap): Promise<MetroResult | null> {
+export function openMetro(from: District, dest: District, j: Journey, entered: Gate, preload: () => void, gis: MetroMap): Promise<MetroResult | null> {
   return new Promise((resolve) => {
     const root = $('#metro');
     let mins = 0;
@@ -122,7 +122,7 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
     const gate = () => {
       const lines = j.legs.filter((l) => l.kind === 'ride').map((l) => `${l.line}호선`).join(' → ');
       const nTransfer = j.legs.filter((l) => l.kind === 'transfer').length;
-      const w = shell(`Ⓜ ${from.station.name}`, `${dest.name}까지 가려면`, `${lines} · 환승 ${nTransfer}번 · 약 ${journeyMins(j)}분`, from.station.photo);
+      const w = shell(`Ⓜ ${from.station.name} · ${entered.label}`, `${dest.name}까지 가려면`, `${lines} · 환승 ${nTransfer}번 · 약 ${journeyMins(j)}분`, from.station.photo);
       const ticket = el('div', 'ticket');
       ticket.appendChild(el('b', '', 'Ticket t+'));
       ticket.appendChild(el('span', '', `메트로·전철 1회권 €${FARE.toFixed(2)}`));
@@ -232,10 +232,10 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
     // ── 마지막. 어느 출구로
     const exits = () => {
       const w = shell(`Ⓜ ${dest.station.name} 도착`, '어느 출구로 올라갈까',
-        '지도에 찍힌 번호가 출구 위치다. 같은 역이라도 출구마다 다른 데로 나오고, 지상에서 보이는 첫 장면이 달라진다.', dest.station.photo);
+        '지도에 찍힌 게 실제 출구 위치다. 같은 역이라도 출구마다 다른 데로 나오고, 지상에서 보이는 첫 장면이 달라진다.', dest.station.photo);
       const list = el('div', 'exits');
       const take = (i: number) => {
-        const x = dest.station.exits[i];
+        const x = dest.station.gates[i];
         blurActive();
         for (const c of list.children) (c as HTMLButtonElement).disabled = true;
         gis.markExit(i);
@@ -244,11 +244,11 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
         sfx.surface();
         setTimeout(() => close({ mins, cost: FARE, exit: x, wrong }), 1500);
       };
-      dest.station.exits.forEach((x, i) => {
+      dest.station.gates.forEach((x, i) => {
         const b = el('button', 'exit') as HTMLButtonElement;
-        const no = el('em', 'exit-no', String(i + 1));
+        const no = el('em', 'exit-no', x.ref);
         const mid = el('span', 'exit-mid');
-        mid.appendChild(el('b', '', `Sortie · ${x.label}`));
+        mid.appendChild(el('b', '', `Sortie ${x.ref} · ${x.label}`));
         mid.appendChild(el('small', '', x.note));
         b.append(no, mid);
         b.onclick = () => take(i);
@@ -257,7 +257,7 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
       w.appendChild(list);
       show(w, true);
       const at = STATION_POS[dest.station.name] ?? dest.station.pos;
-      gis.exits(dest.station.exits, at, take);
+      gis.exits(dest.station.gates, at, take);
     };
 
     const next = () => {

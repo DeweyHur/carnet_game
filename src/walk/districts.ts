@@ -6,8 +6,10 @@ import { CURATED_SG } from './saintgermain';
 
 export type DistrictId = 'marais' | 'saint-germain';
 
-export interface Exit {
-  label: string; // 출구 표지에 적힌 것
+/** 지하철 출입구 하나(OSM railway=subway_entrance). 들어갈 때도 나올 때도 같은 구멍이다. */
+export interface Gate {
+  ref: string; // 표지판의 출구 번호(sortie)
+  label: string; // 출구 이름 — 표지판에 적힌 그대로
   note: string; // 올라오면 무엇이 보이나
   pos: LngLat;
   mins: number; // 개찰구에서 지상까지
@@ -16,8 +18,8 @@ export interface Exit {
 export interface Station {
   name: string;
   lines: string[];
-  pos: LngLat; // 지상 입구
-  exits: Exit[]; // 이 역에 내렸을 때 고를 수 있는 출구
+  pos: LngLat; // 역 자체의 위치(노선도·지도 중심용)
+  gates: Gate[]; // 이 역의 출입구 — 가까운 데로 들어가고, 내릴 땐 골라서 나온다
   photo?: string[]; // 위키미디어 공용 후보(승강장 등)
 }
 
@@ -30,8 +32,6 @@ export interface District {
   station: Station;
   /** 처음 시작할 때 서 있는 자리(마레만 쓴다) */
   start: LngLat;
-  /** 지상으로 올라온 순간 한 줄 */
-  surface: string;
 }
 
 export const DISTRICTS: Record<DistrictId, District> = {
@@ -41,16 +41,16 @@ export const DISTRICTS: Record<DistrictId, District> = {
     full: '마레 지구 · 3·4구',
     data: 'walk/marais.json',
     curated: CURATED_MARAIS,
-    start: [2.3612, 48.8552],
-    surface: '리볼리 거리의 소음. 등 뒤로 생폴 성당의 정면이 골목 끝에 솟아 있다.',
+    start: [2.360296, 48.855267],
     station: {
       name: 'Saint-Paul',
       lines: ['1'],
       photo: ['file:Station Saint Paul Métro Paris - Paris IV (FR75) - 2025-10-17 - 3.jpg', 'file:St-Paul (1) par Cramos.JPG'],
       pos: [2.3612, 48.8552],
-      exits: [
-        { label: 'Rue de Rivoli — 생폴 성당 쪽', note: '큰길로 곧장. 성당 정면과 로지에 거리 방향.', pos: [2.3612, 48.8552], mins: 2 },
-        { label: 'Rue Saint-Antoine — 보주 광장 쪽', note: '동쪽으로 조금 더. 광장과 쉴리 저택이 가깝다.', pos: [2.3630, 48.8550], mins: 3 },
+      // 생폴 역은 리볼리 거리 양쪽에 구멍이 하나씩, 그게 전부다(OSM).
+      gates: [
+        { ref: '1', label: 'Rue de Rivoli — 남쪽 보도', note: '생폴 성당 정면과 생탕투안 거리, 보주 광장 방향.', pos: [2.360296, 48.855267], mins: 2 },
+        { ref: '1', label: 'Rue de Rivoli — 북쪽 보도', note: '길을 건너지 않고 로지에 거리와 마레 안쪽으로.', pos: [2.360125, 48.855312], mins: 2 },
       ],
     },
   },
@@ -60,17 +60,17 @@ export const DISTRICTS: Record<DistrictId, District> = {
     full: '생제르맹–라탱 · 5·6구',
     data: 'walk/saint-germain.json',
     curated: CURATED_SG,
-    start: [2.3443, 48.8534],
-    surface: '계단을 올라오면 바로 분수 소리. 강 건너로 시테섬이 보인다.',
+    start: [2.34423, 48.853265],
     station: {
       name: 'Saint-Michel',
       lines: ['4'],
       photo: ['file:Saint-Michel-quais-depuis-puits-dacces.jpg'],
       pos: [2.3443, 48.8534],
-      exits: [
-        { label: 'Place Saint-Michel — 분수 쪽', note: '대천사 분수 앞. 사람이 제일 많고 어디로든 갈 수 있다.', pos: [2.3443, 48.8534], mins: 2 },
-        { label: 'Quai des Grands-Augustins — 강 쪽', note: '강변으로 바로. 헌책 좌판과 다리, 노트르담 쪽 풍경.', pos: [2.3430, 48.8540], mins: 3 },
-        { label: 'Rue de la Huchette — 골목 쪽', note: '좁은 식당 골목 한복판. 생세브랭 성당이 코앞이다.', pos: [2.3457, 48.8528], mins: 2 },
+      gates: [
+        { ref: '1', label: 'Quai Saint-Michel — 노트르담 쪽', note: '강변으로 바로 나온다. 헌책 좌판, 다리 건너 노트르담.', pos: [2.34447, 48.853499], mins: 3 },
+        { ref: '2', label: 'Place Saint-Michel', note: '광장 한복판. 사람이 제일 많고 어디로든 갈 수 있다.', pos: [2.34423, 48.853265], mins: 2 },
+        { ref: '3', label: 'Fontaine Saint-Michel — 분수 앞', note: '대천사 분수 바로 앞. 파리 사람들의 약속 장소.', pos: [2.343635, 48.853288], mins: 2 },
+        { ref: '4', label: 'Place Saint-André-des-Arts', note: '광장 뒤 좁은 골목 쪽. 부시 거리와 오데옹 방향.', pos: [2.342704, 48.853146], mins: 2 },
       ],
     },
   },

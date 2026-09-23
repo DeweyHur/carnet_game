@@ -12,7 +12,7 @@ import { CAT_INFO, TASTE_OF, parsePlaces } from './places';
 import type { Place, Taste } from './places';
 import { loadDistrict } from './data';
 import { DISTRICTS, journeyFor, otherDistrict } from './districts';
-import type { District, DistrictId } from './districts';
+import type { District, DistrictId, Gate } from './districts';
 import { ALL_RICH } from './rich';
 import { openMetro } from './metro';
 import type { MetroMap } from './metro';
@@ -68,6 +68,7 @@ const S = {
   trail: [START] as LngLat[],
   origin: START as LngLat,
   travelTo: null as DistrictId | null,
+  travelGate: null as Gate | null,
   started: false,
   finished: false,
 };
@@ -383,46 +384,55 @@ function arrive() {
   const t = S.target;
   S.target = null;
   camera('look');
-  if (S.travelTo) { const to = S.travelTo; S.travelTo = null; void ride(to); return; }
+  if (S.travelTo) { const to = S.travelTo; const g = S.travelGate ?? nearestGate(); S.travelTo = null; S.travelGate = null; void ride(to, g); return; }
   if (t) openCard(t);
 }
 
 // ───────── 지구 사이 이동 ─────────
 
 /** 역까지 걸어가서 지하철을 탄다. 역에서 멀면 먼저 걷는다. */
-function travel(to: DistrictId) {
+/** 지금 자리에서 가장 가까운 출입구 */
+function nearestGate(): Gate {
+  return district.station.gates.reduce((a, b) => (dist(S.pos, b.pos) < dist(S.pos, a.pos) ? b : a));
+}
+
+function travel(to: DistrictId, gate?: Gate) {
   if (!S.started || S.finished || openPlace || metroOpen) return;
-  const st = district.station;
-  // 버튼 한 번으로 순간이동하지 않는다. 지도에 찍힌 역 입구까지 걸어가서 들어간다.
-  if (dist(S.pos, st.pos) > 15) {
+  const g = gate ?? nearestGate();
+  // 버튼 한 번으로 순간이동하지 않는다. 지도에 찍힌 그 출입구까지 걸어가서 내려간다.
+  if (dist(S.pos, g.pos) > 12) {
     S.travelTo = to;
-    walkTo(st.pos, null);
-    toast(`Ⓜ ${st.name} 입구로 걸어갑니다`);
-    hint('지하철 입구까지 걸어갑니다. 도착하면 표를 찍고 내려갑니다.');
+    S.travelGate = g;
+    walkTo(g.pos, null);
+    toast(`Ⓜ ${g.label} 입구로 걸어갑니다`);
+    hint(`${district.station.name} · ${g.label} 입구까지 걸어갑니다.`);
     return;
   }
-  void ride(to);
+  void ride(to, g);
 }
 
 // ───────── 지하철을 탈 때의 지도 ─────────
 let metroOpen = false;
-let stationMarker: Marker | null = null;
+const gateMarkers: Marker[] = [];
 let trainMarker: Marker | null = null;
 const stopMarkers: Marker[] = [];
 const exitMarkers: Marker[] = [];
 let trainAnim = 0;
 
-/** 지금 지구의 지하철 입구를 지도에 찍는다. 눌러도 지하철을 탈 수 있다. */
+/** 지금 지구의 지하철 출입구를 전부 지도에 찍는다. 눌러 둔 그 구멍으로 들어간다. */
 function showStationMarker() {
-  stationMarker?.remove();
+  for (const m of gateMarkers) m.remove();
+  gateMarkers.length = 0;
   const st = district.station;
-  const el = document.createElement('div');
-  el.className = 'mstation';
-  el.innerHTML = `<span class="m">Ⓜ</span><span class="nm"></span>`;
-  el.querySelector('.nm')!.textContent = st.name;
-  el.title = '지하철 입구';
-  el.addEventListener('click', (ev) => { ev.stopPropagation(); travel(otherDistrict(district.id)); });
-  stationMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(st.pos).addTo(map);
+  for (const g of st.gates) {
+    const el = document.createElement('div');
+    el.className = 'mstation';
+    el.innerHTML = `<span class="m">Ⓜ</span><span class="nm"></span>`;
+    el.querySelector('.nm')!.textContent = g.label.split('—')[0].trim();
+    el.title = `${st.name} · ${g.label} (sortie ${g.ref})`;
+    el.addEventListener('click', (ev) => { ev.stopPropagation(); travel(otherDistrict(district.id), g); });
+    gateMarkers.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(g.pos).addTo(map));
+  }
 }
 
 const bottomPad = () => Math.round(Math.min(window.innerHeight * 0.52, 460));
@@ -505,14 +515,14 @@ const metroMap: MetroMap = {
   },
 };
 
-async function ride(to: DistrictId) {
+async function ride(to: DistrictId, gate: Gate) {
   const dest = DISTRICTS[to];
   const j = journeyFor(district.id, to);
   if (!j) return;
   let pre: Promise<unknown> | null = null;
   metroOpen = true;
   hint('');
-  const r = await openMetro(district, dest, j, () => { pre = loadDistrict(dest, () => {}).catch(() => null); }, metroMap);
+  const r = await openMetro(district, dest, j, gate, () => { pre = loadDistrict(dest, () => {}).catch(() => null); }, metroMap);
   metroMap.clear();
   metroOpen = false;
   if (!r) { camera('look'); map.easeTo({ center: S.pos, zoom: CAM_LOOK.zoom, pitch: CAM_LOOK.pitch, duration: 900 }); return; }
@@ -526,7 +536,7 @@ async function ride(to: DistrictId) {
     return;
   }
   toast(`${dest.name} · ${r.mins}분 · €${r.cost.toFixed(2)}${r.wrong ? ` · 방향을 ${r.wrong}번 잘못 골랐어요` : ''}`);
-  hint(dest.surface);
+  hint(`${r.exit.label} — ${r.exit.note}`);
   setTimeout(() => hint(''), 6000);
 }
 
