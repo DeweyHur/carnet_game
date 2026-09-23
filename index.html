@@ -14,7 +14,9 @@
     <div id="map"></div>
 
     <div id="hud">
-      <div class="chips"><b id="clock">10:00</b><span id="money">€80</span><span id="walked">0 m</span><span id="found">0곳 발견</span></div>
+      <div class="chips"><b id="clock">07:40</b><span id="money">€320</span><span id="walked">0 m</span><span id="found">0곳 발견</span>
+        <span class="bar" id="hunger" data-level="ok" title="허기"><em>허기</em><i></i></span>
+        <span class="bar" id="tired" data-level="ok" title="지침"><em>지침</em><i></i></span></div>
       <div class="hud-right"><button id="metro-go">🚇</button><button id="eye">👁 시선</button><button id="end">하루 마치기</button></div>
     </div>
     <div id="toast"></div>
@@ -30,12 +32,13 @@
     <section id="inside"></section>
     <section id="metro"></section>
     <section id="dest"></section>
+    <section id="trip"></section>
 
     <section id="intro">
       <div class="tunnel">
-        <p class="line">Ⓜ 1 · Saint-Paul</p>
-        <h1>파리, 마레 지구<br />오전 10시</h1>
-        <p class="sub">가 보려던 곳이 세 군데 있습니다. 나머지는 걸어 봐야 압니다.</p>
+        <p class="line">CDG · 오전 7시 40분</p>
+        <h1>오늘 아침,<br />파리에 도착했다</h1>
+        <p class="sub">묵을 곳을 정하고, 공항에서 시내로 들어가고, 그다음은 걸어 봐야 압니다.</p>
         <button id="go" disabled>지도를 펴는 중…</button>
         <p id="status"></p>
         <p class="classic"><a href="/classic.html">예전 Carnet(기자·미션 버전) 열기</a></p>

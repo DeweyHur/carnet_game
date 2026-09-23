@@ -8,6 +8,8 @@ import { CURATED_BELLEVILLE } from './belleville';
 import { CURATED_CHAMPS } from './champs';
 import { STATION_POS } from './stations';
 import { BUS_LINES } from './bus';
+import { fareFor } from './trip';
+import type { Pass } from './trip';
 
 export type DistrictId = 'marais' | 'saint-germain' | 'montmartre' | 'belleville' | 'champs-elysees';
 
@@ -149,11 +151,7 @@ export const otherDistricts = (id: DistrictId) => ALL_DISTRICTS.filter((d) => d.
 // ───────── 노선 ─────────
 export type Mode = 'metro' | 'bus';
 
-export const FARE: Record<Mode, number> = {
-  metro: 2.55, // 메트로·전철·RER 1회권 (같은 계열끼리 2시간 환승)
-  bus: 2.05, // 버스·트램 1회권 (지상 교통끼리 1시간 30분 환승)
-};
-// 버스와 메트로는 표가 다르다 — 섞어 타면 두 장을 산다. (Navigo Liberté+만 예외)
+// 요금은 trip.ts (낱장이냐 Navigo Liberté+냐에 따라 다르다)
 
 const PACE: Record<Mode, number> = { metro: 1.6, bus: 2.4 }; // 한 정거장에 걸리는 분
 const BOARD: Record<Mode, number> = { metro: 3, bus: 6 }; // 개찰·플랫폼 / 정류장에서 기다리기
@@ -285,6 +283,7 @@ interface PlanOpts {
   at?: LngLat; // 지금 서 있는 자리
   only?: Mode;
   goal?: LngLat; // 가고 싶은 곳 — 내리는 곳도 여기서 가까운 데로 고른다
+  pass?: Pass; // 낱장이냐 Liberté+냐 — 값이 달라진다
 }
 
 /** 출발 후보 → 도착 후보 중 가장 빠른 여정. only를 주면 그 수단만 쓴다. */
@@ -384,7 +383,7 @@ export function planJourney(to: DistrictId, from: District, dest: District, opts
   const walkEnd = opts.goal && endPos ? Math.round(walkMins(endPos, opts.goal)) : 0;
   const board = Math.max(...modes.map((m) => BOARD[m]));
   const mins = walk + walkEnd + board + legs.reduce((n, l) => n + (l.kind === 'transfer' ? l.mins : rideInfo(l).mins), 0);
-  const fare = Math.round(modes.reduce((n, m) => n + FARE[m], 0) * 100) / 100;
+  const fare = fareFor(modes, opts.pass ?? 'single');
   return { to, legs, mins, walk, walkEnd, fare, modes, from: split(path[0])[1], arrive: lastStation, arriveMode: LINES[lastLine].mode };
 }
 
@@ -396,16 +395,17 @@ const inside = (d: District, p: LngLat) => {
 export interface Options { metro: Journey | null; bus: Journey | null; mixed: Journey | null; walkMins: number }
 
 /** 지하철만 / 버스만 / (확실히 빠를 때만) 섞어서 — 셋을 비교해 보여 준다. */
-export function planOptions(from: District, dest: District, at?: LngLat, goal?: LngLat): Options {
-  const metro = planJourney(dest.id, from, dest, { at, goal, only: 'metro' });
-  const bus = planJourney(dest.id, from, dest, { at, goal, only: 'bus' });
-  const any = planJourney(dest.id, from, dest, { at, goal });
+export function planOptions(from: District, dest: District, at?: LngLat, goal?: LngLat, pass: Pass = 'single'): Options {
+  const metro = planJourney(dest.id, from, dest, { at, goal, pass, only: 'metro' });
+  const bus = planJourney(dest.id, from, dest, { at, goal, pass, only: 'bus' });
+  const any = planJourney(dest.id, from, dest, { at, goal, pass });
   const bestSingle = Math.min(metro?.mins ?? Infinity, bus?.mins ?? Infinity);
-  const mixed = any && any.modes.length > 1 && any.mins + 6 < bestSingle ? any : null;
+  // 낱장이면 섞는 게 확실히 빨라야만 권한다(표가 두 장이니까). Liberté+면 문턱이 낮다.
+  const mixed = any && any.modes.length > 1 && any.mins + (pass === 'liberte' ? 2 : 6) < bestSingle ? any : null;
   const a = at ?? from.stations[0].gates[0].pos;
   const b = goal ?? dest.stations[0].gates[0].pos;
   return { metro, bus, mixed, walkMins: Math.round(walkMins(a, b)) };
 }
 
-export const journeyFor = (from: DistrictId, to: DistrictId, at?: LngLat) =>
-  planJourney(to, DISTRICTS[from], DISTRICTS[to], { at });
+export const journeyFor = (from: DistrictId, to: DistrictId, at?: LngLat, pass?: Pass) =>
+  planJourney(to, DISTRICTS[from], DISTRICTS[to], { at, pass });

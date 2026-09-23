@@ -16,6 +16,10 @@ import type { District, Gate, Journey } from './districts';
 import { ALL_RICH } from './rich';
 import { openMetro } from './metro';
 import { openDestination } from './destination';
+import { openArrival, openMorning } from './arrival';
+import type { Stay } from './stays';
+import { bodyLine, drain, eat, level, paceFactor, rest, sightFactor, LIBERTE_CARD } from './trip';
+import type { Pass } from './trip';
 import type { Dest } from './destination';
 import type { MetroMap } from './metro';
 import * as sfx from './sound';
@@ -57,8 +61,14 @@ const S = {
   path: [] as LngLat[],
   seg: 0,
   target: null as Place | null,
-  clock: 10 * 60,
-  money: 80,
+  clock: 7 * 60 + 40, // 공항 도착
+  money: 320, // 오늘 쓸 수 있는 돈
+  hunger: 35, // 기내식 먹고 몇 시간 지난 상태
+  tired: 20,
+  stay: null as Stay | null,
+  pass: 'single' as Pass,
+  fares: 0, // 오늘 교통비
+  ate: 0, // 오늘 먹은 횟수
   walked: 0,
   heading: 0,
   seen: new Map<string, number>(),
@@ -71,6 +81,7 @@ const S = {
   origin: START as LngLat,
   travelTo: null as Dest | null,
   travelGate: null as Gate | null,
+  restAt: false,
   dest: null as Dest | null,
   started: false,
   finished: false,
@@ -127,7 +138,7 @@ async function boot() {
       dressMap(st.fallback, ways);
       status.textContent = '';
       $('#go').removeAttribute('disabled');
-      $('#go').textContent = '출구로 올라간다';
+      $('#go').textContent = '파리에 도착했다';
     });
   } catch (e) {
     status.textContent = e instanceof Error ? e.message : String(e);
@@ -321,7 +332,8 @@ function distToSeg(q: LngLat, a: LngLat, b: LngLat): number {
 /** 지금 이 순간 눈에 들어오는 곳인가 */
 function inSight(p: Place): boolean {
   const d = dist(S.pos, p.pos);
-  if (d > (S.path.length > 1 ? SIGHT : VISION)) return false;
+  const f = sightFactor(S); // 배고프면 주변이 덜 눈에 들어온다
+  if (d > (S.path.length > 1 ? SIGHT : VISION) * f) return false;
   if (S.path.length > 1) {
     const rel = ((bearing(S.pos, p.pos) - S.heading + 540) % 360) - 180;
     if (Math.abs(rel) > FOV && d > 12) return false;
@@ -341,14 +353,14 @@ function frame(t: number) {
   const dt = Math.min(0.1, (t - lastT) / 1000 || 0);
   lastT = t;
   if (S.path.length > 1 && !openPlace && !S.finished) {
-    let move = WALK_MPS * TIME_SCALE * dt;
+    let move = WALK_MPS * TIME_SCALE * dt * paceFactor(S);
     let guard = 0;
     while (move > 0 && S.seg + 1 < S.path.length && guard++ < 200) {
       const next = S.path[S.seg + 1];
       const d = dist(S.pos, next);
       if (d > 0.3) S.heading = bearing(S.pos, next);
-      if (d <= move) { S.pos = next; S.seg++; move -= d; S.walked += d; S.clock += d / WALK_MPS / 60; }
-      else { const k = move / d; S.pos = [S.pos[0] + (next[0] - S.pos[0]) * k, S.pos[1] + (next[1] - S.pos[1]) * k]; S.walked += move; S.clock += move / WALK_MPS / 60; move = 0; }
+      if (d <= move) { S.pos = next; S.seg++; move -= d; S.walked += d; S.clock += d / WALK_MPS / 60; drain(S, d / WALK_MPS / 60, d); }
+      else { const k = move / d; S.pos = [S.pos[0] + (next[0] - S.pos[0]) * k, S.pos[1] + (next[1] - S.pos[1]) * k]; S.walked += move; S.clock += move / WALK_MPS / 60; drain(S, move / WALK_MPS / 60, move); move = 0; }
     }
     if (!Number.isFinite(S.pos[0]) || !Number.isFinite(S.pos[1])) { // 좌표가 깨지면 마지막 멀쩡한 노드로 되돌린다
       S.pos = S.path[Math.min(S.seg, S.path.length - 1)] ?? graph.nodes[nearestNode(graph, district.start)];
@@ -387,6 +399,7 @@ function arrive() {
   const t = S.target;
   S.target = null;
   camera('look');
+  if (S.restAt) { S.restAt = false; goRest(); return; }
   if (S.travelTo) { const d = S.travelTo; const g = S.travelGate ?? nearestGate(); S.travelTo = null; S.travelGate = null; void ride(d, g); return; }
   if (t) openCard(t);
 }
@@ -435,7 +448,7 @@ function travel(dest: Dest, gate?: Gate) {
 /** 목적지 고르는 화면을 연다 */
 function chooseDestination() {
   if (!S.started || S.finished || openPlace || metroOpen) return;
-  void openDestination(district, otherDistricts(district.id), (from, to, goal) => planOptions(from, to, S.pos, goal)).then((d) => {
+  void openDestination(district, otherDistricts(district.id), (from, to, goal) => planOptions(from, to, S.pos, goal, S.pass)).then((d) => {
     if (d) travel(d);
   });
 }
@@ -449,6 +462,36 @@ const exitMarkers: Marker[] = [];
 let trainAnim = 0;
 
 /** 지금 지구의 지하철 출입구를 전부 지도에 찍는다. 눌러 둔 그 구멍으로 들어간다. */
+let stayMarker: Marker | null = null;
+/** 숙소를 지도에 찍는다. 눌러서 돌아가 쉴 수 있다. */
+function showStayMarker() {
+  stayMarker?.remove();
+  stayMarker = null;
+  const st = S.stay;
+  if (!st || st.district !== district.id) return;
+  const el = document.createElement('div');
+  el.className = 'mstay';
+  el.innerHTML = `<span class="m">🛏</span><span class="nm"></span>`;
+  el.querySelector('.nm')!.textContent = st.name;
+  el.title = '숙소 — 눌러서 돌아가 쉬기';
+  el.addEventListener('click', (ev) => { ev.stopPropagation(); goRest(); });
+  stayMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(st.pos).addTo(map);
+}
+
+/** 숙소로 돌아가 쉰다. 멀면 먼저 걸어간다. */
+function goRest() {
+  const st = S.stay;
+  if (!st || !S.started || S.finished || openPlace || metroOpen) return;
+  if (st.district !== district.id) { toast(`${st.name}은 ${DISTRICTS[st.district].name}에 있어요`); return; }
+  if (dist(S.pos, st.pos) > 20) { S.restAt = true; walkTo(st.pos, null); toast(`🛏 ${st.name}으로 돌아갑니다`); return; }
+  S.clock += 45;
+  rest(S, 45);
+  drain(S, 45, 0);
+  sfx.enter();
+  toast(`${st.name}에서 45분 쉬었어요`);
+  hud();
+}
+
 function showStationMarker() {
   for (const m of gateMarkers) m.remove();
   gateMarkers.length = 0;
@@ -546,7 +589,7 @@ const metroMap: MetroMap = {
 async function ride(target: Dest, gate: Gate) {
   const dest = target.district;
   // 걸어오는 동안 자리가 바뀌었으니 고른 수단·목적지를 그대로 두고 다시 계산한다
-  const j = planJourney(dest.id, district, dest, { at: S.pos, goal: target.place?.pos, only: target.mode }) ?? target.journey;
+  const j = planJourney(dest.id, district, dest, { at: S.pos, goal: target.place?.pos, only: target.mode, pass: S.pass }) ?? target.journey;
   let pre: Promise<unknown> | null = null;
   metroOpen = true;
   hint('');
@@ -556,6 +599,7 @@ async function ride(target: Dest, gate: Gate) {
   if (!r) { camera('look'); map.easeTo({ center: S.pos, zoom: CAM_LOOK.zoom, pitch: CAM_LOOK.pitch, duration: 900 }); return; }
   S.clock += r.mins;
   S.money = Math.round((S.money - r.cost) * 100) / 100;
+  S.fares = Math.round((S.fares + r.cost) * 100) / 100;
   await pre;
   try {
     await enterDistrict(dest, r.exit.pos);
@@ -606,6 +650,7 @@ async function enterDistrict(d: District, at: LngLat) {
   map.easeTo({ center: S.pos, zoom: CAM_LOOK.zoom, pitch: CAM_LOOK.pitch, duration: 2400 });
   for (const p of places) if (p.known) showMarker(p, false);
   showStationMarker();
+  showStayMarker();
   paintMetroBtn();
   look();
   hud();
@@ -613,10 +658,30 @@ async function enterDistrict(d: District, at: LngLat) {
 
 function hud() {
   $('#clock').textContent = fmtClock(S.clock);
+  paintBody();
   $('#money').textContent = `€${Number.isInteger(S.money) ? S.money : S.money.toFixed(2)}`;
   $('#walked').textContent = S.walked < 1000 ? `${Math.round(S.walked)} m` : `${(S.walked / 1000).toFixed(1)} km`;
   $('#found').textContent = `${S.seen.size}곳 발견`;
+  bodyHint();
   if (S.clock >= 19 * 60 && !S.finished) hint('해가 기울어요. 슬슬 하루를 마쳐도 좋아요.');
+}
+
+/** 허기·지침 막대 */
+function paintBody() {
+  for (const [id, v] of [['hunger', S.hunger], ['tired', S.tired]] as const) {
+    const bar = document.querySelector(`#${id} i`) as HTMLElement | null;
+    if (!bar) continue;
+    bar.style.width = `${Math.round(v)}%`;
+    (bar.parentElement as HTMLElement).dataset.level = level(v);
+  }
+}
+
+let lastBodyLine = '';
+function bodyHint() {
+  const line = bodyLine(S);
+  if (line === lastBodyLine) return;
+  lastBodyLine = line;
+  if (line) toast(line);
 }
 
 let toastTimer = 0;
@@ -676,6 +741,10 @@ async function goInside(p: Place, entry: number) {
     if (!meal) { closeCard('pass'); toast('메뉴만 보고 나왔어요'); return; }
     S.visits.push({ place: p, at, mins: meal.mins, cost: meal.cost, dishes: meal.dishes });
     S.clock += meal.mins;
+    drain(S, meal.mins, 0);
+    // 앉아서 먹으면 다리도 좀 쉰다. 창구에서 사 먹으면 덜.
+    eat(S, Math.min(70, 18 + meal.cost * 1.6), meal.mins >= 25 ? 12 : 4);
+    S.ate++;
     S.money = Math.round((S.money - meal.cost) * 100) / 100;
     toast(`${p.emoji} ${meal.mins}분 · €${meal.cost}`);
   } else {
@@ -684,6 +753,9 @@ async function goInside(p: Place, entry: number) {
     S.visits.push({ place: p, at, mins: v.mins, cost: entry, seen: v.seen, total: v.total });
     S.shots.push(...v.shots);
     S.clock += v.mins;
+    drain(S, v.mins, 0);
+    if (p.cat === 'park') rest(S, 12); // 벤치
+    else if (p.cat === 'cafe' || p.cat === 'bar') { rest(S, 15); eat(S, 12); }
     S.money -= entry;
     toast(`${p.emoji} ${v.mins}분 머물렀어요`);
   }
@@ -698,23 +770,44 @@ function closeCard(_why: 'enter' | 'pass') {
   hud();
 }
 
-function start() {
+async function start() {
   sfx.unlock();
   const intro = $('#intro');
   $('#go').setAttribute('disabled', '');
+  intro.classList.add('gone');
+
+  // ① 숙소 ② 공항에서 오는 법 ③ 표
+  const a = await openArrival();
+  S.stay = a.stay;
+  S.pass = a.pass;
+  S.money = Math.round((S.money - a.ride.cost - (a.pass === 'liberte' ? LIBERTE_CARD : 0)) * 100) / 100;
+  S.fares = a.ride.cost;
+  S.clock += a.ride.mins;
+  S.tired = Math.min(100, S.tired + a.ride.tired);
+  S.hunger = Math.min(100, S.hunger + a.ride.mins * 0.11);
+
   for (let i = 0; i < 6; i++) sfx.stair(i);
   sfx.surface();
-  intro.classList.add('rise');
-  setTimeout(() => {
-    intro.classList.add('gone');
-    map.easeTo({ zoom: CAM_LOOK.zoom, pitch: CAM_LOOK.pitch, bearing: 35, duration: 2600 });
-    camMode = 'look';
-    S.started = true;
-    $('#hud').classList.add('on');
-    paintMetroBtn();
-    const vosges = places.find((p) => p.known && p.cat === 'park');
-    hint(vosges ? '지도에서 아무 데나 누르면 그쪽으로 걸어갑니다. 핀은 오기 전부터 알던 곳이에요.' : '지도에서 아무 데나 누르면 그쪽으로 걸어갑니다.');
-  }, 2500);
+  S.started = true;
+  $('#hud').classList.add('on');
+  try {
+    await enterDistrict(DISTRICTS[a.stay.district], a.stay.pos);
+  } catch (e) {
+    toast(e instanceof Error ? e.message : '지도를 펴지 못했어요');
+    return;
+  }
+  S.origin = S.pos;
+  S.trail = [S.pos];
+
+  // ④ 체크인·아침
+  const m = await openMorning(a.stay, S.clock);
+  S.clock += m.mins;
+  S.money = Math.round((S.money - m.cost) * 100) / 100;
+  if (m.fed) eat(S, m.fed, 10); else rest(S, 6);
+  hud();
+  toast(`${a.stay.name} · ${fmtClock(S.clock)}`);
+  hint(`${m.line} 지도에서 아무 데나 누르면 그쪽으로 걸어갑니다.`);
+  setTimeout(() => hint(''), 8000);
 }
 
 const mode = (xs: string[]) => [...xs.reduce((m, x) => m.set(x, (m.get(x) ?? 0) + 1), new Map<string, number>())].sort((a, b) => b[1] - a[1])[0][0];
@@ -763,9 +856,17 @@ function finish() {
     lines.push(full * 2 >= looked.length ? `둘러본 ${looked.length}곳 중 ${full}곳을 끝까지 봤어요. 한 곳을 깊게 보는 편이네요.` : `둘러본 ${looked.length}곳 중 ${looked.length - full}곳은 중간에 나왔어요. 여러 곳을 가볍게 훑는 편이네요.`);
   }
   if (S.shots.length) lines.push(`사진을 ${S.shots.length}장 찍었어요. 가장 많이 찍은 곳은 ${mode(S.shots.map((x) => x.place))}.`);
+  if (S.fares) {
+    const single = S.pass === 'single';
+    lines.push(`교통비로 €${S.fares.toFixed(2)}을 썼어요. ${single ? '낱장으로만 다녔는데, Navigo Liberté+였다면 회당 값이 싸고 버스↔지하철 환승도 됐을 거예요.' : 'Navigo Liberté+로 다녔어요 — 버스와 지하철을 섞어도 한 번만 계산됐습니다.'}`);
+  }
+  if (S.tired >= 70) lines.push(`하루 끝에 꽤 지쳤어요(지침 ${Math.round(S.tired)}). 중간에 앉는 자리를 더 넣으면 같은 동선도 덜 힘들어요.`);
+  else if (S.tired <= 35) lines.push('여유 있게 다녔어요. 하루에 한 곳쯤 더 넣어도 괜찮았겠어요.');
+  if (S.ate === 0) lines.push('오늘 아무것도 먹지 않았어요. 실제로 이렇게 다니면 오후에 무너집니다.');
+  else if (S.ate >= 3) lines.push(`${S.ate}번 먹었어요. 먹으러 다니는 여행이네요.`);
   if (!lines.length) lines.push('아직 기록이 적어요. 조금 더 걸어 보면 당신이 어디서 멈추는 사람인지 보이기 시작해요.');
 
-  $('#sum-stats').textContent = `${fmtClock(10 * 60)} → ${fmtClock(S.clock)} · ${(S.walked / 1000).toFixed(1)} km · ${S.seen.size}곳 발견 · ${S.visits.length}곳 들어감 · €${Math.round((80 - S.money) * 100) / 100} 씀`;
+  $('#sum-stats').textContent = `${fmtClock(7 * 60 + 40)} → ${fmtClock(S.clock)} · ${(S.walked / 1000).toFixed(1)} km · ${S.seen.size}곳 발견 · ${S.visits.length}곳 들어감 · €${(320 - S.money).toFixed(2)} 씀${S.stay ? ` · ${S.stay.name}` : ''}`;
   $('#sum-lines').replaceChildren(...lines.map((s) => { const li = document.createElement('li'); li.textContent = s; return li; }));
   const stops = [...S.visits.map((v) => ({ p: v.place, note: `${fmtClock(v.at)} · ${v.mins}분${v.cost ? ` · €${v.cost}` : ''}${v.dishes ? ` · ${v.dishes.map((d) => d.name).join(', ')}` : ''}` })),
     ...[...S.saved].map((id) => byId.get(id)).filter((p): p is Place => !!p && !S.visits.some((v) => v.place.id === p.id)).map((p) => ({ p, note: '찜 — 다음에' }))];
