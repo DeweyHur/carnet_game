@@ -3,6 +3,7 @@
 import { LINES, rideInfo } from './districts';
 import type { Curated } from './places';
 import type { District, Journey, Options } from './districts';
+import type { LngLat } from './graph';
 
 export interface Dest { district: District; place?: Curated; journey: Journey }
 
@@ -43,14 +44,16 @@ const CHARACTER: Record<string, string> = {
   mixed: '제일 빠르지만 버스표와 메트로표를 따로 사야 해서 값이 두 배다.',
 };
 
-export function openDestination(here: District, others: District[], plan: (from: District, to: District) => Options): Promise<Dest | null> {
+export function openDestination(here: District, others: District[], plan: (from: District, to: District, goal?: LngLat) => Options): Promise<Dest | null> {
   return new Promise((resolve) => {
     const root = $('#dest');
     const close = (d: Dest | null) => { root.classList.remove('on'); root.replaceChildren(); resolve(d); };
     const show = (node: HTMLElement) => { root.replaceChildren(node); root.classList.add('on'); root.scrollTop = 0; };
 
     // ── ② 어떻게 갈까
-    const how = (d: District, place: Curated | undefined, opts: Options) => {
+    const how = (d: District, place: Curated | undefined, base: Options) => {
+      // 명소를 골랐으면 그 자리까지 걷는 시간까지 넣어 다시 계산한다
+      const opts = place ? plan(here, d, place.pos) : base;
       const w = el('div', 'dest-sheet');
       w.appendChild(el('p', 'metro-eyebrow', place ? d.name : '동네로'));
       w.appendChild(el('h2', '', `${place ? place.name : d.name}까지 어떻게 갈까`));
@@ -64,7 +67,7 @@ export function openDestination(here: District, others: District[], plan: (from:
         top.appendChild(badges(j));
         top.appendChild(el('span', 'dmins', `${j.mins}분`));
         b.appendChild(top);
-        b.appendChild(el('small', 'dsum', summary(j)));
+        b.appendChild(el('small', 'dsum', summary(j) + (j.walkEnd >= 2 ? ` · 내려서 도보 ${j.walkEnd}분` : '')));
         b.appendChild(el('small', 'dchar', CHARACTER[tag]));
         b.onclick = () => { blurActive(); close({ district: d, place, journey: j }); };
         list.appendChild(b);

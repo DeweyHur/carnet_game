@@ -434,7 +434,7 @@ function travel(dest: Dest, gate?: Gate) {
 /** 목적지 고르는 화면을 연다 */
 function chooseDestination() {
   if (!S.started || S.finished || openPlace || metroOpen) return;
-  void openDestination(district, otherDistricts(district.id), (from, to) => planOptions(from, to, S.pos)).then((d) => {
+  void openDestination(district, otherDistricts(district.id), (from, to, goal) => planOptions(from, to, S.pos, goal)).then((d) => {
     if (d) travel(d);
   });
 }

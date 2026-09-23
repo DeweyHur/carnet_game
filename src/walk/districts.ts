@@ -273,6 +273,7 @@ export interface Journey {
   legs: Leg[];
   mins: number; // 도보 + 대기 + 타는 시간 전부
   walk: number; // 지금 자리에서 타는 곳까지
+  walkEnd: number; // 내려서 목적지까지 (목적지를 고른 경우)
   fare: number;
   modes: Mode[];
   from: string;
@@ -280,7 +281,11 @@ export interface Journey {
   arriveMode: Mode;
 }
 
-interface PlanOpts { at?: LngLat; only?: Mode }
+interface PlanOpts {
+  at?: LngLat; // 지금 서 있는 자리
+  only?: Mode;
+  goal?: LngLat; // 가고 싶은 곳 — 내리는 곳도 여기서 가까운 데로 고른다
+}
 
 /** 출발 후보 → 도착 후보 중 가장 빠른 여정. only를 주면 그 수단만 쓴다. */
 export function planJourney(to: DistrictId, from: District, dest: District, opts: PlanOpts = {}): Journey | null {
@@ -303,6 +308,7 @@ export function planJourney(to: DistrictId, from: District, dest: District, opts
   if (!starts.length || !goalList.length) return null;
   const goals = new Map(goalList.map((g) => [g.k, g.pos]));
 
+  let bestKey: string | null = null;
   const dist = new Map<string, number>();
   const prev = new Map<string, string>();
   const prevStreet = new Map<string, boolean>();
@@ -313,13 +319,14 @@ export function planJourney(to: DistrictId, from: District, dest: District, opts
     if (w < (dist.get(s.k) ?? Infinity)) { dist.set(s.k, w); walk0.set(s.k, w); queue.push({ k: s.k, d: w }); }
   }
 
-  let best: string | null = null;
   const L = links();
   while (queue.length) {
     queue.sort((a, b) => a.d - b.d);
     const cur = queue.shift()!;
     if (cur.d > (dist.get(cur.k) ?? Infinity)) continue;
-    if (goals.has(cur.k)) { best = cur.k; break; }
+    // 목적지를 고르지 않았으면 도착 후보에 처음 닿는 순간 끝. 골랐으면 끝까지 풀어
+    // 보고 "내려서 걷는 시간"까지 더해 가장 빠른 도착지를 고른다(노드가 300개쯤이라 싸다).
+    if (goals.has(cur.k) && !opts.goal) { bestKey = cur.k; break; }
     const [line, station] = split(cur.k);
     const arr = LINES[line].stations;
     const i = arr.indexOf(station);
@@ -331,7 +338,17 @@ export function planJourney(to: DistrictId, from: District, dest: District, opts
     if (i < arr.length - 1) push(key(line, arr[i + 1]), cur.d + pace);
     for (const e of L.get(cur.k) ?? []) if (allowed(split(e.to)[0])) push(e.to, cur.d + e.mins, e.street);
   }
-  if (!best) return null;
+  if (!bestKey) {
+    let bestCost = Infinity;
+    for (const [g, gpos] of goals) {
+      const d = dist.get(g);
+      if (d === undefined) continue;
+      const total = d + (opts.goal ? walkMins(gpos, opts.goal) : 0);
+      if (total < bestCost) { bestCost = total; bestKey = g; }
+    }
+  }
+  if (!bestKey) return null;
+  const best: string = bestKey;
 
   const path: string[] = [];
   for (let k: string | undefined = best; k; k = prev.get(k)) path.unshift(k);
@@ -363,10 +380,12 @@ export function planJourney(to: DistrictId, from: District, dest: District, opts
 
   const modes = [...new Set(legs.filter((l): l is Extract<Leg, { kind: 'ride' }> => l.kind === 'ride').map((l) => LINES[l.line].mode))];
   const walk = Math.round(walk0.get(path[0]) ?? 0);
+  const endPos = goals.get(best);
+  const walkEnd = opts.goal && endPos ? Math.round(walkMins(endPos, opts.goal)) : 0;
   const board = Math.max(...modes.map((m) => BOARD[m]));
-  const mins = walk + board + legs.reduce((n, l) => n + (l.kind === 'transfer' ? l.mins : rideInfo(l).mins), 0);
+  const mins = walk + walkEnd + board + legs.reduce((n, l) => n + (l.kind === 'transfer' ? l.mins : rideInfo(l).mins), 0);
   const fare = Math.round(modes.reduce((n, m) => n + FARE[m], 0) * 100) / 100;
-  return { to, legs, mins, walk, fare, modes, from: split(path[0])[1], arrive: lastStation, arriveMode: LINES[lastLine].mode };
+  return { to, legs, mins, walk, walkEnd, fare, modes, from: split(path[0])[1], arrive: lastStation, arriveMode: LINES[lastLine].mode };
 }
 
 const inside = (d: District, p: LngLat) => {
@@ -377,14 +396,14 @@ const inside = (d: District, p: LngLat) => {
 export interface Options { metro: Journey | null; bus: Journey | null; mixed: Journey | null; walkMins: number }
 
 /** 지하철만 / 버스만 / (확실히 빠를 때만) 섞어서 — 셋을 비교해 보여 준다. */
-export function planOptions(from: District, dest: District, at?: LngLat): Options {
-  const metro = planJourney(dest.id, from, dest, { at, only: 'metro' });
-  const bus = planJourney(dest.id, from, dest, { at, only: 'bus' });
-  const any = planJourney(dest.id, from, dest, { at });
+export function planOptions(from: District, dest: District, at?: LngLat, goal?: LngLat): Options {
+  const metro = planJourney(dest.id, from, dest, { at, goal, only: 'metro' });
+  const bus = planJourney(dest.id, from, dest, { at, goal, only: 'bus' });
+  const any = planJourney(dest.id, from, dest, { at, goal });
   const bestSingle = Math.min(metro?.mins ?? Infinity, bus?.mins ?? Infinity);
   const mixed = any && any.modes.length > 1 && any.mins + 6 < bestSingle ? any : null;
   const a = at ?? from.stations[0].gates[0].pos;
-  const b = dest.stations[0].gates[0].pos;
+  const b = goal ?? dest.stations[0].gates[0].pos;
   return { metro, bus, mixed, walkMins: Math.round(walkMins(a, b)) };
 }
 
