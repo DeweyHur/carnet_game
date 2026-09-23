@@ -48,7 +48,8 @@ function routeMap(r: Ride, onPick?: (dir: 0 | 1) => void) {
     const node = el(onPick ? 'button' : 'div', `term ${onPick ? 'pick' : ''}`);
     node.appendChild(el('span', 'arrow', dir === 0 ? '↑' : '↓'));
     const mid = el('span', 'term-mid');
-    mid.appendChild(el('small', '', cut ? `${Math.abs((dir === 0 ? lo : r.stations.length - 1 - hi))}개 역 지나 · direction` : 'direction'));
+    const far = dir === 0 ? lo : r.stations.length - 1 - hi;
+    mid.appendChild(el('small', '', cut ? `direction · 종점까지 ${far}개 역` : 'direction'));
     mid.appendChild(el('b', '', name));
     node.appendChild(mid);
     if (onPick) (node as HTMLButtonElement).onclick = () => onPick(dir);
