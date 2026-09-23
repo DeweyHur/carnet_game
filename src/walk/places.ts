@@ -62,13 +62,13 @@ export interface Curated {
 
 // 가격·시간은 전부 프로토타입용 대략값.
 export const CURATED_MARAIS: Curated[] = [
-  { match: /^place des vosges$/i, name: '보주 광장 Place des Vosges', photo: ['Place des Vosges'], pos: [2.3655, 48.8556], cat: 'park', emoji: '⛲', known: true, mins: 20,
+  { match: /^place des vosges$/i, name: '보주 광장 Place des Vosges', photo: ['Place des Vosges'], pos: [2.3655, 48.8556], cat: 'park', emoji: '⛲', known: true, star: true, mins: 20,
     blurb: '1612년에 완성된, 파리에서 가장 오래된 계획 광장. 사방이 똑같은 붉은 벽돌 건물과 아케이드로 둘러싸여 있다. 잔디에 앉은 사람들 틈에 끼면 된다.' },
   { match: /maison de victor hugo/i, name: '빅토르 위고의 집', pos: [2.3661, 48.8548], cat: 'museum', emoji: '🖋️', cost: 0, mins: 40,
     blurb: '보주 광장 모퉁이 6번지. 위고가 1832년부터 16년을 살며 《레 미제라블》의 상당 부분을 쓴 아파트. 상설 전시는 무료.' },
-  { match: /mus[ée]e carnavalet/i, name: '카르나발레 박물관', pos: [2.3625, 48.8574], cat: 'museum', emoji: '🏛️', cost: 0, mins: 75,
+  { match: /mus[ée]e carnavalet/i, name: '카르나발레 박물관', photo: ['Musée Carnavalet'], pos: [2.3625, 48.8574], cat: 'museum', emoji: '🏛️', star: true, cost: 0, mins: 75,
     blurb: '파리라는 도시 자체의 역사 박물관. 옛 가게 간판들이 걸린 방이 유명하다. 상설 전시는 무료라서 부담 없이 들어갈 수 있다.' },
-  { match: /mus[ée]e (national )?picasso/i, name: '피카소 미술관', pos: [2.3623, 48.8598], cat: 'museum', emoji: '🎨', known: true, cost: 16, mins: 90,
+  { match: /mus[ée]e (national )?picasso/i, name: '피카소 미술관', photo: ['file:Courtyard of the Musée National Picasso-Paris.jpg'], pos: [2.3623, 48.8598], cat: 'museum', emoji: '🎨', known: true, star: true, cost: 16, mins: 90,
     blurb: '17세기 저택 오텔 살레(Hôtel Salé) 안에 있는 피카소 컬렉션. 건물 계단만 봐도 값을 한다.' },
   { match: /as du fa/i, name: "라스 뒤 팔라펠 L'As du Fallafel", pos: [2.3591, 48.8574], cat: 'eat', emoji: '🥙', known: true, cost: 10, mins: 25,
     blurb: '로지에 거리의 그 줄. 창구에서 사서 걸으면서 먹는 게 정석이다. 안식일인 토요일에는 문을 닫는다.' },
