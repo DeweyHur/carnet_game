@@ -1,8 +1,9 @@
 // 지하철로 다른 지구에 간다. 로딩 화면이 아니라, 초행자가 실제로 헤매는 자리만 골라 넣었다.
 // 노선도를 보고 방향을 고르고, 환승 통로를 걷고, 어느 출구로 올라올지 고른다.
 import * as sfx from './sound';
-import { FARE, journeyMins, rideInfo } from './districts';
+import { FARE, rideInfo } from './districts';
 import type { District, Gate, Journey, Leg, Ride } from './districts';
+import type { Curated } from './places';
 import { findPhoto } from './photos';
 import { STATION_POS } from './stations';
 import type { LngLat } from './graph';
@@ -30,6 +31,9 @@ const el = (tag: string, cls?: string, text?: string) => {
 };
 /** 화면 밖으로 밀려난 버튼에 포커스가 남으면 문서가 스크롤된다 */
 const blurActive = () => (document.activeElement as HTMLElement | null)?.blur();
+
+const near = (a: LngLat, b: LngLat) => Math.hypot((a[0] - b[0]) * 73000, (a[1] - b[1]) * 111320);
+const stationPhoto = (d: District, name: string) => d.stations.find((s) => s.name === name)?.photo;
 
 const WRONG_MINS = 7; // 반대 방향 플랫폼에 서서 한 정거장 갔다가 되돌아오기
 
@@ -90,7 +94,7 @@ function routeMap(r: Ride, onPick?: (dir: 0 | 1) => void) {
  * 역에 내려가서 목적지 지구의 지상까지. 취소하면 null.
  * 타는 동안 목적지 지구 데이터를 미리 받아 두라고 preload를 불러 준다.
  */
-export function openMetro(from: District, dest: District, j: Journey, entered: Gate, preload: () => void, gis: MetroMap): Promise<MetroResult | null> {
+export function openMetro(from: District, dest: District, j: Journey, entered: Gate, want: Curated | null, preload: () => void, gis: MetroMap): Promise<MetroResult | null> {
   return new Promise((resolve) => {
     const root = $('#metro');
     let mins = 0;
@@ -122,7 +126,8 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
     const gate = () => {
       const lines = j.legs.filter((l) => l.kind === 'ride').map((l) => `${l.line}호선`).join(' → ');
       const nTransfer = j.legs.filter((l) => l.kind === 'transfer').length;
-      const w = shell(`Ⓜ ${from.station.name} · ${entered.label}`, `${dest.name}까지 가려면`, `${lines} · 환승 ${nTransfer}번 · 약 ${journeyMins(j)}분`, from.station.photo);
+      const goal = want ? `${want.name}까지 가려면` : `${dest.name}까지 가려면`;
+      const w = shell(`Ⓜ ${j.from} · ${entered.label}`, goal, `${lines} · ${nTransfer ? `환승 ${nTransfer}번` : '환승 없음'} · 약 ${j.mins}분`, stationPhoto(from, j.from));
       const ticket = el('div', 'ticket');
       ticket.appendChild(el('b', '', 'Ticket t+'));
       ticket.appendChild(el('span', '', `메트로·전철 1회권 €${FARE.toFixed(2)}`));
@@ -231,11 +236,15 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
 
     // ── 마지막. 어느 출구로
     const exits = () => {
-      const w = shell(`Ⓜ ${dest.station.name} 도착`, '어느 출구로 올라갈까',
-        '지도에 찍힌 게 실제 출구 위치다. 같은 역이라도 출구마다 다른 데로 나오고, 지상에서 보이는 첫 장면이 달라진다.', dest.station.photo);
+      const arrive = dest.stations.find((st) => st.name === j.arrive) ?? dest.stations[0];
+      const gates = arrive.gates;
+      // 가고 싶다고 고른 곳이 있으면 거기서 가장 가까운 출구를 추천한다
+      const best = want ? gates.reduce((a, b, i) => (near(b.pos, want.pos) < near(gates[a].pos, want.pos) ? i : a), 0) : -1;
+      const w = shell(`Ⓜ ${arrive.name} 도착`, '어느 출구로 올라갈까',
+        '지도에 찍힌 게 실제 출구 위치다. 같은 역이라도 출구마다 다른 데로 나오고, 지상에서 보이는 첫 장면이 달라진다.', arrive.photo);
       const list = el('div', 'exits');
       const take = (i: number) => {
-        const x = dest.station.gates[i];
+        const x = gates[i];
         blurActive();
         for (const c of list.children) (c as HTMLButtonElement).disabled = true;
         gis.markExit(i);
@@ -244,20 +253,22 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
         sfx.surface();
         setTimeout(() => close({ mins, cost: FARE, exit: x, wrong }), 1500);
       };
-      dest.station.gates.forEach((x, i) => {
-        const b = el('button', 'exit') as HTMLButtonElement;
+      gates.forEach((x, i) => {
+        const b = el('button', `exit ${i === best ? 'best' : ''}`) as HTMLButtonElement;
         const no = el('em', 'exit-no', x.ref);
         const mid = el('span', 'exit-mid');
-        mid.appendChild(el('b', '', `Sortie ${x.ref} · ${x.label}`));
-        mid.appendChild(el('small', '', x.note));
+        const t = el('b', '', `Sortie ${x.ref} · ${x.label}`);
+        if (i === best && want) t.appendChild(el('em', 'pick-tag', `${want.name} 최단`));
+        mid.appendChild(t);
+        mid.appendChild(el('small', '', want ? `${x.note} (${want.name}까지 도보 ${Math.max(1, Math.round((near(x.pos, want.pos) * 1.3) / 1.35 / 60))}분)` : x.note));
         b.append(no, mid);
         b.onclick = () => take(i);
         list.appendChild(b);
       });
       w.appendChild(list);
       show(w, true);
-      const at = STATION_POS[dest.station.name] ?? dest.station.pos;
-      gis.exits(dest.station.gates, at, take);
+      const at = STATION_POS[arrive.name] ?? gates[0].pos;
+      gis.exits(gates, at, take);
     };
 
     const next = () => {

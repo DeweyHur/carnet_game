@@ -11,10 +11,12 @@ import type { Graph, LngLat } from './graph';
 import { CAT_INFO, TASTE_OF, parsePlaces } from './places';
 import type { Place, Taste } from './places';
 import { loadDistrict } from './data';
-import { DISTRICTS, journeyFor, otherDistrict } from './districts';
-import type { District, DistrictId, Gate } from './districts';
+import { DISTRICTS, journeyFor, otherDistricts, planJourney } from './districts';
+import type { District, Gate, Journey } from './districts';
 import { ALL_RICH } from './rich';
 import { openMetro } from './metro';
+import { openDestination } from './destination';
+import type { Dest } from './destination';
 import type { MetroMap } from './metro';
 import * as sfx from './sound';
 import { menuFor } from './content';
@@ -67,8 +69,9 @@ const S = {
   shots: [] as Shot[],
   trail: [START] as LngLat[],
   origin: START as LngLat,
-  travelTo: null as DistrictId | null,
+  travelTo: null as Dest | null,
   travelGate: null as Gate | null,
+  dest: null as Dest | null,
   started: false,
   finished: false,
 };
@@ -384,31 +387,47 @@ function arrive() {
   const t = S.target;
   S.target = null;
   camera('look');
-  if (S.travelTo) { const to = S.travelTo; const g = S.travelGate ?? nearestGate(); S.travelTo = null; S.travelGate = null; void ride(to, g); return; }
+  if (S.travelTo) { const d = S.travelTo; const g = S.travelGate ?? nearestGate(); S.travelTo = null; S.travelGate = null; void ride(d, g); return; }
   if (t) openCard(t);
 }
 
 // ───────── 지구 사이 이동 ─────────
 
-/** 역까지 걸어가서 지하철을 탄다. 역에서 멀면 먼저 걷는다. */
-/** 지금 자리에서 가장 가까운 출입구 */
-function nearestGate(): Gate {
-  return district.station.gates.reduce((a, b) => (dist(S.pos, b.pos) < dist(S.pos, a.pos) ? b : a));
+/** 이 지구의 모든 출입구(역이 여러 개일 수 있다) */
+const allGates = (d: District) => d.stations.flatMap((st) => st.gates.map((g) => ({ st, g })));
+const stationOfGate = (g: Gate) => allGates(district).find((x) => x.g === g)?.st ?? district.stations[0];
+
+/** 지금 자리에서 가장 가까운 출입구. 여정이 정해져 있으면 그 여정이 쓰는 역의 출입구 중에서 고른다. */
+function nearestGate(onlyStation?: string): Gate {
+  const list = allGates(district).filter((x) => !onlyStation || x.st.name === onlyStation);
+  return (list.length ? list : allGates(district)).reduce((a, b) => (dist(S.pos, b.g.pos) < dist(S.pos, a.g.pos) ? b : a)).g;
 }
 
-function travel(to: DistrictId, gate?: Gate) {
+/** 목적지(동네 또는 그 동네의 한 장소)로 간다. */
+function travel(dest: Dest, gate?: Gate) {
   if (!S.started || S.finished || openPlace || metroOpen) return;
-  const g = gate ?? nearestGate();
+  const j = planJourney(dest.district.id, district.stations, dest.district.stations);
+  if (!j) { toast('그쪽으로 가는 길을 못 찾았어요'); return; }
+  const g = gate ?? nearestGate(j.from);
+  S.dest = dest;
   // 버튼 한 번으로 순간이동하지 않는다. 지도에 찍힌 그 출입구까지 걸어가서 내려간다.
   if (dist(S.pos, g.pos) > 12) {
-    S.travelTo = to;
+    S.travelTo = dest;
     S.travelGate = g;
     walkTo(g.pos, null);
     toast(`Ⓜ ${g.label} 입구로 걸어갑니다`);
-    hint(`${district.station.name} · ${g.label} 입구까지 걸어갑니다.`);
+    hint(`${stationOfGate(g).name} · ${g.label} 입구까지 걸어갑니다.`);
     return;
   }
-  void ride(to, g);
+  void ride(dest, g, j);
+}
+
+/** 목적지 고르는 화면을 연다 */
+function chooseDestination() {
+  if (!S.started || S.finished || openPlace || metroOpen) return;
+  void openDestination(district, otherDistricts(district.id), (from, to) => planJourney(to.id, from.stations, to.stations)).then((d) => {
+    if (d) travel(d);
+  });
 }
 
 // ───────── 지하철을 탈 때의 지도 ─────────
@@ -423,14 +442,13 @@ let trainAnim = 0;
 function showStationMarker() {
   for (const m of gateMarkers) m.remove();
   gateMarkers.length = 0;
-  const st = district.station;
-  for (const g of st.gates) {
+  for (const { st, g } of allGates(district)) {
     const el = document.createElement('div');
     el.className = 'mstation';
     el.innerHTML = `<span class="m">Ⓜ</span><span class="nm"></span>`;
-    el.querySelector('.nm')!.textContent = g.label.split('—')[0].trim();
-    el.title = `${st.name} · ${g.label} (sortie ${g.ref})`;
-    el.addEventListener('click', (ev) => { ev.stopPropagation(); travel(otherDistrict(district.id), g); });
+    el.querySelector('.nm')!.textContent = `${st.name} · ${g.label.split('—')[0].trim()}`;
+    el.title = `${st.name} ${st.lines.map((l) => l + '호선').join('·')} · sortie ${g.ref}`;
+    el.addEventListener('click', (ev) => { ev.stopPropagation(); chooseDestination(); });
     gateMarkers.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(g.pos).addTo(map));
   }
 }
@@ -515,14 +533,14 @@ const metroMap: MetroMap = {
   },
 };
 
-async function ride(to: DistrictId, gate: Gate) {
-  const dest = DISTRICTS[to];
-  const j = journeyFor(district.id, to);
+async function ride(target: Dest, gate: Gate, plan?: Journey) {
+  const dest = target.district;
+  const j = plan ?? journeyFor(district.id, dest.id);
   if (!j) return;
   let pre: Promise<unknown> | null = null;
   metroOpen = true;
   hint('');
-  const r = await openMetro(district, dest, j, gate, () => { pre = loadDistrict(dest, () => {}).catch(() => null); }, metroMap);
+  const r = await openMetro(district, dest, j, gate, target.place ?? null, () => { pre = loadDistrict(dest, () => {}).catch(() => null); }, metroMap);
   metroMap.clear();
   metroOpen = false;
   if (!r) { camera('look'); map.easeTo({ center: S.pos, zoom: CAM_LOOK.zoom, pitch: CAM_LOOK.pitch, duration: 900 }); return; }
@@ -536,8 +554,17 @@ async function ride(to: DistrictId, gate: Gate) {
     return;
   }
   toast(`${dest.name} · ${r.mins}분 · €${r.cost.toFixed(2)}${r.wrong ? ` · 방향을 ${r.wrong}번 잘못 골랐어요` : ''}`);
-  hint(`${r.exit.label} — ${r.exit.note}`);
-  setTimeout(() => hint(''), 6000);
+  // 가고 싶다고 고른 곳이 있으면 지상에 올라와 그리로 계속 걷는다
+  const want = target.place;
+  const p = want && places.find((x) => x.name === want.name);
+  if (p) {
+    hint(`${r.exit.label}. ${p.name}까지 계속 걷습니다.`);
+    setTimeout(() => { if (!S.finished && !metroOpen) walkTo(p.pos, p); }, 1200);
+  } else {
+    hint(`${r.exit.label} — ${r.exit.note}`);
+  }
+  S.dest = null;
+  setTimeout(() => hint(''), 7000);
 }
 
 /** 새 지구의 길·장소로 통째로 갈아 끼운다. */
@@ -760,10 +787,9 @@ function finish() {
 
 const metroBtn = $<HTMLButtonElement>('#metro-go');
 function paintMetroBtn() {
-  const to = DISTRICTS[otherDistrict(district.id)];
-  metroBtn.textContent = `🚇 ${to.name}`;
-  metroBtn.title = `${district.station.name} 역에서 지하철로 ${to.full}에 간다`;
-  metroBtn.onclick = () => travel(to.id);
+  metroBtn.textContent = '🚇 어디 갈까';
+  metroBtn.title = '다른 동네, 또는 가고 싶은 곳을 고른다';
+  metroBtn.onclick = chooseDestination;
 }
 $('#go').addEventListener('click', start);
 const eyeBtn = $<HTMLButtonElement>('#eye');

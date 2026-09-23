@@ -52,6 +52,10 @@ export interface Curated {
   known?: boolean;
   mins?: number;
   cost?: number;
+  /** 명판·조각처럼 건물이 아닌 것 */
+  minor?: boolean;
+  /** 목적지 고르는 화면에서 맨 위에 보여 줄 곳 */
+  star?: boolean;
 }
 
 // 가격·시간은 전부 프로토타입용 대략값.
@@ -156,7 +160,7 @@ export function parsePlaces(raw: RawPlace[], curated: Curated[], rich: Rich[]): 
   return thin(out);
 }
 
-const pick = (c: Curated) => ({ name: c.name, cat: c.cat, emoji: c.emoji, blurb: c.blurb, known: c.known, mins: c.mins, cost: c.cost });
+const pick = (c: Curated) => ({ name: c.name, cat: c.cat, emoji: c.emoji, blurb: c.blurb, known: c.known, mins: c.mins, cost: c.cost, minor: c.minor });
 
 /** 같은 자리에 겹친 일반 장소를 솎아낸다(큐레이션 장소는 항상 남긴다). */
 function thin(list: Place[]): Place[] {
