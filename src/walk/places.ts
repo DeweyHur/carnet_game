@@ -1,6 +1,6 @@
 // 장소 데이터: OSM 태그 → 게임 카테고리, 그리고 손으로 고른 마레 지구 장소들.
 import type { LngLat } from './graph';
-import { RICH } from './marais';
+import type { Rich } from './marais';
 
 export type Cat = 'eat' | 'cafe' | 'bar' | 'bakery' | 'sweet' | 'gourmet' | 'museum' | 'sight' | 'park' | 'shop';
 export type Taste = '먹기' | '카페·바' | '문화·역사' | '산책·쉼' | '가게 구경';
@@ -42,7 +42,7 @@ export interface Place {
   tags: Record<string, string>;
 }
 
-interface Curated {
+export interface Curated {
   match: RegExp;
   name: string;
   pos: LngLat; // OSM에서 못 찾았을 때 쓰는 대략 좌표
@@ -55,7 +55,7 @@ interface Curated {
 }
 
 // 가격·시간은 전부 프로토타입용 대략값.
-const CURATED: Curated[] = [
+export const CURATED_MARAIS: Curated[] = [
   { match: /^place des vosges$/i, name: '보주 광장 Place des Vosges', pos: [2.3655, 48.8556], cat: 'park', emoji: '⛲', known: true, mins: 20,
     blurb: '1612년에 완성된, 파리에서 가장 오래된 계획 광장. 사방이 똑같은 붉은 벽돌 건물과 아케이드로 둘러싸여 있다. 잔디에 앉은 사람들 틈에 끼면 된다.' },
   { match: /maison de victor hugo/i, name: '빅토르 위고의 집', pos: [2.3661, 48.8548], cat: 'museum', emoji: '🖋️', cost: 0, mins: 40,
@@ -121,52 +121,36 @@ const GENERIC: [string, RegExp, Cat, string][] = [
   ['shop', /^(books|antiques|art|second_hand|music|stationery)$/, 'shop', '📖'],
 ];
 
-export interface OverpassElement {
-  type: string;
-  id: number;
-  lat?: number;
-  lon?: number;
-  center?: { lat: number; lon: number };
-  geometry?: { lat: number; lon: number }[];
-  tags?: Record<string, string>;
-}
+/** 구워 둔 지구 데이터의 한 장소(태그 그대로) */
+export interface RawPlace { id: string; pos: LngLat; tags: Record<string, string> }
 
-export function parseWays(els: OverpassElement[]): LngLat[][] {
-  return els
-    .filter((e) => e.type === 'way' && e.tags?.highway && e.geometry)
-    .map((e) => e.geometry!.map((p) => [p.lon, p.lat] as LngLat));
-}
-
-export function parsePlaces(els: OverpassElement[]): Place[] {
+export function parsePlaces(raw: RawPlace[], curated: Curated[], rich: Rich[]): Place[] {
   const out: Place[] = [];
   const usedCurated = new Set<Curated>();
-  const usedRich = new Set<(typeof RICH)[number]>();
-  for (const e of els) {
+  const usedRich = new Set<Rich>();
+  for (const e of raw) {
     const tags = e.tags;
-    if (!tags?.name || tags.highway) continue;
-    const lat = e.lat ?? e.center?.lat;
-    const lon = e.lon ?? e.center?.lon;
-    if (lat === undefined || lon === undefined) continue;
-    const cur = CURATED.find((c) => c.match.test(tags.name));
+    if (!tags?.name) continue;
+    const cur = curated.find((c) => c.match.test(tags.name));
     if (cur) {
       if (usedCurated.has(cur)) continue;
       usedCurated.add(cur);
-      out.push({ id: `${e.type}${e.id}`, pos: [lon, lat], curated: true, tags, ...pick(cur) });
+      out.push({ id: e.id, pos: e.pos, curated: true, tags, ...pick(cur) });
       continue;
     }
-    const rich = RICH.find((r) => r.match.test(tags.name));
-    if (rich) {
-      if (usedRich.has(rich)) continue;
-      usedRich.add(rich);
-      out.push({ id: `${e.type}${e.id}`, pos: [lon, lat], curated: true, tags, name: rich.name, cat: rich.cat, emoji: rich.emoji, blurb: rich.blurb, mins: rich.mins, cost: rich.cost });
+    const r = rich.find((x) => x.match.test(tags.name));
+    if (r) {
+      if (usedRich.has(r)) continue;
+      usedRich.add(r);
+      out.push({ id: e.id, pos: e.pos, curated: true, tags, name: r.name, cat: r.cat, emoji: r.emoji, blurb: r.blurb, mins: r.mins, cost: r.cost });
       continue;
     }
     const g = GENERIC.find(([k, re]) => tags[k] !== undefined && re.test(tags[k]));
     if (!g) continue;
     const minor = tags.historic === 'memorial' || tags.historic === 'monument' || tags.tourism === 'artwork';
-    out.push({ id: `${e.type}${e.id}`, name: tags.name, pos: [lon, lat], cat: g[2], emoji: g[3], curated: false, minor, tags });
+    out.push({ id: e.id, name: tags.name, pos: e.pos, cat: g[2], emoji: g[3], curated: false, minor, tags });
   }
-  for (const cur of CURATED) {
+  for (const cur of curated) {
     if (!usedCurated.has(cur)) out.push({ id: `cur-${cur.name}`, pos: cur.pos, curated: true, tags: {}, ...pick(cur) });
   }
   return thin(out);

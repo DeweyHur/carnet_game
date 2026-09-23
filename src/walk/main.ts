@@ -8,9 +8,13 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import './walk.css';
 import { bearing, buildGraph, dist, nearestNode, route } from './graph';
 import type { Graph, LngLat } from './graph';
-import { CAT_INFO, TASTE_OF, parsePlaces, parseWays } from './places';
+import { CAT_INFO, TASTE_OF, parsePlaces } from './places';
 import type { Place, Taste } from './places';
-import { loadElements } from './data';
+import { loadDistrict } from './data';
+import { DISTRICTS, journeyFor, otherDistrict } from './districts';
+import type { District, DistrictId } from './districts';
+import { ALL_RICH } from './rich';
+import { openMetro } from './metro';
 import * as sfx from './sound';
 import { menuFor } from './content';
 import { describe } from './generic';
@@ -20,7 +24,8 @@ import type { Shot } from './inside';
 
 maplibregl.setWorkerUrl(workerUrl);
 
-const START: LngLat = [2.3612, 48.8552]; // 메트로 1호선 Saint-Paul 출구 부근
+let district: District = DISTRICTS.marais;
+const START: LngLat = district.start; // 메트로 1호선 Saint-Paul 출구 부근
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 const VISION = 45; // m — 이 안에 들어와야 가게가 "눈에 띈다"
 const NEAR = 70; // m — 이 안에 있어야 들어갈 수 있다
@@ -60,9 +65,14 @@ const S = {
   legs: [] as ('place' | 'wander')[],
   shots: [] as Shot[],
   trail: [START] as LngLat[],
+  origin: START as LngLat,
+  travelTo: null as DistrictId | null,
   started: false,
   finished: false,
 };
+
+/** 지구를 옮겨도 남는 것: 본 곳·들른 곳을 나중에 다시 찾으려면 필요하다 */
+const allPlaces = new Map<string, Place>();
 
 let map: MlMap;
 let graph: Graph;
@@ -96,14 +106,16 @@ async function resolveStyle(): Promise<{ style: StyleSpecification; fallback: bo
 async function boot() {
   const status = $('#status');
   try {
-    const [els, st] = await Promise.all([loadElements((s) => (status.textContent = s)), resolveStyle()]);
-    const ways = parseWays(els);
+    const [data, st] = await Promise.all([loadDistrict(district, (s) => (status.textContent = s)), resolveStyle()]);
+    const ways = data.ways;
     graph = buildGraph(ways);
-    places = parsePlaces(els);
+    places = parsePlaces(data.places, district.curated, ALL_RICH);
+    for (const p of places) allPlaces.set(p.id, p);
     if (graph.nodes.length < 50) throw new Error('거리 그래프가 비어 있습니다.');
-    S.node = nearestNode(graph, START);
+    S.node = nearestNode(graph, district.start);
     S.pos = graph.nodes[S.node];
     S.trail = [S.pos];
+    S.origin = S.pos;
 
     map = new maplibregl.Map({ container: 'map', style: st.style, center: S.pos, zoom: 18.4, pitch: 25, bearing: -20, attributionControl: { compact: true }, maxPitch: 85, maxZoom: 24, clickTolerance: 10 }); // 살짝 끌린 손가락은 클릭으로 치지 않는다
     map.on('load', () => {
@@ -330,7 +342,7 @@ function frame(t: number) {
       else { const k = move / d; S.pos = [S.pos[0] + (next[0] - S.pos[0]) * k, S.pos[1] + (next[1] - S.pos[1]) * k]; S.walked += move; S.clock += move / WALK_MPS / 60; move = 0; }
     }
     if (!Number.isFinite(S.pos[0]) || !Number.isFinite(S.pos[1])) { // 좌표가 깨지면 마지막 멀쩡한 노드로 되돌린다
-      S.pos = S.path[Math.min(S.seg, S.path.length - 1)] ?? graph.nodes[nearestNode(graph, START)];
+      S.pos = S.path[Math.min(S.seg, S.path.length - 1)] ?? graph.nodes[nearestNode(graph, district.start)];
       S.path = []; toast('길을 잃었어요. 다시 골라 주세요.'); camera('look');
     }
     S.trail.push(S.pos);
@@ -366,7 +378,77 @@ function arrive() {
   const t = S.target;
   S.target = null;
   camera('look');
+  if (S.travelTo) { const to = S.travelTo; S.travelTo = null; void ride(to); return; }
   if (t) openCard(t);
+}
+
+// ───────── 지구 사이 이동 ─────────
+
+/** 역까지 걸어가서 지하철을 탄다. 역에서 멀면 먼저 걷는다. */
+function travel(to: DistrictId) {
+  if (!S.started || S.finished || openPlace) return;
+  const st = district.station;
+  if (dist(S.pos, st.pos) > 60) {
+    S.travelTo = to;
+    walkTo(st.pos, null);
+    toast(`Ⓜ ${st.name} 역으로 걸어갑니다`);
+    return;
+  }
+  void ride(to);
+}
+
+async function ride(to: DistrictId) {
+  const dest = DISTRICTS[to];
+  const j = journeyFor(district.id, to);
+  if (!j) return;
+  let pre: Promise<unknown> | null = null;
+  const r = await openMetro(district, dest, j, () => { pre = loadDistrict(dest, () => {}).catch(() => null); });
+  if (!r) return;
+  S.clock += r.mins;
+  S.money = Math.round((S.money - r.cost) * 100) / 100;
+  await pre;
+  try {
+    await enterDistrict(dest, r.exit.pos);
+  } catch (e) {
+    toast(e instanceof Error ? e.message : '그 동네 지도를 펴지 못했어요');
+    return;
+  }
+  toast(`${dest.name} · ${r.mins}분 · €${r.cost.toFixed(2)}${r.wrong ? ` · 방향을 ${r.wrong}번 잘못 골랐어요` : ''}`);
+  hint(dest.surface);
+  setTimeout(() => hint(''), 6000);
+}
+
+/** 새 지구의 길·장소로 통째로 갈아 끼운다. */
+async function enterDistrict(d: District, at: LngLat) {
+  const data = await loadDistrict(d, (s) => toast(s));
+  district = d;
+  graph = buildGraph(data.ways);
+  places = parsePlaces(data.places, d.curated, ALL_RICH);
+  for (const p of places) allPlaces.set(p.id, p);
+  for (const m of markers.values()) m.remove();
+  markers.clear();
+  buildingOf.clear();
+  litIds.clear();
+  paintBuildings();
+  S.node = nearestNode(graph, at);
+  S.pos = graph.nodes[S.node];
+  S.path = [];
+  S.seg = 0;
+  S.target = null;
+  S.trail = [S.pos];
+  camMode = '';
+  camera('look');
+  avatar.setLngLat(S.pos);
+  (map.getSource('trail') as GeoJSONSource).setData(line(S.trail));
+  (map.getSource('route') as GeoJSONSource).setData(line([]));
+  (map.getSource('vision') as GeoJSONSource).setData(circle(S.pos, VISION));
+  if (map.getSource('streets')) (map.getSource('streets') as GeoJSONSource).setData({ type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: data.ways } });
+  map.jumpTo({ center: S.pos, zoom: 18.6, pitch: 30, bearing: 20 });
+  map.easeTo({ center: S.pos, zoom: CAM_LOOK.zoom, pitch: CAM_LOOK.pitch, duration: 2400 });
+  for (const p of places) if (p.known) showMarker(p, false);
+  paintMetroBtn();
+  look();
+  hud();
 }
 
 function hud() {
@@ -469,6 +551,7 @@ function start() {
     camMode = 'look';
     S.started = true;
     $('#hud').classList.add('on');
+    paintMetroBtn();
     const vosges = places.find((p) => p.known && p.cat === 'park');
     hint(vosges ? '지도에서 아무 데나 누르면 그쪽으로 걸어갑니다. 핀은 오기 전부터 알던 곳이에요.' : '지도에서 아무 데나 누르면 그쪽으로 걸어갑니다.');
   }, 2500);
@@ -486,9 +569,9 @@ function finish() {
     row[k]++;
     tastes.set(t, row);
   };
-  const byId = new Map(places.map((p) => [p.id, p]));
-  for (const id of S.seen.keys()) bump(byId.get(id)!, 'seen');
-  for (const id of S.opened) bump(byId.get(id)!, 'opened');
+  const byId = allPlaces;
+  for (const id of S.seen.keys()) { const p = byId.get(id); if (p) bump(p, 'seen'); }
+  for (const id of S.opened) { const p = byId.get(id); if (p) bump(p, 'opened'); }
   for (const v of S.visits) bump(v.place, 'entered');
 
   const lines: string[] = [];
@@ -525,12 +608,12 @@ function finish() {
   $('#sum-stats').textContent = `${fmtClock(10 * 60)} → ${fmtClock(S.clock)} · ${(S.walked / 1000).toFixed(1)} km · ${S.seen.size}곳 발견 · ${S.visits.length}곳 들어감 · €${Math.round((80 - S.money) * 100) / 100} 씀`;
   $('#sum-lines').replaceChildren(...lines.map((s) => { const li = document.createElement('li'); li.textContent = s; return li; }));
   const stops = [...S.visits.map((v) => ({ p: v.place, note: `${fmtClock(v.at)} · ${v.mins}분${v.cost ? ` · €${v.cost}` : ''}${v.dishes ? ` · ${v.dishes.map((d) => d.name).join(', ')}` : ''}` })),
-    ...[...S.saved].map((id) => byId.get(id)!).filter((p) => !S.visits.some((v) => v.place.id === p.id)).map((p) => ({ p, note: '찜 — 다음에' }))];
+    ...[...S.saved].map((id) => byId.get(id)).filter((p): p is Place => !!p && !S.visits.some((v) => v.place.id === p.id)).map((p) => ({ p, note: '찜 — 다음에' }))];
   $('#sum-stops').replaceChildren(...stops.map(({ p, note }) => { const li = document.createElement('li'); li.textContent = `${p.emoji} ${p.name} — ${note}`; return li; }));
   const link = $<HTMLAnchorElement>('#sum-maps');
   if (stops.length) {
     const pts = stops.slice(0, 9).map(({ p }) => `${p.pos[1].toFixed(6)},${p.pos[0].toFixed(6)}`);
-    const q = new URLSearchParams({ api: '1', origin: `${START[1]},${START[0]}`, destination: pts[pts.length - 1], travelmode: 'walking' });
+    const q = new URLSearchParams({ api: '1', origin: `${S.origin[1]},${S.origin[0]}`, destination: pts[pts.length - 1], travelmode: 'walking' });
     if (pts.length > 1) q.set('waypoints', pts.slice(0, -1).join('|'));
     link.href = `https://www.google.com/maps/dir/?${q}`;
     link.hidden = false;
@@ -552,6 +635,13 @@ function finish() {
   }
 }
 
+const metroBtn = $<HTMLButtonElement>('#metro-go');
+function paintMetroBtn() {
+  const to = DISTRICTS[otherDistrict(district.id)];
+  metroBtn.textContent = `🚇 ${to.name}`;
+  metroBtn.title = `${district.station.name} 역에서 지하철로 ${to.full}에 간다`;
+  metroBtn.onclick = () => travel(to.id);
+}
 $('#go').addEventListener('click', start);
 const eyeBtn = $<HTMLButtonElement>('#eye');
 const paintEye = () => { eyeBtn.textContent = eyeMode ? '👁 시선' : '🚁 위에서'; eyeBtn.title = eyeMode ? '걸을 때 눈높이에서 본다 (누르면 위에서 보기)' : '걸을 때 위에서 본다 (누르면 눈높이)'; };
@@ -572,6 +662,9 @@ eyeBtn.addEventListener('click', () => {
 $('#end').addEventListener('click', finish);
 $('#again').addEventListener('click', () => location.reload());
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openPlace) closeCard('pass'); });
+// 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
+// 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
+window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
 if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, walkTo, openCard, finish, places: () => places, graph: () => graph, map: () => map };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
