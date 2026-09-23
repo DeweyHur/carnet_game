@@ -15,6 +15,7 @@ import { DISTRICTS, journeyFor, otherDistrict } from './districts';
 import type { District, DistrictId } from './districts';
 import { ALL_RICH } from './rich';
 import { openMetro } from './metro';
+import type { MetroMap } from './metro';
 import * as sfx from './sound';
 import { menuFor } from './content';
 import { describe } from './generic';
@@ -153,6 +154,9 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
   map.addLayer({ id: 'trail', type: 'line', source: 'trail', paint: { 'line-color': '#e4572e', 'line-width': 4, 'line-opacity': 0.55 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
   map.addSource('route', { type: 'geojson', data: line([]) });
   map.addLayer({ id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#2d6cdf', 'line-width': 5, 'line-dasharray': [0.2, 1.6] }, layout: { 'line-cap': 'round' } });
+  // 지하철 구간(탈 때만 보인다)
+  map.addSource('metro', { type: 'geojson', data: line([]) });
+  map.addLayer({ id: 'metro', type: 'line', source: 'metro', paint: { 'line-color': '#bf3283', 'line-width': 7, 'line-opacity': 0.95 }, layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' } });
 
   const el = document.createElement('div');
   el.className = 'me';
@@ -160,8 +164,9 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
   avatar = new maplibregl.Marker({ element: el }).setLngLat(S.pos).addTo(map);
 
   for (const p of places) if (p.known) showMarker(p, false);
+  showStationMarker();
   map.on('click', (e) => {
-    if (!S.started || S.finished) return;
+    if (!S.started || S.finished || metroOpen) return;
     if (openPlace) { closeCard('pass'); return; }
     // 색칠된 건물을 눌렀나? 걷는 중이면 멈춰서 바라본다.
     const hit = map.queryRenderedFeatures(e.point, { layers: ['hl'] })[0];
@@ -368,7 +373,7 @@ function frame(t: number) {
     eyeFrame(cur + diff * Math.min(1, dt * 2));
   }
   lookAcc += dt;
-  if (lookAcc > 0.12 && S.started) { lookAcc = 0; look(); hud(); }
+  if (lookAcc > 0.12 && S.started && !metroOpen) { lookAcc = 0; look(); hud(); }
   requestAnimationFrame(frame);
 }
 
@@ -386,24 +391,123 @@ function arrive() {
 
 /** 역까지 걸어가서 지하철을 탄다. 역에서 멀면 먼저 걷는다. */
 function travel(to: DistrictId) {
-  if (!S.started || S.finished || openPlace) return;
+  if (!S.started || S.finished || openPlace || metroOpen) return;
   const st = district.station;
-  if (dist(S.pos, st.pos) > 60) {
+  // 버튼 한 번으로 순간이동하지 않는다. 지도에 찍힌 역 입구까지 걸어가서 들어간다.
+  if (dist(S.pos, st.pos) > 15) {
     S.travelTo = to;
     walkTo(st.pos, null);
-    toast(`Ⓜ ${st.name} 역으로 걸어갑니다`);
+    toast(`Ⓜ ${st.name} 입구로 걸어갑니다`);
+    hint('지하철 입구까지 걸어갑니다. 도착하면 표를 찍고 내려갑니다.');
     return;
   }
   void ride(to);
 }
+
+// ───────── 지하철을 탈 때의 지도 ─────────
+let metroOpen = false;
+let stationMarker: Marker | null = null;
+let trainMarker: Marker | null = null;
+const stopMarkers: Marker[] = [];
+const exitMarkers: Marker[] = [];
+let trainAnim = 0;
+
+/** 지금 지구의 지하철 입구를 지도에 찍는다. 눌러도 지하철을 탈 수 있다. */
+function showStationMarker() {
+  stationMarker?.remove();
+  const st = district.station;
+  const el = document.createElement('div');
+  el.className = 'mstation';
+  el.innerHTML = `<span class="m">Ⓜ</span><span class="nm"></span>`;
+  el.querySelector('.nm')!.textContent = st.name;
+  el.title = '지하철 입구';
+  el.addEventListener('click', (ev) => { ev.stopPropagation(); travel(otherDistrict(district.id)); });
+  stationMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(st.pos).addTo(map);
+}
+
+const bottomPad = () => Math.round(Math.min(window.innerHeight * 0.52, 460));
+
+const metroMap: MetroMap = {
+  ride(color, stops) {
+    (map.getSource('metro') as GeoJSONSource).setData(line(stops.map((s) => s.pos)));
+    map.setPaintProperty('metro', 'line-color', color);
+    map.setLayoutProperty('metro', 'visibility', 'visible');
+    for (const m of stopMarkers) m.remove();
+    stopMarkers.length = 0;
+    stops.forEach((s, i) => {
+      const el = document.createElement('div');
+      el.className = `stpin ${i === 0 ? 'from' : ''} ${i === stops.length - 1 ? 'to' : ''}`;
+      el.style.setProperty('--c', color);
+      el.innerHTML = `<i></i><span class="nm"></span>`;
+      el.querySelector('.nm')!.textContent = s.name;
+      stopMarkers.push(new maplibregl.Marker({ element: el, anchor: 'left' }).setLngLat(s.pos).addTo(map));
+    });
+    if (!trainMarker) {
+      const el = document.createElement('div');
+      el.className = 'train';
+      el.textContent = '🚇';
+      trainMarker = new maplibregl.Marker({ element: el }).setLngLat(stops[0].pos);
+    }
+    trainMarker.setLngLat(stops[0].pos).addTo(map);
+    avatar.getElement().classList.add('hidden');
+    map.setCenterClampedToGround(true);
+    const b = stops.reduce((bb, s) => bb.extend(s.pos), new maplibregl.LngLatBounds(stops[0].pos, stops[0].pos));
+    map.easeTo({ pitch: 0, bearing: 0, duration: 500 });
+    setTimeout(() => map.fitBounds(b, { padding: { top: 90, bottom: bottomPad(), left: 50, right: 50 }, maxZoom: 15.8, duration: 1100 }), 520);
+  },
+  train(from, to, ms) {
+    cancelAnimationFrame(trainAnim);
+    const t0 = performance.now();
+    const tick = (t: number) => {
+      const k = Math.min(1, (t - t0) / ms);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      trainMarker?.setLngLat([from[0] + (to[0] - from[0]) * e, from[1] + (to[1] - from[1]) * e]);
+      if (k < 1) trainAnim = requestAnimationFrame(tick);
+    };
+    trainAnim = requestAnimationFrame(tick);
+  },
+  exits(list, at, pick) {
+    for (const m of exitMarkers) m.remove();
+    exitMarkers.length = 0;
+    list.forEach((x, i) => {
+      const el = document.createElement('div');
+      el.className = 'exitpin';
+      el.innerHTML = `<b></b><span class="nm"></span>`;
+      el.querySelector('b')!.textContent = String(i + 1);
+      el.querySelector('.nm')!.textContent = x.label.split('—')[0].trim();
+      el.addEventListener('click', (ev) => { ev.stopPropagation(); pick(i); });
+      exitMarkers.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(x.pos).addTo(map));
+    });
+    const b = list.reduce((bb, x) => bb.extend(x.pos), new maplibregl.LngLatBounds(at, at));
+    map.fitBounds(b, { padding: { top: 90, bottom: bottomPad(), left: 60, right: 60 }, maxZoom: 17.4, duration: 1100 });
+  },
+  markExit(i) {
+    exitMarkers.forEach((m, k) => m.getElement().classList.toggle('picked', k === i));
+  },
+  clear() {
+    cancelAnimationFrame(trainAnim);
+    map.setLayoutProperty('metro', 'visibility', 'none');
+    (map.getSource('metro') as GeoJSONSource).setData(line([]));
+    trainMarker?.remove();
+    for (const m of stopMarkers) m.remove();
+    stopMarkers.length = 0;
+    for (const m of exitMarkers) m.remove();
+    exitMarkers.length = 0;
+    avatar.getElement().classList.remove('hidden');
+  },
+};
 
 async function ride(to: DistrictId) {
   const dest = DISTRICTS[to];
   const j = journeyFor(district.id, to);
   if (!j) return;
   let pre: Promise<unknown> | null = null;
-  const r = await openMetro(district, dest, j, () => { pre = loadDistrict(dest, () => {}).catch(() => null); });
-  if (!r) return;
+  metroOpen = true;
+  hint('');
+  const r = await openMetro(district, dest, j, () => { pre = loadDistrict(dest, () => {}).catch(() => null); }, metroMap);
+  metroMap.clear();
+  metroOpen = false;
+  if (!r) { camera('look'); map.easeTo({ center: S.pos, zoom: CAM_LOOK.zoom, pitch: CAM_LOOK.pitch, duration: 900 }); return; }
   S.clock += r.mins;
   S.money = Math.round((S.money - r.cost) * 100) / 100;
   await pre;
@@ -446,6 +550,7 @@ async function enterDistrict(d: District, at: LngLat) {
   map.jumpTo({ center: S.pos, zoom: 18.6, pitch: 30, bearing: 20 });
   map.easeTo({ center: S.pos, zoom: CAM_LOOK.zoom, pitch: CAM_LOOK.pitch, duration: 2400 });
   for (const p of places) if (p.known) showMarker(p, false);
+  showStationMarker();
   paintMetroBtn();
   look();
   hud();

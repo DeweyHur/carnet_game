@@ -164,3 +164,33 @@ button:disabled { opacity:.5; cursor:default; }
 .route .tag { font-style:normal; font-size:11px; padding:2px 8px; border-radius:999px; background:#ffffff1a; color:#d9cfbd; white-space:nowrap; }
 .route .tag.now { background:#f3ead9; color:#1f1b16; font-weight:700; }
 .route .tag.off { background:#e4572e; color:#fff; font-weight:700; }
+
+/* 지하철: 지도를 뒤로 보여 주는 모드 */
+#metro.mapmode { justify-content:flex-end; pointer-events:none; background:linear-gradient(#0b0a0900 0 34%, #0b0a09b3 58%, #0b0a09 84%); }
+#metro.mapmode .metro-sheet { pointer-events:auto; background:#141210f2; backdrop-filter:blur(10px); border-radius:18px; padding:16px 16px 18px; box-shadow:0 -12px 44px #000a, inset 0 0 0 1px #ffffff14; }
+#metro.mapmode .metro-photo { display:none; }
+
+.metro-sheet.riding .ride-head { display:flex; align-items:center; gap:10px; font-size:16px; }
+.ride-chips { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 10px; }
+.ride-chips .chip { font-size:13px; padding:5px 11px; border-radius:999px; background:#ffffff14; color:#8d8373; transition:.3s; }
+.ride-chips .chip.on { background:#f3ead9; color:#1f1b16; font-weight:700; }
+.ride-say { margin:0; font-size:15px; line-height:1.6; color:#d9cfbd; min-height:1.6em; }
+
+.exit { flex-direction:row !important; align-items:center !important; gap:12px; }
+.exit-no { flex:0 0 28px; height:28px; border-radius:50%; display:grid; place-items:center; font-style:normal; font-weight:800; font-size:14px; background:#ffd166; color:#1f1b16; }
+.exit-mid { display:flex; flex-direction:column; gap:2px; min-width:0; text-align:left; }
+
+/* 지도 위: 역 입구 · 전동차 · 지나는 역 · 출구 */
+.mstation { display:flex; align-items:center; gap:6px; padding:4px 12px 4px 5px; border-radius:999px; background:#1c1a16; color:#f3ead9; box-shadow:0 2px 8px #0007, inset 0 0 0 1px #ffffff2b; cursor:pointer; }
+.mstation .m { width:24px; height:24px; border-radius:50%; background:#ffd166; color:#1f1b16; display:grid; place-items:center; font-size:15px; font-weight:800; }
+.mstation .nm { font-size:13px; font-weight:700; white-space:nowrap; }
+.train { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; font-size:19px; background:#fff; box-shadow:0 3px 12px #0007, 0 0 0 5px #ffffff4d; }
+.stpin { display:flex; align-items:center; gap:7px; margin-left:-7px; }
+.stpin i { width:14px; height:14px; border-radius:50%; background:#fff; box-shadow:inset 0 0 0 4px var(--c), 0 1px 4px #0007; flex:0 0 14px; }
+.stpin .nm { font-size:12px; font-weight:700; color:#1f1b16; background:#fffffff0; padding:2px 8px; border-radius:999px; white-space:nowrap; box-shadow:0 1px 4px #0005; }
+.stpin.from .nm, .stpin.to .nm { background:#1c1a16; color:#f3ead9; }
+.exitpin { display:flex; align-items:center; gap:6px; padding:4px 11px 4px 4px; border-radius:999px; background:#fbf7ef; color:#1f1b16; box-shadow:0 3px 10px #0006; cursor:pointer; transition:.2s; }
+.exitpin b { width:24px; height:24px; border-radius:50%; background:#ffd166; display:grid; place-items:center; font-size:14px; }
+.exitpin .nm { font-size:12.5px; font-weight:700; white-space:nowrap; }
+.exitpin:hover { translate:0 -2px; }
+.exitpin.picked { background:#e4572e; color:#fff; } .exitpin.picked b { background:#fff; }

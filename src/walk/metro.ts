@@ -4,8 +4,22 @@ import * as sfx from './sound';
 import { FARE, journeyMins, rideInfo } from './districts';
 import type { District, Exit, Journey, Leg, Ride } from './districts';
 import { findPhoto } from './photos';
+import { STATION_POS } from './stations';
+import type { LngLat } from './graph';
 
 export interface MetroResult { mins: number; cost: number; exit: Exit; wrong: number }
+
+/** 지하철을 타는 동안 뒤에 보이는 지도. main.ts가 구현한다. */
+export interface MetroMap {
+  /** 이번 구간을 지도에 그리고 화면에 맞춘다 */
+  ride(color: string, stops: { name: string; pos: LngLat }[]): void;
+  /** 전동차를 from에서 to까지 ms 동안 움직인다 */
+  train(from: LngLat, to: LngLat, ms: number): void;
+  /** 출구를 지도에 찍는다. 핀을 누르면 pick(i) */
+  exits(list: Exit[], at: LngLat, pick: (i: number) => void): void;
+  markExit(i: number): void;
+  clear(): void;
+}
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const el = (tag: string, cls?: string, text?: string) => {
@@ -76,15 +90,20 @@ function routeMap(r: Ride, onPick?: (dir: 0 | 1) => void) {
  * 역에 내려가서 목적지 지구의 지상까지. 취소하면 null.
  * 타는 동안 목적지 지구 데이터를 미리 받아 두라고 preload를 불러 준다.
  */
-export function openMetro(from: District, dest: District, j: Journey, preload: () => void): Promise<MetroResult | null> {
+export function openMetro(from: District, dest: District, j: Journey, preload: () => void, gis: MetroMap): Promise<MetroResult | null> {
   return new Promise((resolve) => {
     const root = $('#metro');
     let mins = 0;
     let wrong = 0;
     let step = 0;
 
-    const show = (node: HTMLElement) => { root.replaceChildren(node); root.classList.add('on'); root.scrollTop = 0; };
-    const close = (r: MetroResult | null) => { root.classList.remove('on'); root.replaceChildren(); resolve(r); };
+    const show = (node: HTMLElement, onMap = false) => {
+      root.replaceChildren(node);
+      root.classList.add('on');
+      root.classList.toggle('mapmode', onMap); // 지도가 뒤로 보이게 아래쪽 패널만 남긴다
+      root.scrollTop = 0;
+    };
+    const close = (r: MetroResult | null) => { root.classList.remove('on', 'mapmode'); root.replaceChildren(); resolve(r); };
 
     const shell = (line: string, title: string, sub?: string, photo?: string[]) => {
       const w = el('div', 'metro-sheet');
@@ -155,56 +174,90 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
         }
         sfx.enter();
         mins += r.mins;
-        bumpRun(w);
         for (const b of wrap.querySelectorAll('.term.pick')) (b as HTMLButtonElement).disabled = true;
         wrap.querySelectorAll('.term.pick')[dir].classList.add('ok');
-        // 한 역씩 지나간다
-        const rows = [...rail.querySelectorAll<HTMLElement>('.stop')];
-        const at = (i: number) => rows.find((x) => Number(x.dataset.i) === i);
-        const stepDir = r.b > r.a ? 1 : -1;
-        let cur = r.a;
-        const tickTo = () => {
-          at(cur)?.classList.remove('here');
-          at(cur)?.querySelector('.tag.now')?.remove();
-          cur += stepDir;
-          const row = at(cur);
-          if (row) {
-            row.classList.add('here', 'passing');
-            if (cur !== r.b) row.appendChild(el('em', 'tag now', '지나간다'));
-            sfx.tick();
-          }
-          if (cur !== r.b) setTimeout(tickTo, 700);
-          else setTimeout(next, 1100);
-        };
-        setTimeout(tickTo, 500);
+        setTimeout(() => running(l, r), 700);
       };
 
-      const { wrap, rail } = routeMap(r, pick);
+      const { wrap } = routeMap(r, pick);
       w.appendChild(wrap);
       show(w);
+    };
+
+    /** 달리는 중: 지도가 뒤로 보이고, 지나는 역이 지도와 패널에 같이 표시된다 */
+    const running = (l: Extract<Leg, { kind: 'ride' }>, r: Ride) => {
+      const stepDir = r.b > r.a ? 1 : -1;
+      const names: string[] = [];
+      for (let i = r.a; i !== r.b + stepDir; i += stepDir) names.push(r.stations[i]);
+      const stops = names.map((n) => ({ name: n, pos: STATION_POS[n] })).filter((x) => x.pos);
+
+      const w = el('div', 'metro-sheet riding');
+      const badge = el('i', 'mline', l.line);
+      badge.style.background = r.color;
+      badge.style.color = r.ink;
+      const head = el('div', 'ride-head');
+      head.append(badge, el('b', '', `${l.from} → ${l.to}`));
+      w.appendChild(head);
+      const chips = el('div', 'ride-chips');
+      const nodes = names.map((n, i) => {
+        const c = el('span', 'chip', n);
+        if (i === 0) c.classList.add('on');
+        chips.appendChild(c);
+        return c;
+      });
+      w.appendChild(chips);
+      const say = el('p', 'ride-say', '문이 닫힌다.');
+      w.appendChild(say);
+      const run = el('p', 'metro-run', `여기까지 ${mins}분`);
+      w.appendChild(run);
+      show(w, stops.length > 1);
+
+      if (stops.length > 1) gis.ride(r.color, stops);
+      const HOP = 1500;
+      let k = 0;
+      const hop = () => {
+        const from = stops[k]?.pos, to = stops[k + 1]?.pos;
+        if (from && to) gis.train(from, to, HOP);
+        k++;
+        nodes.forEach((c, i) => c.classList.toggle('on', i === k));
+        sfx.tick();
+        const last = k >= names.length - 1;
+        say.textContent = last ? `${names[k]}. 여기서 내린다.` : `${names[k]} 통과.`;
+        if (!last) setTimeout(hop, HOP + 250);
+        else setTimeout(next, 1400);
+      };
+      setTimeout(hop, stops.length > 1 ? 1700 : 500);
     };
 
     // ── 마지막. 어느 출구로
     const exits = () => {
       const w = shell(`Ⓜ ${dest.station.name} 도착`, '어느 출구로 올라갈까',
-        '같은 역이라도 출구마다 다른 데로 나온다. 지상에서 보이는 첫 장면이 달라진다.', dest.station.photo);
+        '지도에 찍힌 번호가 출구 위치다. 같은 역이라도 출구마다 다른 데로 나오고, 지상에서 보이는 첫 장면이 달라진다.', dest.station.photo);
       const list = el('div', 'exits');
-      for (const x of dest.station.exits) {
+      const take = (i: number) => {
+        const x = dest.station.exits[i];
+        blurActive();
+        for (const c of list.children) (c as HTMLButtonElement).disabled = true;
+        gis.markExit(i);
+        mins += x.mins;
+        for (let n = 0; n < 6; n++) sfx.stair(n);
+        sfx.surface();
+        setTimeout(() => close({ mins, cost: FARE, exit: x, wrong }), 1500);
+      };
+      dest.station.exits.forEach((x, i) => {
         const b = el('button', 'exit') as HTMLButtonElement;
-        b.appendChild(el('b', '', `Sortie · ${x.label}`));
-        b.appendChild(el('small', '', x.note));
-        b.onclick = () => {
-          blurActive();
-          for (const c of list.children) (c as HTMLButtonElement).disabled = true;
-          mins += x.mins;
-          for (let i = 0; i < 6; i++) sfx.stair(i);
-          sfx.surface();
-          setTimeout(() => close({ mins, cost: FARE, exit: x, wrong }), 1500);
-        };
+        const no = el('em', 'exit-no', String(i + 1));
+        const mid = el('span', 'exit-mid');
+        mid.appendChild(el('b', '', `Sortie · ${x.label}`));
+        mid.appendChild(el('small', '', x.note));
+        b.append(no, mid);
+        b.onclick = () => take(i);
         list.appendChild(b);
-      }
+      });
       w.appendChild(list);
-      show(w);
+      show(w, true);
+      const at = STATION_POS[dest.station.name] ?? dest.station.pos;
+      gis.exits(dest.station.exits, at, take);
     };
 
     const next = () => {
