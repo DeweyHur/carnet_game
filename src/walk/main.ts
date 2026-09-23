@@ -11,7 +11,7 @@ import type { Graph, LngLat } from './graph';
 import { CAT_INFO, TASTE_OF, parsePlaces } from './places';
 import type { Place, Taste } from './places';
 import { loadDistrict } from './data';
-import { DISTRICTS, journeyFor, otherDistricts, planJourney } from './districts';
+import { DISTRICTS, journeyFor, otherDistricts, planOptions, stopPos, LINES } from './districts';
 import type { District, Gate, Journey } from './districts';
 import { ALL_RICH } from './rich';
 import { openMetro } from './metro';
@@ -397,18 +397,27 @@ function arrive() {
 const allGates = (d: District) => d.stations.flatMap((st) => st.gates.map((g) => ({ st, g })));
 const stationOfGate = (g: Gate) => allGates(district).find((x) => x.g === g)?.st ?? district.stations[0];
 
-/** 지금 자리에서 가장 가까운 출입구. 여정이 정해져 있으면 그 여정이 쓰는 역의 출입구 중에서 고른다. */
+/** 지금 자리에서 가장 가까운 출입구 */
 function nearestGate(onlyStation?: string): Gate {
   const list = allGates(district).filter((x) => !onlyStation || x.st.name === onlyStation);
   return (list.length ? list : allGates(district)).reduce((a, b) => (dist(S.pos, b.g.pos) < dist(S.pos, a.g.pos) ? b : a)).g;
 }
 
+/** 이 여정을 타는 곳. 지하철이면 그 역의 가까운 출입구, 버스면 정류장 자체. */
+function boardingGate(j: Journey): Gate {
+  const first = j.legs.find((l) => l.kind === 'ride') as Extract<Journey['legs'][number], { kind: 'ride' }> | undefined;
+  if (first && LINES[first.line].mode === 'bus') {
+    const pos = stopPos(first.line, j.from) ?? S.pos;
+    return { ref: LINES[first.line].label, label: `${j.from} 정류장`, note: '길가 정류장. 버스가 오면 앞문으로 탄다.', pos, mins: 0 };
+  }
+  return nearestGate(j.from);
+}
+
 /** 목적지(동네 또는 그 동네의 한 장소)로 간다. */
 function travel(dest: Dest, gate?: Gate) {
   if (!S.started || S.finished || openPlace || metroOpen) return;
-  const j = planJourney(dest.district.id, district.stations, dest.district.stations, S.pos);
-  if (!j) { toast('그쪽으로 가는 길을 못 찾았어요'); return; }
-  const g = gate ?? nearestGate(j.from);
+  const j = dest.journey;
+  const g = gate ?? boardingGate(j);
   S.dest = dest;
   // 버튼 한 번으로 순간이동하지 않는다. 지도에 찍힌 그 출입구까지 걸어가서 내려간다.
   if (dist(S.pos, g.pos) > 12) {
@@ -425,7 +434,7 @@ function travel(dest: Dest, gate?: Gate) {
 /** 목적지 고르는 화면을 연다 */
 function chooseDestination() {
   if (!S.started || S.finished || openPlace || metroOpen) return;
-  void openDestination(district, otherDistricts(district.id), (from, to) => planJourney(to.id, from.stations, to.stations, S.pos)).then((d) => {
+  void openDestination(district, otherDistricts(district.id), (from, to) => planOptions(from, to, S.pos)).then((d) => {
     if (d) travel(d);
   });
 }

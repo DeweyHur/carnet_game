@@ -1,7 +1,7 @@
 // 지하철로 다른 지구에 간다. 로딩 화면이 아니라, 초행자가 실제로 헤매는 자리만 골라 넣었다.
 // 노선도를 보고 방향을 고르고, 환승 통로를 걷고, 어느 출구로 올라올지 고른다.
 import * as sfx from './sound';
-import { FARE, rideInfo } from './districts';
+import { LINES, rideInfo, stopPos } from './districts';
 import type { District, Gate, Journey, Leg, Ride } from './districts';
 import type { Curated } from './places';
 import { findPhoto } from './photos';
@@ -123,18 +123,23 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
     const bumpRun = (w: HTMLElement) => { const r = w.querySelector('.metro-run'); if (r) r.textContent = `여기까지 ${mins}분`; };
 
     // ── 0. 들어갈까
+    const firstRide = j.legs.find((l) => l.kind === 'ride') as Extract<Leg, { kind: 'ride' }> | undefined;
+    const startsByBus = !!firstRide && LINES[firstRide.line].mode === 'bus';
+
     const gate = () => {
-      const lines = j.legs.filter((l) => l.kind === 'ride').map((l) => `${l.line}호선`).join(' → ');
+      const lines = j.legs.filter((l): l is Extract<Leg, { kind: 'ride' }> => l.kind === 'ride').map((l) => LINES[l.line].label).join(' → ');
       const nTransfer = j.legs.filter((l) => l.kind === 'transfer').length;
       const goal = want ? `${want.name}까지 가려면` : `${dest.name}까지 가려면`;
-      const w = shell(`Ⓜ ${j.from} · ${entered.label}`, goal, `${lines} · ${nTransfer ? `환승 ${nTransfer}번` : '환승 없음'} · 약 ${j.mins}분`, stationPhoto(from, j.from));
+      const head = startsByBus ? `🚏 ${j.from} 정류장` : `Ⓜ ${j.from} · ${entered.label}`;
+      const w = shell(head, goal, `${lines} · ${nTransfer ? `갈아타기 ${nTransfer}번` : '갈아타기 없음'} · 약 ${j.mins}분`, startsByBus ? undefined : stationPhoto(from, j.from));
       const ticket = el('div', 'ticket');
-      ticket.appendChild(el('b', '', 'Ticket t+'));
-      ticket.appendChild(el('span', '', `메트로·전철 1회권 €${FARE.toFixed(2)}`));
+      ticket.appendChild(el('b', '', j.modes.length > 1 ? 'Tickets ×2' : startsByBus ? 'Ticket Bus-Tram' : 'Ticket Métro'));
+      ticket.appendChild(el('span', '', `${j.modes.map((m) => (m === 'bus' ? '버스·트램 €2.05' : '메트로·전철 €2.55')).join(' + ')} = €${j.fare.toFixed(2)}`));
       w.appendChild(ticket);
+      if (j.modes.length > 1) w.appendChild(el('p', 'metro-wrong', '버스표로는 지하철을 못 탄다. 두 장을 사야 한다.'));
       const acts = el('div', 'acts');
-      const go = el('button', 'primary', '표를 찍고 내려간다') as HTMLButtonElement;
-      go.onclick = () => { blurActive(); sfx.tick(); mins += 3; preload(); next(); };
+      const go = el('button', 'primary', startsByBus ? '정류장에서 기다린다' : '표를 찍고 내려간다') as HTMLButtonElement;
+      go.onclick = () => { blurActive(); sfx.tick(); mins += startsByBus ? 6 : 3; preload(); next(); };
       const no = el('button', '', '그만둔다');
       no.onclick = () => { blurActive(); close(null); };
       acts.append(go, no);
@@ -144,9 +149,9 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
 
     // ── 환승
     const transfer = (l: Extract<Leg, { kind: 'transfer' }>) => {
-      const w = shell(`${l.at} 환승`, `${l.from}호선에서 ${l.to}호선으로`, l.note, l.photo);
+      const w = shell(`${l.at} ${l.street ? '갈아타기' : '환승'}`, `${l.from}에서 ${l.to}로`, l.note, l.photo);
       const acts = el('div', 'acts');
-      const go = el('button', 'primary', `통로를 걷는다 (${l.mins}분)`) as HTMLButtonElement;
+      const go = el('button', 'primary', `${l.street ? '길을 걸어 옮긴다' : '통로를 걷는다'} (${l.mins}분)`) as HTMLButtonElement;
       go.onclick = () => {
         blurActive();
         go.disabled = true;
@@ -162,8 +167,11 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
     // ── 타기: 노선도에서 방향을 고른다
     const ride = (l: Extract<Leg, { kind: 'ride' }>) => {
       const r = rideInfo(l);
-      const w = shell(`Ⓜ${l.line} · ${l.from} 승강장`, `${l.to}까지 ${r.stops}정거장`,
-        '파리 지하철은 가는 방향을 종착역 이름으로 적어 둔다. 노선도에서 내려야 할 역이 위인지 아래인지 보고 고르면 된다.', l.photo);
+      const bus = r.mode === 'bus';
+      const w = shell(`${bus ? '🚏' : 'Ⓜ'} ${r.label} · ${l.from}`, `${l.to}까지 ${r.stops}정거장`,
+        bus
+          ? '버스도 가는 방향을 종착지 이름으로 적어 둔다. 길 이쪽에서 탈지 건너편에서 탈지가 갈린다.'
+          : '파리 지하철은 가는 방향을 종착역 이름으로 적어 둔다. 노선도에서 내려야 할 역이 위인지 아래인지 보고 고르면 된다.', l.photo);
 
       const pick = (dir: 0 | 1) => {
         blurActive();
@@ -236,6 +244,7 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
 
     // ── 마지막. 어느 출구로
     const exits = () => {
+      if (j.arriveMode === 'bus') return offBus();
       const arrive = dest.stations.find((st) => st.name === j.arrive) ?? dest.stations[0];
       const gates = arrive.gates;
       // 가고 싶다고 고른 곳이 있으면 거기서 가장 가까운 출구를 추천한다
@@ -251,7 +260,7 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
         mins += x.mins;
         for (let n = 0; n < 6; n++) sfx.stair(n);
         sfx.surface();
-        setTimeout(() => close({ mins, cost: FARE, exit: x, wrong }), 1500);
+        setTimeout(() => close({ mins, cost: j.fare, exit: x, wrong }), 1500);
       };
       gates.forEach((x, i) => {
         const b = el('button', `exit ${i === best ? 'best' : ''}`) as HTMLButtonElement;
@@ -269,6 +278,22 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
       show(w, true);
       const at = STATION_POS[arrive.name] ?? gates[0].pos;
       gis.exits(gates, at, take);
+    };
+
+    /** 버스는 내리면 바로 길가다 — 출구를 고를 게 없다 */
+    const offBus = () => {
+      const lastRide = [...j.legs].reverse().find((l) => l.kind === 'ride') as Extract<Leg, { kind: 'ride' }>;
+      const pos = stopPos(lastRide.line, j.arrive) ?? entered.pos;
+      const stop: Gate = { ref: LINES[lastRide.line].label, label: `${j.arrive} 정류장`, note: '버스에서 내리면 바로 길가다.', pos, mins: 0 };
+      const w = shell(`🚏 ${j.arrive}`, '여기서 내린다',
+        want ? `${want.name}까지 걸어서 ${Math.max(1, Math.round((near(pos, want.pos) * 1.3) / 1.35 / 60))}분.` : '문이 열리고 거리 소음이 들어온다.', undefined);
+      const acts = el('div', 'acts');
+      const go = el('button', 'primary', '내린다') as HTMLButtonElement;
+      go.onclick = () => { blurActive(); go.disabled = true; sfx.surface(); setTimeout(() => close({ mins, cost: j.fare, exit: stop, wrong }), 900); };
+      acts.appendChild(go);
+      w.appendChild(acts);
+      show(w, true);
+      gis.exits([stop], pos, () => go.click());
     };
 
     const next = () => {

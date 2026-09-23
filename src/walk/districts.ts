@@ -7,6 +7,7 @@ import { CURATED_MONTMARTRE } from './montmartre';
 import { CURATED_BELLEVILLE } from './belleville';
 import { CURATED_CHAMPS } from './champs';
 import { STATION_POS } from './stations';
+import { BUS_LINES } from './bus';
 
 export type DistrictId = 'marais' | 'saint-germain' | 'montmartre' | 'belleville' | 'champs-elysees';
 
@@ -34,6 +35,7 @@ export interface District {
   data: string; // public/walk/*.json
   curated: Curated[];
   stations: Station[];
+  bbox: [number, number, number, number]; // s,w,n,e — 이 안의 버스 정류장이 이 동네의 정류장
   start: LngLat; // 게임을 시작하는 자리(마레만 쓴다)
 }
 
@@ -44,6 +46,7 @@ export const DISTRICTS: Record<DistrictId, District> = {
     id: 'marais', name: '마레', full: '마레 지구 · 3·4구',
     blurb: '좁은 골목, 17세기 저택, 유대인 거리와 부티크. 걸어 다니기 가장 좋은 동네.',
     data: 'walk/marais.json', curated: CURATED_MARAIS,
+    bbox: [48.8520, 2.3530, 48.8625, 2.3700],
     start: [2.360296, 48.855267],
     stations: [
       { name: 'Saint-Paul', lines: ['1'],
@@ -65,6 +68,7 @@ export const DISTRICTS: Record<DistrictId, District> = {
     id: 'saint-germain', name: '생제르맹', full: '생제르맹–라탱 · 5·6구',
     blurb: '강변 헌책 좌판, 오래된 카페와 서점, 대학과 공원. 마레보다 넓고 평평하다.',
     data: 'walk/saint-germain.json', curated: CURATED_SG,
+    bbox: [48.8440, 2.3300, 48.8580, 2.3490],
     start: [2.34423, 48.853265],
     stations: [
       { name: 'Saint-Michel', lines: ['4'], photo: ['file:Saint-Michel-quais-depuis-puits-dacces.jpg'],
@@ -86,6 +90,7 @@ export const DISTRICTS: Record<DistrictId, District> = {
     id: 'montmartre', name: '몽마르트르', full: '몽마르트르 · 18구',
     blurb: '언덕 위 하얀 성당, 화가들의 광장, 계단과 포도밭. 오르내리는 만큼 풍경이 바뀐다.',
     data: 'walk/montmartre.json', curated: CURATED_MONTMARTRE,
+    bbox: [48.8790, 2.3320, 48.8905, 2.3480],
     start: [2.338642, 48.884804],
     stations: [
       { name: 'Abbesses', lines: ['12'],
@@ -102,6 +107,7 @@ export const DISTRICTS: Record<DistrictId, District> = {
     id: 'belleville', name: '벨빌', full: '벨빌·메닐몽탕 · 20·11구',
     blurb: '언덕 위 전망 공원, 벽화 골목, 여러 나라 밥집. 관광지가 아니라 사람 사는 동네.',
     data: 'walk/belleville.json', curated: CURATED_BELLEVILLE,
+    bbox: [48.8650, 2.3730, 48.8770, 2.3900],
     start: [2.376955, 48.872293],
     stations: [
       { name: 'Belleville', lines: ['2', '11'],
@@ -117,6 +123,7 @@ export const DISTRICTS: Record<DistrictId, District> = {
     id: 'champs-elysees', name: '샹젤리제', full: '샹젤리제·에투알 · 8구',
     blurb: '개선문과 1.9km 대로, 유리 지붕의 궁전들. 블록이 크고 대로가 넓다.',
     data: 'walk/champs-elysees.json', curated: CURATED_CHAMPS,
+    bbox: [48.8655, 2.2925, 48.8765, 2.3150],
     start: [2.30061, 48.872207],
     stations: [
       { name: 'George V', lines: ['1'],
@@ -139,13 +146,23 @@ export const DISTRICTS: Record<DistrictId, District> = {
 export const ALL_DISTRICTS = Object.values(DISTRICTS);
 export const otherDistricts = (id: DistrictId) => ALL_DISTRICTS.filter((d) => d.id !== id);
 
-// ───────── 지하철 ─────────
-export const FARE = 2.55; // 2026년 Île-de-France 메트로·전철 1회권
-const MIN_PER_STOP = 1.6;
-const TRANSFER_MINS = 5;
+// ───────── 노선 ─────────
+export type Mode = 'metro' | 'bus';
 
-/** 노선의 전체 역 순서. 방향 이름(종착역)·정거장 수·환승역이 전부 여기서 나온다. */
-export const LINES: Record<string, { color: string; ink: string; stations: string[] }> = {
+export const FARE: Record<Mode, number> = {
+  metro: 2.55, // 메트로·전철·RER 1회권 (같은 계열끼리 2시간 환승)
+  bus: 2.05, // 버스·트램 1회권 (지상 교통끼리 1시간 30분 환승)
+};
+// 버스와 메트로는 표가 다르다 — 섞어 타면 두 장을 산다. (Navigo Liberté+만 예외)
+
+const PACE: Record<Mode, number> = { metro: 1.6, bus: 2.4 }; // 한 정거장에 걸리는 분
+const BOARD: Record<Mode, number> = { metro: 3, bus: 6 }; // 개찰·플랫폼 / 정류장에서 기다리기
+const CORRIDOR = 5; // 같은 역 안에서 노선 갈아타기
+const NEAR_M = 220; // 이 안이면 걸어서 갈아탄다
+
+export interface LineDef { mode: Mode; color: string; ink: string; label: string; stations: string[] }
+
+const METRO: Record<string, Omit<LineDef, 'mode' | 'label'>> = {
   '1': { color: '#ffcd00', ink: '#1f1b16', stations: ['La Défense', 'Esplanade de La Défense', 'Pont de Neuilly', 'Les Sablons', 'Porte Maillot', 'Argentine', 'Charles de Gaulle – Étoile', 'George V', 'Franklin D. Roosevelt', 'Champs-Élysées – Clemenceau', 'Concorde', 'Tuileries', 'Palais Royal – Musée du Louvre', 'Louvre – Rivoli', 'Châtelet', 'Hôtel de Ville', 'Saint-Paul', 'Bastille', 'Gare de Lyon', 'Reuilly – Diderot', 'Nation', 'Porte de Vincennes', 'Saint-Mandé', 'Bérault', 'Château de Vincennes'] },
   '2': { color: '#0064b0', ink: '#fff', stations: ['Porte Dauphine', 'Victor Hugo', 'Charles de Gaulle – Étoile', 'Ternes', 'Courcelles', 'Monceau', 'Villiers', 'Rome', 'Place de Clichy', 'Blanche', 'Pigalle', 'Anvers', 'Barbès – Rochechouart', 'La Chapelle', 'Stalingrad', 'Jaurès', 'Colonel Fabien', 'Belleville', 'Couronnes', 'Ménilmontant', 'Père Lachaise', 'Philippe Auguste', 'Alexandre Dumas', 'Avron', 'Nation'] },
   '4': { color: '#bf3283', ink: '#fff', stations: ['Porte de Clignancourt', 'Simplon', 'Marcadet – Poissonniers', 'Château Rouge', 'Barbès – Rochechouart', 'Gare du Nord', "Gare de l'Est", "Château d'Eau", 'Strasbourg – Saint-Denis', 'Réaumur – Sébastopol', 'Étienne Marcel', 'Les Halles', 'Châtelet', 'Cité', 'Saint-Michel', 'Odéon', 'Saint-Germain-des-Prés', 'Saint-Sulpice', 'Saint-Placide', 'Montparnasse – Bienvenüe', 'Vavin', 'Raspail', 'Denfert-Rochereau', 'Mouton-Duvernet', 'Alésia', "Porte d'Orléans", 'Mairie de Montrouge', 'Barbara', 'Bagneux – Lucie Aubrac'] },
@@ -153,9 +170,27 @@ export const LINES: Record<string, { color: string; ink: string; stations: strin
   '12': { color: '#007852', ink: '#fff', stations: ["Mairie d'Aubervilliers", 'Aimé Césaire', 'Front Populaire', 'Porte de la Chapelle', 'Marx Dormoy', 'Marcadet – Poissonniers', 'Jules Joffrin', 'Lamarck – Caulaincourt', 'Abbesses', 'Pigalle', 'Saint-Georges', 'Notre-Dame-de-Lorette', "Trinité – d'Estienne d'Orves", 'Saint-Lazare', 'Madeleine', 'Concorde', 'Assemblée nationale', 'Rue du Bac', 'Sèvres – Babylone', 'Rennes', 'Montparnasse – Bienvenüe', 'Falguière', 'Volontaires', 'Vaugirard', 'Convention', 'Porte de Versailles', 'Corentin Celton', "Mairie d'Issy"] },
 };
 
+const BUS_COLOR = '#5b7f3a';
+
+export const LINES: Record<string, LineDef> = {
+  ...Object.fromEntries(Object.entries(METRO).map(([k, v]) => [k, { ...v, mode: 'metro' as const, label: `${k}호선` }])),
+  ...Object.fromEntries(Object.entries(BUS_LINES).map(([k, v]) => [
+    `bus${k}`,
+    { mode: 'bus' as const, color: BUS_COLOR, ink: '#fff', label: `${k}번 버스`, stations: v.stops.map((st) => st[0]) },
+  ])),
+};
+
+/** 정류장·역의 좌표 */
+export function stopPos(lineKey: string, station: string): LngLat | undefined {
+  const def = LINES[lineKey];
+  if (def?.mode === 'bus') return BUS_LINES[lineKey.slice(3)].stops.find((st) => st[0] === station)?.[1];
+  return STATION_POS[station];
+}
+export const stationPos = (name: string): LngLat | undefined => STATION_POS[name];
+
 export type Leg =
   | { kind: 'ride'; line: string; from: string; to: string; photo?: string[] }
-  | { kind: 'transfer'; at: string; from: string; to: string; mins: number; note: string; photo?: string[] };
+  | { kind: 'transfer'; at: string; from: string; to: string; mins: number; note: string; street: boolean; photo?: string[] };
 
 export interface Ride {
   stations: string[];
@@ -166,26 +201,31 @@ export interface Ride {
   mins: number;
   color: string;
   ink: string;
+  mode: Mode;
+  label: string;
 }
 
 export function rideInfo(l: { line: string; from: string; to: string }): Ride {
   const L = LINES[l.line];
   const a = L.stations.indexOf(l.from);
   const b = L.stations.indexOf(l.to);
-  if (a < 0 || b < 0) throw new Error(`${l.line}호선에 없는 역: ${a < 0 ? l.from : l.to}`);
+  if (a < 0 || b < 0) throw new Error(`${L.label}에 없는 정류장: ${a < 0 ? l.from : l.to}`);
   const stops = Math.abs(b - a);
   return {
     stations: L.stations, a, b,
     dirs: [L.stations[0], L.stations[L.stations.length - 1]],
     right: b > a ? 1 : 0,
     stops,
-    mins: Math.max(2, Math.round(stops * MIN_PER_STOP) + 1),
-    color: L.color, ink: L.ink,
+    mins: Math.max(2, Math.round(stops * PACE[L.mode]) + 1),
+    color: L.color, ink: L.ink, mode: L.mode, label: L.label,
   };
 }
 
 // ───────── 여정 계산 ─────────
-// 역@노선을 노드로 두고 최소 시간 경로를 찾는다. 환승은 같은 이름의 역 사이를 5분에 잇는다.
+const WALK_MPS = 1.35;
+const DETOUR = 1.3;
+const metres = (a: LngLat, b: LngLat) => Math.hypot((a[0] - b[0]) * 73000, (a[1] - b[1]) * 111320);
+const walkMins = (a: LngLat, b: LngLat) => (metres(a, b) * DETOUR) / WALK_MPS / 60;
 
 const HARP = 'file:2018 Paris Metro harpist at Chatelet station between no. 1 and no. 4 lines.jpg';
 const TRAIN_PHOTO: Record<string, string[]> = {
@@ -193,94 +233,160 @@ const TRAIN_PHOTO: Record<string, string[]> = {
   '4': ['file:MP89cc Ligne 4.jpg', 'file:Metro Paris - Ligne 4 - station Chatelet 01.jpg'],
 };
 
-interface Node { line: string; station: string }
-const key = (n: Node) => `${n.line}@${n.station}`;
+const key = (line: string, station: string) => `${line}@${station}`;
+const split = (k: string): [string, string] => { const i = k.indexOf('@'); return [k.slice(0, i), k.slice(i + 1)]; };
 
-/** 같은 이름의 역이 여러 노선에 있으면 환승역 */
-const linesAt = (station: string) => Object.keys(LINES).filter((l) => LINES[l].stations.includes(station));
+/** 노선 사이를 갈아탈 수 있는 곳을 미리 찾아 둔다(같은 역 이름 또는 걸어갈 만한 거리). */
+let LINKS: Map<string, { to: string; mins: number; street: boolean }[]> | null = null;
+function links() {
+  if (LINKS) return LINKS;
+  const nodes: { k: string; line: string; station: string; pos: LngLat; mode: Mode }[] = [];
+  for (const [lk, def] of Object.entries(LINES)) {
+    for (const st of def.stations) {
+      const pos = stopPos(lk, st);
+      if (pos) nodes.push({ k: key(lk, st), line: lk, station: st, pos, mode: def.mode });
+    }
+  }
+  const m = new Map<string, { to: string; mins: number; street: boolean }[]>();
+  const add = (a: string, b: string, mins: number, street: boolean) => {
+    (m.get(a) ?? m.set(a, []).get(a)!).push({ to: b, mins, street });
+  };
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const A = nodes[i], B = nodes[j];
+      if (A.line === B.line) continue;
+      const sameName = A.station === B.station;
+      const d = metres(A.pos, B.pos);
+      if (sameName && A.mode === 'metro' && B.mode === 'metro') { add(A.k, B.k, CORRIDOR, false); add(B.k, A.k, CORRIDOR, false); continue; }
+      if (d <= NEAR_M) {
+        const t = Math.max(2, Math.round(walkMins(A.pos, B.pos) + 1));
+        add(A.k, B.k, t, true); add(B.k, A.k, t, true);
+      }
+    }
+  }
+  LINKS = m;
+  return m;
+}
 
 export interface Journey {
   to: DistrictId;
   legs: Leg[];
-  mins: number; // 도보 + 지하철 전부
-  walk: number; // 지금 자리에서 타는 역 입구까지 걷는 시간
-  from: string; // 타는 역
-  arrive: string; // 내리는 역
+  mins: number; // 도보 + 대기 + 타는 시간 전부
+  walk: number; // 지금 자리에서 타는 곳까지
+  fare: number;
+  modes: Mode[];
+  from: string;
+  arrive: string;
+  arriveMode: Mode;
 }
 
-const WALK_MPS = 1.35;
-const DETOUR = 1.3; // 직선거리 → 실제 걷는 거리
-const walkMins = (a: LngLat, b: LngLat) =>
-  (Math.hypot((a[0] - b[0]) * 73000, (a[1] - b[1]) * 111320) * DETOUR) / WALK_MPS / 60;
+interface PlanOpts { at?: LngLat; only?: Mode }
 
-/**
- * 출발 역 후보 → 도착 역 후보 중 가장 빠른 여정. 없으면 null.
- * at을 주면 그 자리에서 각 역 입구까지 걸어가는 시간까지 넣고 비교한다 —
- * 가까운 역의 돌아가는 노선보다, 좀 걸어서 타는 직통이 빠를 때가 있다.
- */
-export function planJourney(to: DistrictId, fromStations: Station[], toStations: Station[], at?: LngLat): Journey | null {
-  const goals = new Set<string>();
-  for (const s of toStations) for (const l of s.lines) goals.add(key({ line: l, station: s.name }));
+/** 출발 후보 → 도착 후보 중 가장 빠른 여정. only를 주면 그 수단만 쓴다. */
+export function planJourney(to: DistrictId, from: District, dest: District, opts: PlanOpts = {}): Journey | null {
+  const use = (lk: string) => !opts.only || LINES[lk].mode === opts.only;
+  const boardPoints = (d: District) => {
+    const out: { k: string; pos: LngLat }[] = [];
+    for (const st of d.stations) for (const l of st.lines) if (use(l)) out.push({ k: key(l, st.name), pos: st.gates[0].pos });
+    // 버스는 정류장이 곧 타는 곳 — 지구 안에 있는 정류장을 전부 후보로
+    for (const [lk, def] of Object.entries(LINES)) {
+      if (def.mode !== 'bus' || !use(lk)) continue;
+      for (const st of def.stations) {
+        const pos = stopPos(lk, st);
+        if (pos && inside(d, pos)) out.push({ k: key(lk, st), pos });
+      }
+    }
+    return out;
+  };
+  const starts = boardPoints(from);
+  const goalList = boardPoints(dest);
+  if (!starts.length || !goalList.length) return null;
+  const goals = new Map(goalList.map((g) => [g.k, g.pos]));
 
   const dist = new Map<string, number>();
   const prev = new Map<string, string>();
-  const walkTo = new Map<string, number>();
+  const prevStreet = new Map<string, boolean>();
+  const walk0 = new Map<string, number>();
   const queue: { k: string; d: number }[] = [];
-  for (const s of fromStations) {
-    const w = at ? Math.min(...s.gates.map((g) => walkMins(at, g.pos))) : 0;
-    for (const l of s.lines) {
-      const k = key({ line: l, station: s.name });
-      dist.set(k, w);
-      walkTo.set(k, w);
-      queue.push({ k, d: w });
-    }
+  for (const s of starts) {
+    const w = opts.at ? walkMins(opts.at, s.pos) : 0;
+    if (w < (dist.get(s.k) ?? Infinity)) { dist.set(s.k, w); walk0.set(s.k, w); queue.push({ k: s.k, d: w }); }
   }
 
   let best: string | null = null;
+  const L = links();
   while (queue.length) {
     queue.sort((a, b) => a.d - b.d);
     const cur = queue.shift()!;
     if (cur.d > (dist.get(cur.k) ?? Infinity)) continue;
     if (goals.has(cur.k)) { best = cur.k; break; }
-    const [line, station] = cur.k.split('@');
+    const [line, station] = split(cur.k);
     const arr = LINES[line].stations;
     const i = arr.indexOf(station);
-    const push = (k: string, d: number) => {
-      if (d < (dist.get(k) ?? Infinity)) { dist.set(k, d); prev.set(k, cur.k); queue.push({ k, d }); }
+    const pace = PACE[LINES[line].mode];
+    const push = (k: string, d: number, street?: boolean) => {
+      if (d < (dist.get(k) ?? Infinity)) { dist.set(k, d); prev.set(k, cur.k); if (street !== undefined) prevStreet.set(k, street); queue.push({ k, d }); }
     };
-    if (i > 0) push(key({ line, station: arr[i - 1] }), cur.d + MIN_PER_STOP);
-    if (i < arr.length - 1) push(key({ line, station: arr[i + 1] }), cur.d + MIN_PER_STOP);
-    for (const l2 of linesAt(station)) if (l2 !== line) push(key({ line: l2, station }), cur.d + TRANSFER_MINS);
+    if (i > 0) push(key(line, arr[i - 1]), cur.d + pace);
+    if (i < arr.length - 1) push(key(line, arr[i + 1]), cur.d + pace);
+    for (const e of L.get(cur.k) ?? []) if (use(split(e.to)[0])) push(e.to, cur.d + e.mins, e.street);
   }
   if (!best) return null;
 
-  // 경로를 되짚어 구간으로 묶는다
   const path: string[] = [];
   for (let k: string | undefined = best; k; k = prev.get(k)) path.unshift(k);
+
   const legs: Leg[] = [];
   let segStart = path[0];
   for (let i = 1; i < path.length; i++) {
-    const [pl, ps] = path[i - 1].split('@');
-    const [cl, cs] = path[i].split('@');
-    if (cl !== pl) {
-      if (ps !== segStart.split('@')[1]) legs.push({ kind: 'ride', line: pl, from: segStart.split('@')[1], to: ps, photo: TRAIN_PHOTO[pl] });
-      legs.push({ kind: 'transfer', at: cs, from: pl, to: cl, mins: TRANSFER_MINS, photo: [HARP],
-        note: `${pl}호선에서 ${cl}호선으로. 표지판의 노선 번호와 종착역 이름만 따라가면 된다.` });
-      segStart = path[i];
-    }
+    const [pl, ps] = split(path[i - 1]);
+    const [cl, cs] = split(path[i]);
+    if (cl === pl) continue;
+    const startStation = split(segStart)[1];
+    if (ps !== startStation) legs.push({ kind: 'ride', line: pl, from: startStation, to: ps, photo: TRAIN_PHOTO[pl] });
+    const street = prevStreet.get(path[i]) ?? true;
+    const a = LINES[pl], b = LINES[cl];
+    legs.push({
+      kind: 'transfer', at: cs, from: a.label, to: b.label,
+      mins: street ? Math.max(2, Math.round(walkMins(stopPos(pl, ps) ?? [0, 0], stopPos(cl, cs) ?? [0, 0]) + 1)) : CORRIDOR,
+      street,
+      photo: street ? undefined : [HARP],
+      note: street
+        ? `${a.label}에서 내려 ${cs}까지 걸어가 ${b.label}로 갈아탄다. 밖으로 나와 길을 건너야 할 수도 있다.`
+        : `${a.label}에서 ${b.label}로. 표지판의 노선 번호와 종착역 이름만 따라가면 된다.`,
+    });
+    segStart = path[i];
   }
-  const lastLine = path[path.length - 1].split('@')[0];
-  const lastStation = path[path.length - 1].split('@')[1];
-  if (segStart.split('@')[1] !== lastStation) legs.push({ kind: 'ride', line: lastLine, from: segStart.split('@')[1], to: lastStation, photo: TRAIN_PHOTO[lastLine] });
+  const [lastLine, lastStation] = split(path[path.length - 1]);
+  if (split(segStart)[1] !== lastStation) legs.push({ kind: 'ride', line: lastLine, from: split(segStart)[1], to: lastStation, photo: TRAIN_PHOTO[lastLine] });
+  if (!legs.some((l) => l.kind === 'ride')) return null;
 
-  const walk = Math.round(walkTo.get(path[0]) ?? 0);
-  const mins = 5 + walk + legs.reduce((n, l) => n + (l.kind === 'transfer' ? l.mins : rideInfo(l).mins), 0);
-  return { to, legs, mins, walk, from: path[0].split('@')[1], arrive: lastStation };
+  const modes = [...new Set(legs.filter((l): l is Extract<Leg, { kind: 'ride' }> => l.kind === 'ride').map((l) => LINES[l.line].mode))];
+  const walk = Math.round(walk0.get(path[0]) ?? 0);
+  const board = Math.max(...modes.map((m) => BOARD[m]));
+  const mins = walk + board + legs.reduce((n, l) => n + (l.kind === 'transfer' ? l.mins : rideInfo(l).mins), 0);
+  const fare = Math.round(modes.reduce((n, m) => n + FARE[m], 0) * 100) / 100;
+  return { to, legs, mins, walk, fare, modes, from: split(path[0])[1], arrive: lastStation, arriveMode: LINES[lastLine].mode };
 }
 
-/** 그 지구에서 목적지 지구로 가는 가장 빠른 여정 */
-export function journeyFor(from: DistrictId, to: DistrictId, at?: LngLat): Journey | null {
-  return planJourney(to, DISTRICTS[from].stations, DISTRICTS[to].stations, at);
+const inside = (d: District, p: LngLat) => {
+  const b = d.bbox;
+  return p[1] >= b[0] && p[0] >= b[1] && p[1] <= b[2] && p[0] <= b[3];
+};
+
+export interface Options { metro: Journey | null; bus: Journey | null; mixed: Journey | null; walkMins: number }
+
+/** 지하철만 / 버스만 / (확실히 빠를 때만) 섞어서 — 셋을 비교해 보여 준다. */
+export function planOptions(from: District, dest: District, at?: LngLat): Options {
+  const metro = planJourney(dest.id, from, dest, { at, only: 'metro' });
+  const bus = planJourney(dest.id, from, dest, { at, only: 'bus' });
+  const any = planJourney(dest.id, from, dest, { at });
+  const bestSingle = Math.min(metro?.mins ?? Infinity, bus?.mins ?? Infinity);
+  const mixed = any && any.modes.length > 1 && any.mins + 6 < bestSingle ? any : null;
+  const a = at ?? from.stations[0].gates[0].pos;
+  const b = dest.stations[0].gates[0].pos;
+  return { metro, bus, mixed, walkMins: Math.round(walkMins(a, b)) };
 }
 
-export const stationPos = (name: string): LngLat | undefined => STATION_POS[name];
+export const journeyFor = (from: DistrictId, to: DistrictId, at?: LngLat) =>
+  planJourney(to, DISTRICTS[from], DISTRICTS[to], { at });
