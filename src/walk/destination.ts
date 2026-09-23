@@ -2,10 +2,10 @@
 // 지하철은 빠르지만 지하, 버스는 느리지만 창밖이 보인다. 표가 달라서 섞으면 두 장이다.
 import { LINES, rideInfo } from './districts';
 import type { Curated } from './places';
-import type { District, Journey, Options } from './districts';
+import type { District, Journey, Mode, Options } from './districts';
 import type { LngLat } from './graph';
 
-export interface Dest { district: District; place?: Curated; journey: Journey }
+export interface Dest { district: District; place?: Curated; journey: Journey; mode?: Mode }
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const el = (tag: string, cls?: string, text?: string) => {
@@ -60,7 +60,7 @@ export function openDestination(here: District, others: District[], plan: (from:
       if (place) w.appendChild(el('p', 'metro-sub', place.blurb));
 
       const list = el('div', 'dways');
-      const row = (label: string, j: Journey, tag: string) => {
+      const row = (label: string, j: Journey, tag: string, mode?: Mode) => {
         const b = el('button', 'dway') as HTMLButtonElement;
         const top = el('div', 'dway-top');
         top.appendChild(el('b', '', label));
@@ -69,12 +69,12 @@ export function openDestination(here: District, others: District[], plan: (from:
         b.appendChild(top);
         b.appendChild(el('small', 'dsum', summary(j) + (j.walkEnd >= 2 ? ` · 내려서 도보 ${j.walkEnd}분` : '')));
         b.appendChild(el('small', 'dchar', CHARACTER[tag]));
-        b.onclick = () => { blurActive(); close({ district: d, place, journey: j }); };
+        b.onclick = () => { blurActive(); close({ district: d, place, journey: j, mode }); };
         list.appendChild(b);
       };
       const best = Math.min(opts.metro?.mins ?? Infinity, opts.bus?.mins ?? Infinity, opts.mixed?.mins ?? Infinity);
-      if (opts.metro) row(`지하철${opts.metro.mins === best ? ' · 가장 빠름' : ''}`, opts.metro, 'metro');
-      if (opts.bus) row(`버스${opts.bus.mins === best ? ' · 가장 빠름' : ''}`, opts.bus, 'bus');
+      if (opts.metro) row(`지하철${opts.metro.mins === best ? ' · 가장 빠름' : ''}`, opts.metro, 'metro', 'metro');
+      if (opts.bus) row(`버스${opts.bus.mins === best ? ' · 가장 빠름' : ''}`, opts.bus, 'bus', 'bus');
       if (opts.mixed) row('버스 + 지하철', opts.mixed, 'mixed');
       if (!opts.metro && !opts.bus && !opts.mixed) list.appendChild(el('p', 'metro-sub', '그쪽으로 가는 길을 찾지 못했어요.'));
       w.appendChild(list);

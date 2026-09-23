@@ -11,7 +11,7 @@ import type { Graph, LngLat } from './graph';
 import { CAT_INFO, TASTE_OF, parsePlaces } from './places';
 import type { Place, Taste } from './places';
 import { loadDistrict } from './data';
-import { DISTRICTS, journeyFor, otherDistricts, planOptions, stopPos, LINES } from './districts';
+import { DISTRICTS, otherDistricts, planJourney, planOptions, stopPos, LINES } from './districts';
 import type { District, Gate, Journey } from './districts';
 import { ALL_RICH } from './rich';
 import { openMetro } from './metro';
@@ -420,15 +420,16 @@ function travel(dest: Dest, gate?: Gate) {
   const g = gate ?? boardingGate(j);
   S.dest = dest;
   // 버튼 한 번으로 순간이동하지 않는다. 지도에 찍힌 그 출입구까지 걸어가서 내려간다.
+  const byBus = dest.mode === 'bus' || j.legs.some((l) => l.kind === 'ride' && LINES[l.line].mode === 'bus' && l.from === j.from);
   if (dist(S.pos, g.pos) > 12) {
     S.travelTo = dest;
     S.travelGate = g;
     walkTo(g.pos, null);
-    toast(`Ⓜ ${g.label} 입구로 걸어갑니다`);
-    hint(`${stationOfGate(g).name} · ${g.label} 입구까지 걸어갑니다.`);
+    toast(byBus ? `🚏 ${g.label}으로 걸어갑니다` : `Ⓜ ${g.label} 입구로 걸어갑니다`);
+    hint(byBus ? `${g.label}까지 걸어가서 버스를 기다립니다.` : `${stationOfGate(g).name} · ${g.label} 입구까지 걸어갑니다.`);
     return;
   }
-  void ride(dest, g, j);
+  void ride(dest, g);
 }
 
 /** 목적지 고르는 화면을 연다 */
@@ -542,10 +543,10 @@ const metroMap: MetroMap = {
   },
 };
 
-async function ride(target: Dest, gate: Gate, plan?: Journey) {
+async function ride(target: Dest, gate: Gate) {
   const dest = target.district;
-  const j = plan ?? journeyFor(district.id, dest.id, S.pos);
-  if (!j) return;
+  // 걸어오는 동안 자리가 바뀌었으니 고른 수단·목적지를 그대로 두고 다시 계산한다
+  const j = planJourney(dest.id, district, dest, { at: S.pos, goal: target.place?.pos, only: target.mode }) ?? target.journey;
   let pre: Promise<unknown> | null = null;
   metroOpen = true;
   hint('');
