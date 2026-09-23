@@ -427,8 +427,15 @@ function showStationMarker() {
 
 const bottomPad = () => Math.round(Math.min(window.innerHeight * 0.52, 460));
 
+/** 지하철을 보여 주는 동안은 걷기용 표시(가게 핀·자취·시야·HUD 버튼)를 치운다 */
+function quietMap(on: boolean) {
+  document.body.classList.toggle('metro-mode', on);
+  for (const id of ['vision', 'trail', 'route']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'none' : 'visible');
+}
+
 const metroMap: MetroMap = {
   ride(color, stops) {
+    quietMap(true);
     (map.getSource('metro') as GeoJSONSource).setData(line(stops.map((s) => s.pos)));
     map.setPaintProperty('metro', 'line-color', color);
     map.setLayoutProperty('metro', 'visibility', 'visible');
@@ -485,6 +492,7 @@ const metroMap: MetroMap = {
     exitMarkers.forEach((m, k) => m.getElement().classList.toggle('picked', k === i));
   },
   clear() {
+    quietMap(false);
     cancelAnimationFrame(trainAnim);
     map.setLayoutProperty('metro', 'visibility', 'none');
     (map.getSource('metro') as GeoJSONSource).setData(line([]));

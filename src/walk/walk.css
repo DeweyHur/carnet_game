@@ -194,3 +194,6 @@ button:disabled { opacity:.5; cursor:default; }
 .exitpin .nm { font-size:12.5px; font-weight:700; white-space:nowrap; }
 .exitpin:hover { translate:0 -2px; }
 .exitpin.picked { background:#e4572e; color:#fff; } .exitpin.picked b { background:#fff; }
+/* 지하철을 타는 동안은 걷기용 표시를 치운다 */
+body.metro-mode .pl, body.metro-mode .mstation, body.metro-mode .me { opacity:0 !important; pointer-events:none; transition:opacity .4s; }
+body.metro-mode .hud-right { opacity:0; pointer-events:none; transition:opacity .3s; }
