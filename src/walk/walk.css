@@ -111,10 +111,12 @@ button:disabled { opacity:.5; cursor:default; }
 #sum-shots { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; } .shot { aspect-ratio:3/4; border-radius:6px; background:#ddd center/cover; background-size:auto 100%; box-shadow:0 0 0 3px #fff, 0 1px 5px #0004; }
 
 /* ───────── 지하철 ───────── */
-#metro { position:absolute; inset:0; z-index:9; display:grid; place-items:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .45s;
+/* safe center: 내용이 화면보다 길면 위가 잘리지 않고 스크롤된다(휴대폰 출구 목록) */
+#metro { position:absolute; inset:0; z-index:9; display:flex; flex-direction:column; align-items:center; justify-content:safe center; overflow-y:auto; overscroll-behavior:contain;
+  padding:24px 20px calc(28px + env(safe-area-inset-bottom)); opacity:0; pointer-events:none; transition:opacity .45s;
   background:radial-gradient(ellipse at 50% 120%, #2a2720 0%, #0b0a09 70%); }
 #metro.on { opacity:1; pointer-events:auto; }
-.metro-sheet { width:min(100%,480px); color:#f3ead9; animation:rise .5s; }
+.metro-sheet { width:min(100%,480px); flex:0 0 auto; color:#f3ead9; animation:rise .5s; }
 .metro-eyebrow { margin:0; letter-spacing:.14em; font-size:13px; color:#ffd166; text-transform:uppercase; }
 .metro-sheet h2 { margin:8px 0 6px; font-size:27px; line-height:1.25; }
 .metro-sub { margin:0; color:#bcb2a1; line-height:1.6; font-size:14.5px; }
