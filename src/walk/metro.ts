@@ -20,6 +20,9 @@ const badge = (line: string, color: string) => {
   return b;
 };
 
+/** 화면 밖으로 밀려난 버튼에 포커스가 남으면 문서가 스크롤돼 요약 패널이 딸려 올라온다 */
+const blurActive = () => (document.activeElement as HTMLElement | null)?.blur();
+
 const WRONG_MINS = 7; // 반대 방향 플랫폼에 서서 한 정거장 갔다가 되돌아오기
 
 /**
@@ -56,7 +59,7 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
       w.appendChild(ticket);
       const acts = el('div', 'acts');
       const go = el('button', 'primary', '표를 찍고 내려간다') as HTMLButtonElement;
-      go.onclick = () => { sfx.tick(); mins += 3; preload(); next(); };
+      go.onclick = () => { blurActive(); sfx.tick(); mins += 3; preload(); next(); };
       const no = el('button', '', '그만둔다');
       no.onclick = () => close(null);
       acts.append(go, no);
@@ -71,6 +74,7 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
         const acts = el('div', 'acts');
         const go = el('button', 'primary', `통로를 걷는다 (${l.mins}분)`) as HTMLButtonElement;
         go.onclick = () => {
+          blurActive();
           go.disabled = true;
           for (let i = 0; i < 5; i++) sfx.stair(i);
           mins += l.mins;
@@ -91,6 +95,7 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
         b.appendChild(el('small', '', 'direction'));
         b.appendChild(el('b', '', d));
         b.onclick = () => {
+          blurActive();
           if (i === l.right) {
             sfx.enter();
             mins += l.mins;
@@ -124,6 +129,7 @@ export function openMetro(from: District, dest: District, j: Journey, preload: (
         b.appendChild(el('b', '', `Sortie · ${x.label}`));
         b.appendChild(el('small', '', x.note));
         b.onclick = () => {
+          blurActive();
           [...list.children].forEach((c) => ((c as HTMLButtonElement).disabled = true));
           mins += x.mins;
           for (let i = 0; i < 6; i++) sfx.stair(i);
