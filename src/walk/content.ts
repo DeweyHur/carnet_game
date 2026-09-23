@@ -1,7 +1,7 @@
 // 장소 안에서 벌어지는 일: 관람 장면(사진·순간들)과 메뉴.
 // 가격은 전부 대략값이고, 큐레이션하지 않은 가게의 메뉴는 "그 종류의 가게에서 흔한 메뉴"다(실제 메뉴 아님).
 import type { Cat, Place } from './places';
-import { RICH } from './marais';
+import { ALL_RICH as RICH } from './rich';
 import { CUISINE_MENUS, genericMoments } from './generic';
 
 // ───────── 사진 후보 ─────────

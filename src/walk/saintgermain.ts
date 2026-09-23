@@ -1,0 +1,80 @@
+// 생제르맹–라탱 일대(6·5구) 손으로 쓴 장소들. 마레의 marais.ts와 같은 구조.
+// 규칙: 확실치 않은 것은 쓰지 않는다. 사진은 OSM의 wikipedia 태그에 맡기고 파일명을 지어내지 않는다.
+import type { Curated } from './places';
+import type { Rich } from './marais';
+
+// ───────── 여행 전부터 알던 곳 · 간판이 큰 곳 ─────────
+export const CURATED_SG: Curated[] = [
+  { match: /shakespeare (and|&) co/i, name: '셰익스피어 앤드 컴퍼니', pos: [2.3470, 48.8526], cat: 'shop', emoji: '📚', known: true, mins: 25,
+    blurb: '노트르담이 강 건너 보이는 자리의 영어 책방. 1951년에 조지 휘트먼이 열었고, 2차 대전 전 실비아 비치의 책방 이름을 물려받았다. 위층은 앉아서 읽으라고 둔 자리다.' },
+  { match: /^(église )?saint-germain-des-pr[ée]s$/i, name: '생제르맹데프레 성당', pos: [2.3345, 48.8541], cat: 'sight', emoji: '⛪', known: true, mins: 20,
+    blurb: '파리에 남은 가장 오래된 종탑. 6세기 수도원 자리에 11세기부터 다시 쌓았고, 동네 이름이 여기서 나왔다. 안쪽 기둥과 천장은 19세기에 다시 칠한 것이라 색이 진하다.' },
+  { match: /caf[ée] de flore/i, name: '카페 드 플로르', pos: [2.3329, 48.8540], cat: 'cafe', emoji: '☕', known: true, cost: 9, mins: 40,
+    blurb: '사르트르와 보부아르가 전쟁 중에 난방 대신 눌러앉아 있던 카페. 값은 관광지 값이고, 그 값에 사는 건 커피가 아니라 자리와 시간이다. 1층 창가와 2층은 분위기가 아주 다르다.' },
+  { match: /deux magots/i, name: '레 되 마고', pos: [2.3336, 48.8540], cat: 'cafe', emoji: '🪑', cost: 9, mins: 40,
+    blurb: '플로르 바로 옆의 라이벌. 가게 안쪽 기둥에 중국 상인 인형 둘이 앉아 있고, 가게 이름은 그 둘이다. 테라스에서는 성당 정면이 정면으로 보인다.' },
+  { match: /jardin du luxembourg/i, name: '뤽상부르 정원', pos: [2.3372, 48.8467], cat: 'park', emoji: '🌳', known: true, mins: 40,
+    blurb: '메디치의 마리가 피렌체를 그리며 만든 정원. 파리 사람들이 의자를 끌어다 아무 데나 놓고 앉는다. 연못에서 아이들이 막대로 미는 나무 돛단배를 빌릴 수 있다.' },
+  { match: /panth[ée]on/i, name: '팡테옹', pos: [2.3464, 48.8462], cat: 'museum', emoji: '🏛️', known: true, cost: 13, mins: 70,
+    blurb: '성당으로 짓다가 혁명이 나면서 위인 묘가 된 건물. 지하에 볼테르·루소·퀴리 부부·졸라가 있다. 가운데 걸린 푸코의 진자는 여기서 지구가 돈다는 걸 처음 눈으로 보여 준 그 진자의 재현이다.' },
+  { match: /saint-sulpice/i, name: '생쉴피스 성당', pos: [2.3348, 48.8511], cat: 'sight', emoji: '⛪', mins: 25,
+    blurb: '탑 두 개의 높이가 다르다 — 짓다가 돈과 시대가 바뀌었다. 들어가면 오른쪽 첫 예배당에 들라크루아의 「야곱과 천사의 씨름」이 걸려 있고, 바닥의 놋쇠 선은 해시계 장치다.' },
+  { match: /mus[ée]e de cluny|moyen [âa]ge/i, name: '클뤼니 중세 박물관', pos: [2.3437, 48.8506], cat: 'museum', emoji: '🦄', cost: 12, mins: 80,
+    blurb: '로마 시대 목욕탕 유적 위에 15세기 수도원장 저택을 얹은 건물. 「여인과 일각수」 태피스트리 여섯 폭이 있는 둥근 방이 이 집의 심장이다.' },
+  { match: /le procope/i, name: '르 프로코프', pos: [2.3392, 48.8531], cat: 'eat', emoji: '🕯️', cost: 40, mins: 90,
+    blurb: '1686년에 문을 연, 파리에서 가장 오래됐다는 카페 겸 식당. 볼테르와 디드로가 여기서 커피를 마셨다. 지금은 관광객 쪽으로 기울었지만 붉은 벽과 거울은 그대로다.' },
+  { match: /cour du commerce/i, name: '쿠르 뒤 코메르스 생앙드레', pos: [2.3390, 48.8528], cat: 'sight', emoji: '🚪', mins: 12,
+    blurb: '큰길에서 보면 그냥 문 하나. 들어가면 자갈 깔린 좁은 통로가 카페 테이블 사이로 이어지고, 중간 유리 아래 필리프 오귀스트 성벽의 탑 밑동이 보인다.' },
+  { match: /odéon.*(théâtre|europe)|th[ée][âa]tre de l.europe/i, name: '오데옹 극장', pos: [2.3390, 48.8497], cat: 'sight', emoji: '🎭', mins: 12,
+    blurb: '언덕 위에 신전처럼 앉은 극장. 계단에 앉아 쉬는 사람이 늘 있다. 1968년 5월엔 학생들이 여기를 점거했다.' },
+  { match: /saint-s[ée]verin/i, name: '생세브랭 성당', pos: [2.3452, 48.8524], cat: 'sight', emoji: '🕯️', mins: 15,
+    blurb: '좁은 골목 한복판의 화염식 고딕 성당. 제단 뒤 기둥 하나가 야자수처럼 비틀려 올라가는데, 그 주위를 도는 게 이 성당을 보는 방법이다.' },
+  { match: /saint-[ée]tienne-du-mont/i, name: '생테티엔뒤몽 성당', pos: [2.3479, 48.8465], cat: 'sight', emoji: '🌀', mins: 20,
+    blurb: '팡테옹 바로 뒤. 프랑스에 하나 남다시피 한 르네상스 성가대석 칸막이가 공중에 다리처럼 걸려 있고, 양쪽으로 나선계단이 붙어 있다. 파스칼과 라신의 묘가 있다.' },
+  { match: /biblioth[èe]que sainte-genevi[èe]ve/i, name: '생트준비에브 도서관', pos: [2.3462, 48.8465], cat: 'sight', emoji: '📖', mins: 10,
+    blurb: '라브루스트가 1850년에 지은 도서관. 위층 열람실은 철골 아치 두 줄이 길게 이어지는 방인데, 도서관 이용증이 없으면 들어갈 수 없다. 정면 돌벽에 새겨진 저자 이름들만 읽어도 값을 한다.' },
+  { match: /mus[ée]e (national )?eug[èe]ne[- ]delacroix|mus[ée]e delacroix/i, name: '들라크루아 미술관', pos: [2.3340, 48.8546], cat: 'museum', emoji: '🎨', cost: 9, mins: 45,
+    blurb: '들라크루아가 생쉴피스 벽화를 그리려고 옮겨 와 죽을 때까지 산 집과 화실. 작은 정원이 딸려 있고, 큰 미술관에서 지친 다음에 오기 좋다.' },
+  { match: /place de furstemberg|rue de furstemberg/i, name: '퓌르스탕베르 광장', pos: [2.3345, 48.8546], cat: 'park', emoji: '🏮', mins: 8,
+    blurb: '가로등 하나와 오동나무 네 그루뿐인 아주 작은 광장. 파리에서 가장 예쁜 광장으로 자주 꼽힌다. 밤에 조용하다.' },
+  { match: /institut de france/i, name: '앵스티튀 드 프랑스', pos: [2.3374, 48.8570], cat: 'sight', emoji: '🏛️', mins: 10,
+    blurb: '강 건너 루브르를 마주 보는 돔. 프랑스어를 관리하는 아카데미 프랑세즈가 여기 있다. 안은 대개 못 들어가고, 퐁 데 자르 위에서 보는 게 제일 좋다.' },
+  { match: /fontaine saint-michel|place saint-michel/i, name: '생미셸 광장', pos: [2.3443, 48.8534], cat: 'sight', emoji: '⛲', mins: 8,
+    blurb: '대천사가 악마를 밟고 선 거대한 분수. 파리 사람들의 약속 장소이자, 강 건너 시테섬으로 건너가는 다리 앞이다. 늘 사람이 많다.' },
+  { match: /caveau de la huchette/i, name: '카보 드 라 위셰트', pos: [2.3459, 48.8531], cat: 'bar', emoji: '🎷', cost: 16, mins: 90,
+    blurb: '좁은 계단을 내려가면 나오는 돌 지하실 재즈 클럽. 1946년부터 여기서 춤을 췄다. 밤에만 연다.' },
+  { match: /march[ée] saint-germain/i, name: '생제르맹 시장', pos: [2.3345, 48.8521], cat: 'gourmet', emoji: '🧺', mins: 20,
+    blurb: '지금은 대부분 상점이 된 옛 시장 건물. 안쪽에 식료품 가게 몇이 남아 있고, 주변 골목에 치즈·생선 가게가 이어진다.' },
+];
+
+// ───────── 들어가면 벌어지는 일이 있는 곳 ─────────
+export const RICH_SG: Rich[] = [
+  { match: /^la palette$/i, name: '라 팔레트', cat: 'cafe', emoji: '🎨', mins: 40, cost: 7,
+    blurb: '미술학교와 화랑 사이, 벽에 팔레트가 잔뜩 걸린 오래된 카페. 테라스가 골목을 반쯤 막고 있다.' },
+  { match: /^les [ée]diteurs$|^caf[ée] de la mairie$/i, name: '동네 카페', cat: 'cafe', emoji: '☕', mins: 30, cost: 5,
+    blurb: '광장을 내다보는 평범한 동네 카페. 관광 카페의 절반 값에 같은 커피를 마실 수 있다.' },
+  { match: /^[ée]cole nationale sup[ée]rieure des beaux-arts|beaux-arts de paris/i, name: '보자르 (국립미술학교)', cat: 'sight', emoji: '🗿', mins: 20,
+    blurb: '강가의 미술학교. 안뜰에 옛 건물에서 떼어 온 조각과 기둥이 전시장처럼 서 있고, 전시가 있을 때는 누구나 들어갈 수 있다.',
+    moments: [
+      { text: '문을 지나면 안뜰 가득 성당 정면 조각들이 조각조각 서 있다. 어디선가 떼어 온 것들이다.', mins: 6 },
+      { text: '유리 지붕 아래 커다란 홀. 학생들이 이젤을 놓고 지나간다.', mins: 8 },
+    ] },
+  { match: /^pont des arts$/i, name: '퐁 데 자르', cat: 'sight', emoji: '🌉', mins: 12,
+    blurb: '차가 다니지 않는 나무 판자 다리. 자물쇠는 2015년에 난간이 무너질 뻔해 전부 떼어 냈다. 지금은 그냥 앉아 있는 다리다.',
+    moments: [
+      { text: '판자 위를 걷는다. 발밑에서 나무 소리가 난다. 왼쪽은 루브르, 오른쪽은 시테섬 끝.', mins: 5 },
+      { text: '가운데쯤에서 난간에 기대 앉는다. 유람선이 지나가고 사람들이 손을 흔든다.', mins: 7 },
+    ] },
+  { match: /bouquiniste/i, name: '부키니스트 (강변 헌책 좌판)', cat: 'shop', emoji: '📗', mins: 15,
+    blurb: '강변 난간에 붙은 초록색 철제 상자들. 16세기부터 여기서 헌책을 팔았다. 요즘은 그림엽서와 포스터가 절반이다.',
+    moments: [
+      { text: '뚜껑을 연 상자를 하나씩 들여다본다. 낡은 문고본, 영화 포스터, 관광엽서.', mins: 8 },
+      { text: '한 아저씨가 접이의자에 앉아 책을 읽고 있다. 사라고 하지 않는다.', mins: 6 },
+    ] },
+  { match: /^la sorbonne$|université.*sorbonne/i, name: '소르본', cat: 'sight', emoji: '🎓', mins: 12,
+    blurb: '13세기부터 이어진 대학. 안뜰은 학기 중엔 학생과 증명서가 있어야 들어간다. 광장 쪽에서 성당 돔과 정문만 봐도 된다.' },
+  { match: /^[ée]glise du val-de-gr|^chapelle de la sorbonne/i, name: '소르본 성당', cat: 'sight', emoji: '⛪', mins: 8,
+    blurb: '리슐리외의 무덤이 있는 대학 성당. 평소엔 닫혀 있고 전시가 있을 때만 연다. 돔은 광장 어디서나 보인다.' },
+  { match: /^rue mouffetard$|^rue de buci$/i, name: '먹거리 골목', cat: 'gourmet', emoji: '🧀', mins: 25,
+    blurb: '치즈·빵·생선 가게가 줄지어 선 짧은 거리. 아침과 저녁 장 볼 때가 제일 살아 있고, 일요일 오전이 가장 붐빈다.' },
+];
