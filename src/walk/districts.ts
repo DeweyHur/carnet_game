@@ -199,20 +199,41 @@ const key = (n: Node) => `${n.line}@${n.station}`;
 /** 같은 이름의 역이 여러 노선에 있으면 환승역 */
 const linesAt = (station: string) => Object.keys(LINES).filter((l) => LINES[l].stations.includes(station));
 
-export interface Journey { to: DistrictId; legs: Leg[]; mins: number; from: string; arrive: string }
+export interface Journey {
+  to: DistrictId;
+  legs: Leg[];
+  mins: number; // 도보 + 지하철 전부
+  walk: number; // 지금 자리에서 타는 역 입구까지 걷는 시간
+  from: string; // 타는 역
+  arrive: string; // 내리는 역
+}
 
-/** 출발 역 후보 → 도착 역 후보 중 가장 빠른 여정. 없으면 null. */
-export function planJourney(to: DistrictId, fromStations: Station[], toStations: Station[]): Journey | null {
+const WALK_MPS = 1.35;
+const DETOUR = 1.3; // 직선거리 → 실제 걷는 거리
+const walkMins = (a: LngLat, b: LngLat) =>
+  (Math.hypot((a[0] - b[0]) * 73000, (a[1] - b[1]) * 111320) * DETOUR) / WALK_MPS / 60;
+
+/**
+ * 출발 역 후보 → 도착 역 후보 중 가장 빠른 여정. 없으면 null.
+ * at을 주면 그 자리에서 각 역 입구까지 걸어가는 시간까지 넣고 비교한다 —
+ * 가까운 역의 돌아가는 노선보다, 좀 걸어서 타는 직통이 빠를 때가 있다.
+ */
+export function planJourney(to: DistrictId, fromStations: Station[], toStations: Station[], at?: LngLat): Journey | null {
   const goals = new Set<string>();
   for (const s of toStations) for (const l of s.lines) goals.add(key({ line: l, station: s.name }));
 
   const dist = new Map<string, number>();
   const prev = new Map<string, string>();
+  const walkTo = new Map<string, number>();
   const queue: { k: string; d: number }[] = [];
-  for (const s of fromStations) for (const l of s.lines) {
-    const k = key({ line: l, station: s.name });
-    dist.set(k, 0);
-    queue.push({ k, d: 0 });
+  for (const s of fromStations) {
+    const w = at ? Math.min(...s.gates.map((g) => walkMins(at, g.pos))) : 0;
+    for (const l of s.lines) {
+      const k = key({ line: l, station: s.name });
+      dist.set(k, w);
+      walkTo.set(k, w);
+      queue.push({ k, d: w });
+    }
   }
 
   let best: string | null = null;
@@ -252,13 +273,14 @@ export function planJourney(to: DistrictId, fromStations: Station[], toStations:
   const lastStation = path[path.length - 1].split('@')[1];
   if (segStart.split('@')[1] !== lastStation) legs.push({ kind: 'ride', line: lastLine, from: segStart.split('@')[1], to: lastStation, photo: TRAIN_PHOTO[lastLine] });
 
-  const mins = 5 + legs.reduce((n, l) => n + (l.kind === 'transfer' ? l.mins : rideInfo(l).mins), 0);
-  return { to, legs, mins, from: path[0].split('@')[1], arrive: lastStation };
+  const walk = Math.round(walkTo.get(path[0]) ?? 0);
+  const mins = 5 + walk + legs.reduce((n, l) => n + (l.kind === 'transfer' ? l.mins : rideInfo(l).mins), 0);
+  return { to, legs, mins, walk, from: path[0].split('@')[1], arrive: lastStation };
 }
 
 /** 그 지구에서 목적지 지구로 가는 가장 빠른 여정 */
-export function journeyFor(from: DistrictId, to: DistrictId): Journey | null {
-  return planJourney(to, DISTRICTS[from].stations, DISTRICTS[to].stations);
+export function journeyFor(from: DistrictId, to: DistrictId, at?: LngLat): Journey | null {
+  return planJourney(to, DISTRICTS[from].stations, DISTRICTS[to].stations, at);
 }
 
 export const stationPos = (name: string): LngLat | undefined => STATION_POS[name];

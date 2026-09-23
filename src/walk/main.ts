@@ -406,7 +406,7 @@ function nearestGate(onlyStation?: string): Gate {
 /** 목적지(동네 또는 그 동네의 한 장소)로 간다. */
 function travel(dest: Dest, gate?: Gate) {
   if (!S.started || S.finished || openPlace || metroOpen) return;
-  const j = planJourney(dest.district.id, district.stations, dest.district.stations);
+  const j = planJourney(dest.district.id, district.stations, dest.district.stations, S.pos);
   if (!j) { toast('그쪽으로 가는 길을 못 찾았어요'); return; }
   const g = gate ?? nearestGate(j.from);
   S.dest = dest;
@@ -425,7 +425,7 @@ function travel(dest: Dest, gate?: Gate) {
 /** 목적지 고르는 화면을 연다 */
 function chooseDestination() {
   if (!S.started || S.finished || openPlace || metroOpen) return;
-  void openDestination(district, otherDistricts(district.id), (from, to) => planJourney(to.id, from.stations, to.stations)).then((d) => {
+  void openDestination(district, otherDistricts(district.id), (from, to) => planJourney(to.id, from.stations, to.stations, S.pos)).then((d) => {
     if (d) travel(d);
   });
 }
@@ -535,7 +535,7 @@ const metroMap: MetroMap = {
 
 async function ride(target: Dest, gate: Gate, plan?: Journey) {
   const dest = target.district;
-  const j = plan ?? journeyFor(district.id, dest.id);
+  const j = plan ?? journeyFor(district.id, dest.id, S.pos);
   if (!j) return;
   let pre: Promise<unknown> | null = null;
   metroOpen = true;

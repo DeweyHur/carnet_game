@@ -28,7 +28,8 @@ function routeLine(j: Journey) {
   });
   const n = j.legs.filter((l) => l.kind === 'transfer').length;
   const stops = rides.reduce((a, l) => a + rideInfo(l).stops, 0);
-  row.appendChild(el('span', 'dsum', `${j.from} → ${j.arrive} · ${stops}정거장 · ${n ? `환승 ${n}번` : '환승 없음'} · 약 ${j.mins}분`));
+  const w = j.walk >= 2 ? `입구까지 도보 ${j.walk}분 + ` : '';
+  row.appendChild(el('span', 'dsum', `${j.from} → ${j.arrive} · ${stops}정거장 · ${n ? `환승 ${n}번` : '환승 없음'} · ${w}약 ${j.mins}분`));
   return row;
 }
 
