@@ -282,6 +282,11 @@ body.metro-mode #stay-go { opacity:0; pointer-events:none; }
 .fact { display:flex; align-items:baseline; gap:10px; font-size:14px; }
 .fact .fk { color:#8d8373; min-width:9em; }
 .fact b { color:#f3ead9; }
-#trip .metro-photo.on { height:140px; margin:10px 0 0; }
-.dway .metro-photo.on { height:120px; margin:10px 0 0; }
-.photo-cap { position:absolute; left:10px; bottom:6px; z-index:1; font-size:11.5px; color:#fff; text-shadow:0 1px 4px #000c; max-width:70%; }
+/* 사진 박스는 배경 이미지뿐이라 내용 너비가 0이다 —
+   .dway/.stay 처럼 align-items:flex-start 인 플렉스 안에서는 반드시 폭을 펴 줘야 한다. */
+.metro-photo.on { width:100%; align-self:stretch; box-sizing:border-box; }
+#trip .metro-photo.on { height:130px; margin:10px 0 0; }
+.dway .metro-photo.on { height:104px; margin:9px 0 2px; }
+.photo-cap { position:absolute; left:10px; bottom:6px; right:10px; z-index:1; font-size:11.5px; color:#fff; text-shadow:0 1px 4px #000c;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.metro-credit { pointer-events:none; }
