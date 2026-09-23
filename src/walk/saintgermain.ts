@@ -5,17 +5,17 @@ import type { Rich } from './marais';
 
 // ───────── 여행 전부터 알던 곳 · 간판이 큰 곳 ─────────
 export const CURATED_SG: Curated[] = [
-  { match: /shakespeare (and|&) co/i, name: '셰익스피어 앤드 컴퍼니', pos: [2.3470, 48.8526], cat: 'shop', emoji: '📚', known: true, mins: 25,
+  { match: /shakespeare (and|&) co/i, name: '셰익스피어 앤드 컴퍼니', photo: ['Shakespeare and Company (bookstore)'], pos: [2.3470, 48.8526], cat: 'shop', emoji: '📚', known: true, mins: 25,
     blurb: '노트르담이 강 건너 보이는 자리의 영어 책방. 1951년에 조지 휘트먼이 열었고, 2차 대전 전 실비아 비치의 책방 이름을 물려받았다. 위층은 앉아서 읽으라고 둔 자리다.' },
-  { match: /^(église )?saint-germain-des-pr[ée]s$/i, name: '생제르맹데프레 성당', pos: [2.3345, 48.8541], cat: 'sight', emoji: '⛪', known: true, mins: 20,
+  { match: /^(église )?saint-germain-des-pr[ée]s$/i, name: '생제르맹데프레 성당', photo: ['fr:Église Saint-Germain-des-Prés'], pos: [2.3345, 48.8541], cat: 'sight', emoji: '⛪', known: true, mins: 20,
     blurb: '파리에 남은 가장 오래된 종탑. 6세기 수도원 자리에 11세기부터 다시 쌓았고, 동네 이름이 여기서 나왔다. 안쪽 기둥과 천장은 19세기에 다시 칠한 것이라 색이 진하다.' },
-  { match: /caf[ée] de flore/i, name: '카페 드 플로르', pos: [2.3329, 48.8540], cat: 'cafe', emoji: '☕', known: true, cost: 9, mins: 40,
+  { match: /caf[ée] de flore/i, name: '카페 드 플로르', photo: ['fr:Café de Flore'], pos: [2.3329, 48.8540], cat: 'cafe', emoji: '☕', known: true, cost: 9, mins: 40,
     blurb: '사르트르와 보부아르가 전쟁 중에 난방 대신 눌러앉아 있던 카페. 값은 관광지 값이고, 그 값에 사는 건 커피가 아니라 자리와 시간이다. 1층 창가와 2층은 분위기가 아주 다르다.' },
   { match: /deux magots/i, name: '레 되 마고', pos: [2.3336, 48.8540], cat: 'cafe', emoji: '🪑', cost: 9, mins: 40,
     blurb: '플로르 바로 옆의 라이벌. 가게 안쪽 기둥에 중국 상인 인형 둘이 앉아 있고, 가게 이름은 그 둘이다. 테라스에서는 성당 정면이 정면으로 보인다.' },
-  { match: /jardin du luxembourg/i, name: '뤽상부르 정원', pos: [2.3372, 48.8467], cat: 'park', emoji: '🌳', known: true, mins: 40,
+  { match: /jardin du luxembourg/i, name: '뤽상부르 정원', photo: ['Jardin du Luxembourg'], pos: [2.3372, 48.8467], cat: 'park', emoji: '🌳', known: true, mins: 40,
     blurb: '메디치의 마리가 피렌체를 그리며 만든 정원. 파리 사람들이 의자를 끌어다 아무 데나 놓고 앉는다. 연못에서 아이들이 막대로 미는 나무 돛단배를 빌릴 수 있다.' },
-  { match: /panth[ée]on/i, name: '팡테옹', pos: [2.3464, 48.8462], cat: 'museum', emoji: '🏛️', known: true, cost: 13, mins: 70,
+  { match: /panth[ée]on/i, name: '팡테옹', photo: ['Panthéon'], pos: [2.3464, 48.8462], cat: 'museum', emoji: '🏛️', known: true, cost: 13, mins: 70,
     blurb: '성당으로 짓다가 혁명이 나면서 위인 묘가 된 건물. 지하에 볼테르·루소·퀴리 부부·졸라가 있다. 가운데 걸린 푸코의 진자는 여기서 지구가 돈다는 걸 처음 눈으로 보여 준 그 진자의 재현이다.' },
   { match: /saint-sulpice/i, name: '생쉴피스 성당', pos: [2.3348, 48.8511], cat: 'sight', emoji: '⛪', mins: 25,
     blurb: '탑 두 개의 높이가 다르다 — 짓다가 돈과 시대가 바뀌었다. 들어가면 오른쪽 첫 예배당에 들라크루아의 「야곱과 천사의 씨름」이 걸려 있고, 바닥의 놋쇠 선은 해시계 장치다.' },

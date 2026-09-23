@@ -17,6 +17,7 @@ import { ALL_RICH } from './rich';
 import { openMetro } from './metro';
 import { openDestination } from './destination';
 import { openArrival, openMorning } from './arrival';
+import type { StayMap } from './arrival';
 import type { Stay } from './stays';
 import { bodyLine, drain, eat, level, paceFactor, rest, sightFactor, LIBERTE_CARD } from './trip';
 import type { Pass } from './trip';
@@ -509,6 +510,70 @@ function showStationMarker() {
 
 const bottomPad = () => Math.round(Math.min(window.innerHeight * 0.52, 460));
 
+// ───────── 숙소를 고르는 동안의 지도 ─────────
+const pickMarkers: Marker[] = [];
+const clearPicks = () => { for (const m of pickMarkers) m.remove(); pickMarkers.length = 0; };
+const fitAll = (pts: LngLat[], maxZoom: number) => {
+  if (!pts.length) return;
+  const b = pts.reduce((bb, p) => bb.extend(p), new maplibregl.LngLatBounds(pts[0], pts[0]));
+  map.easeTo({ pitch: 0, bearing: 0, duration: 400 });
+  setTimeout(() => map.fitBounds(b, { padding: { top: 80, bottom: bottomPad(), left: 50, right: 50 }, maxZoom, duration: 1100 }), 420);
+};
+const pin = (cls: string, html: string, pos: LngLat, onClick?: () => void) => {
+  const el = document.createElement('div');
+  el.className = cls;
+  el.innerHTML = html;
+  if (onClick) el.addEventListener('click', (ev) => { ev.stopPropagation(); onClick(); });
+  pickMarkers.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(pos).addTo(map));
+  return el;
+};
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+const stayMap: StayMap = {
+  overview(items, pick) {
+    clearPicks();
+    quietMap(true);
+    for (const { d, pos } of items) pin('areapin', `<b>${esc(d.name)}</b>`, pos, () => pick(d.id));
+    fitAll(items.map((x) => x.pos), 13.4);
+  },
+  district(_d, stays, sights, pick) {
+    clearPicks();
+    quietMap(true);
+    for (const c of sights) pin('sightpin', `<span>${c.emoji}</span><b>${esc(c.name)}</b>`, c.pos);
+    for (const s of stays) pin('staypin', `<b>${esc(s.name)}</b><em>€${s.night}</em>`, s.pos, () => pick(s.id));
+    fitAll([...stays.map((s) => s.pos), ...sights.map((c) => c.pos)], 16.2);
+  },
+  focus(stay, links) {
+    for (const m of pickMarkers) m.getElement().classList.toggle('picked', m.getLngLat().lng === stay.pos[0] && m.getLngLat().lat === stay.pos[1]);
+    (map.getSource('metro') as GeoJSONSource).setData({
+      type: 'FeatureCollection',
+      features: links.map((l) => ({ type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: [stay.pos, l.to] } })),
+    });
+    map.setPaintProperty('metro', 'line-color', '#e4b23a');
+    map.setPaintProperty('metro', 'line-width', 3);
+    map.setLayoutProperty('metro', 'visibility', 'visible');
+    fitAll([stay.pos, ...links.map((l) => l.to)], 16.6);
+  },
+  airport(from, to) {
+    clearPicks();
+    quietMap(true);
+    pin('areapin', '<b>CDG 공항</b>', from);
+    pin('staypin', '<b>숙소</b>', to);
+    (map.getSource('metro') as GeoJSONSource).setData(line([from, to]));
+    map.setPaintProperty('metro', 'line-color', '#e4572e');
+    map.setPaintProperty('metro', 'line-width', 3);
+    map.setLayoutProperty('metro', 'visibility', 'visible');
+    fitAll([from, to], 11);
+  },
+  clear() {
+    clearPicks();
+    map.setLayoutProperty('metro', 'visibility', 'none');
+    (map.getSource('metro') as GeoJSONSource).setData(line([]));
+    map.setPaintProperty('metro', 'line-width', 7);
+    quietMap(false);
+  },
+};
+
 /** 지하철을 보여 주는 동안은 걷기용 표시(가게 핀·자취·시야·HUD 버튼)를 치운다 */
 function quietMap(on: boolean) {
   document.body.classList.toggle('metro-mode', on);
@@ -778,7 +843,7 @@ async function start() {
   intro.classList.add('gone');
 
   // ① 숙소 ② 공항에서 오는 법 ③ 표
-  const a = await openArrival();
+  const a = await openArrival(stayMap);
   S.stay = a.stay;
   S.pass = a.pass;
   S.money = Math.round((S.money - a.ride.cost - (a.pass === 'liberte' ? LIBERTE_CARD : 0)) * 100) / 100;

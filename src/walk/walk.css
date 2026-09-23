@@ -268,3 +268,20 @@ body.metro-mode .mstay { opacity:0; pointer-events:none; }
 .stay-note { font-size:12.5px; color:#8d8373; line-height:1.55; }
 #stay-go { font-size:15px; }
 body.metro-mode #stay-go { opacity:0; pointer-events:none; }
+
+/* 숙소 고르는 동안의 지도 핀 */
+#trip.mapmode { justify-content:flex-end; pointer-events:none; background:linear-gradient(#0b0a0900 0 30%, #0b0a09b3 54%, #0b0a09 82%); }
+#trip.mapmode .dest-sheet { pointer-events:auto; background:#141210f2; backdrop-filter:blur(10px); border-radius:18px; padding:16px 16px 18px; box-shadow:0 -12px 44px #000a, inset 0 0 0 1px #ffffff14; max-height:58vh; overflow-y:auto; }
+.areapin, .staypin, .sightpin { display:flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; cursor:pointer; box-shadow:0 3px 12px #0007; white-space:nowrap; font-size:13px; transition:.18s; }
+.areapin { background:#1c1a16; color:#f3ead9; font-size:14px; box-shadow:0 3px 12px #0007, inset 0 0 0 2px #e4b23a; }
+.staypin { background:#fbf7ef; color:#1f1b16; font-weight:700; }
+.staypin em { font-style:normal; font-weight:800; color:#a0522d; }
+.staypin:hover, .staypin.picked { background:#e4b23a; translate:0 -2px; }
+.sightpin { background:#ffd16622; color:#f3ead9; box-shadow:0 2px 8px #0006, inset 0 0 0 1px #ffd16688; cursor:default; font-size:12px; }
+.facts { display:flex; flex-direction:column; gap:6px; margin:16px 0 0; }
+.fact { display:flex; align-items:baseline; gap:10px; font-size:14px; }
+.fact .fk { color:#8d8373; min-width:9em; }
+.fact b { color:#f3ead9; }
+#trip .metro-photo.on { height:140px; margin:10px 0 0; }
+.dway .metro-photo.on { height:120px; margin:10px 0 0; }
+.photo-cap { position:absolute; left:10px; bottom:6px; z-index:1; font-size:11.5px; color:#fff; text-shadow:0 1px 4px #000c; max-width:70%; }

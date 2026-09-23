@@ -3,11 +3,11 @@ import type { Curated } from './places';
 import type { Rich } from './marais';
 
 export const CURATED_BELLEVILLE: Curated[] = [
-  { match: /parc de belleville/i, name: '벨빌 공원', pos: [2.3838, 48.8714], cat: 'park', emoji: '🌆', known: true, star: true, mins: 35,
+  { match: /parc de belleville/i, name: '벨빌 공원', photo: ['Parc de Belleville'], pos: [2.3838, 48.8714], cat: 'park', emoji: '🌆', known: true, star: true, mins: 35,
     blurb: '언덕을 계단식으로 깎아 만든 공원. 맨 위 테라스에서 파리 시내가 한눈에 들어오는데, 에펠탑이 정면으로 보이면서도 사람은 몽마르트르의 십분의 일이다. 해 질 때가 제일 좋다.' },
-  { match: /rue de belleville/i, name: '벨빌 거리', pos: [2.3800, 48.8724], cat: 'gourmet', emoji: '🥟', star: true, mins: 30,
+  { match: /rue de belleville/i, name: '벨빌 거리', photo: ['fr:Rue de Belleville'], pos: [2.3800, 48.8724], cat: 'gourmet', emoji: '🥟', star: true, mins: 30,
     blurb: '언덕을 따라 올라가는 이 동네의 중심 거리. 중국·베트남 식당과 튀니지 빵집, 아프리카 식료품점이 번갈아 나온다. 파리에서 가장 싸게, 가장 여러 나라 음식을 먹을 수 있는 거리 중 하나다.' },
-  { match: /rue d[ée]noyez/i, name: '드누아예 거리', pos: [2.3785, 48.8722], cat: 'sight', emoji: '🎨', star: true, mins: 15,
+  { match: /rue d[ée]noyez/i, name: '드누아예 거리', photo: ['fr:Rue Dénoyez'], pos: [2.3785, 48.8722], cat: 'sight', emoji: '🎨', star: true, mins: 15,
     blurb: '담벼락이 통째로 그라피티 캔버스인 짧은 골목. 그림이 몇 주 단위로 덮여 바뀌기 때문에 오늘 본 벽은 오늘 것이다. 재개발이 진행 중이라 해마다 모습이 달라진다.' },
   { match: /march[ée] de belleville/i, name: '벨빌 시장', pos: [2.3776, 48.8710], cat: 'gourmet', emoji: '🧺', mins: 30,
     blurb: '대로 가운데 길게 서는 노천 시장(화·금 오전). 파리에서 값이 가장 싼 시장으로 꼽힌다. 끝날 무렵엔 상인들이 목청껏 떨이를 외친다.' },

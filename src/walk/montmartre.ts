@@ -4,17 +4,17 @@ import type { Curated } from './places';
 import type { Rich } from './marais';
 
 export const CURATED_MONTMARTRE: Curated[] = [
-  { match: /sacr[ée][- ]c[œoe]ur/i, name: '사크레쾨르 대성당', pos: [2.3431, 48.8867], cat: 'sight', emoji: '⛪', known: true, star: true, mins: 40,
+  { match: /sacr[ée][- ]c[œoe]ur/i, name: '사크레쾨르 대성당', photo: ['Sacré-Cœur, Paris'], pos: [2.3431, 48.8867], cat: 'sight', emoji: '⛪', known: true, star: true, mins: 40,
     blurb: '파리에서 가장 높은 언덕 위의 하얀 성당. 비를 맞을수록 하얘지는 돌로 지었다. 계단 앞에 앉아 파리 전체를 내려다보는 게 절반이고, 나머지 절반은 안의 어둠과 천장 모자이크다. 입장 무료, 돔은 따로 유료.' },
-  { match: /place du tertre/i, name: '테르트르 광장', pos: [2.3406, 48.8865], cat: 'sight', emoji: '🎨', known: true, star: true, mins: 25,
+  { match: /place du tertre/i, name: '테르트르 광장', photo: ['Place du Tertre'], pos: [2.3406, 48.8865], cat: 'sight', emoji: '🎨', known: true, star: true, mins: 25,
     blurb: '화가들이 이젤을 펴고 초상화를 그려 주는 작은 광장. 값은 부르는 게 값이라 먼저 물어야 한다. 사람이 가장 몰리는 곳이고, 여기서 한 골목만 벗어나면 갑자기 조용해진다.' },
-  { match: /mus[ée]e de montmartre/i, name: '몽마르트르 박물관', pos: [2.3401, 48.8884], cat: 'museum', emoji: '🏡', star: true, cost: 15, mins: 70,
+  { match: /mus[ée]e de montmartre/i, name: '몽마르트르 박물관', photo: ['Musée de Montmartre'], pos: [2.3401, 48.8884], cat: 'museum', emoji: '🏡', star: true, cost: 15, mins: 70,
     blurb: '르누아르·위트릴로·발라동이 실제로 살며 그렸던 집. 언덕에서 가장 오래된 건물 중 하나다. 뒤편 르누아르 정원에서 포도밭과 지붕들이 내려다보이는데, 그 자리가 이 동네에서 제일 조용하다.' },
   { match: /mur des je t.aime|je t.aime/i, name: '사랑해 벽', pos: [2.3384, 48.8843], cat: 'sight', emoji: '💬', mins: 8,
     blurb: '아베스 역 옆 작은 공원의 파란 타일 벽. 311개 언어로 「사랑해」가 적혀 있다. 한국어도 있다. 사진 한 장 찍고 지나가는 곳.' },
   { match: /moulin de la galette|blute-fin/i, name: '물랭 드 라 갈레트', pos: [2.3358, 48.8876], cat: 'sight', emoji: '🌾', mins: 10,
     blurb: '르누아르가 춤추는 사람들을 그린 그 풍차. 언덕에 남은 두 대 중 하나이고, 지금은 사유지라 밖에서만 본다. 올라오는 길(rue Lepic)이 가파르다.' },
-  { match: /moulin rouge/i, name: '물랭 루주', pos: [2.3323, 48.8842], cat: 'sight', emoji: '🔴', known: true, mins: 10,
+  { match: /moulin rouge/i, name: '물랭 루주', photo: ['Moulin Rouge'], pos: [2.3323, 48.8842], cat: 'sight', emoji: '🔴', known: true, mins: 10,
     blurb: '1889년부터 그 자리의 빨간 풍차. 공연은 비싸고 예약제라, 대개는 간판만 보고 지나간다. 주변은 관광지 특유의 번잡함이 있다.' },
   { match: /maison rose/i, name: '라 메종 로즈', pos: [2.3396, 48.8886], cat: 'eat', emoji: '🌸', cost: 28, mins: 60,
     blurb: '분홍 벽에 초록 창틀. 위트릴로가 그려서 유명해진 모퉁이 집이고, 지금도 식당이다. 사진 찍는 줄이 늘 조금 있다.' },

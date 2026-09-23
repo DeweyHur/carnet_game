@@ -56,11 +56,13 @@ export interface Curated {
   minor?: boolean;
   /** 목적지 고르는 화면에서 맨 위에 보여 줄 곳 */
   star?: boolean;
+  /** 위키미디어 공용 사진 후보 (숙소 고를 때 이 동네가 어떤 곳인지 보여 준다) */
+  photo?: string[];
 }
 
 // 가격·시간은 전부 프로토타입용 대략값.
 export const CURATED_MARAIS: Curated[] = [
-  { match: /^place des vosges$/i, name: '보주 광장 Place des Vosges', pos: [2.3655, 48.8556], cat: 'park', emoji: '⛲', known: true, mins: 20,
+  { match: /^place des vosges$/i, name: '보주 광장 Place des Vosges', photo: ['Place des Vosges'], pos: [2.3655, 48.8556], cat: 'park', emoji: '⛲', known: true, mins: 20,
     blurb: '1612년에 완성된, 파리에서 가장 오래된 계획 광장. 사방이 똑같은 붉은 벽돌 건물과 아케이드로 둘러싸여 있다. 잔디에 앉은 사람들 틈에 끼면 된다.' },
   { match: /maison de victor hugo/i, name: '빅토르 위고의 집', pos: [2.3661, 48.8548], cat: 'museum', emoji: '🖋️', cost: 0, mins: 40,
     blurb: '보주 광장 모퉁이 6번지. 위고가 1832년부터 16년을 살며 《레 미제라블》의 상당 부분을 쓴 아파트. 상설 전시는 무료.' },
