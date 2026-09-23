@@ -490,6 +490,7 @@ function goRest() {
   sfx.enter();
   toast(`${st.name}에서 45분 쉬었어요`);
   hud();
+  paintMetroBtn();
 }
 
 function showStationMarker() {
@@ -784,7 +785,7 @@ async function start() {
   S.fares = a.ride.cost;
   S.clock += a.ride.mins;
   S.tired = Math.min(100, S.tired + a.ride.tired);
-  S.hunger = Math.min(100, S.hunger + a.ride.mins * 0.11);
+  S.hunger = Math.min(100, S.hunger + a.ride.mins * 0.14);
 
   for (let i = 0; i < 6; i++) sfx.stair(i);
   sfx.surface();
@@ -897,10 +898,19 @@ function finish() {
 }
 
 const metroBtn = $<HTMLButtonElement>('#metro-go');
+const stayBtn = $<HTMLButtonElement>('#stay-go');
 function paintMetroBtn() {
   metroBtn.textContent = '🚇 어디 갈까';
   metroBtn.title = '다른 동네, 또는 가고 싶은 곳을 고른다';
   metroBtn.onclick = chooseDestination;
+  const st = S.stay;
+  stayBtn.hidden = !st;
+  if (st) {
+    const here = st.district === district.id;
+    stayBtn.textContent = here ? '🛏 숙소' : `🛏 ${DISTRICTS[st.district].name}`;
+    stayBtn.title = here ? `${st.name}으로 돌아가 쉰다` : `숙소는 ${DISTRICTS[st.district].name}에 있다`;
+    stayBtn.onclick = () => (here ? goRest() : chooseDestination());
+  }
 }
 $('#go').addEventListener('click', start);
 const eyeBtn = $<HTMLButtonElement>('#eye');

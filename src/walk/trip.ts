@@ -28,8 +28,8 @@ const clamp = (n: number) => Math.max(0, Math.min(100, n));
 
 /** 시간이 흐르고 걸은 만큼 쌓인다 */
 export function drain(b: Body, mins: number, metres: number) {
-  b.hunger = clamp(b.hunger + mins * 0.11);
-  b.tired = clamp(b.tired + mins * 0.02 + (metres / 100) * 0.75);
+  b.hunger = clamp(b.hunger + mins * 0.14);
+  b.tired = clamp(b.tired + mins * 0.025 + (metres / 100) * 0.9);
 }
 export function eat(b: Body, amount: number, sat = 0) {
   b.hunger = clamp(b.hunger - amount);
