@@ -862,7 +862,7 @@ export class Street {
     if (it.follow && q && Math.hypot(it.x - q.npc.x, it.y - q.npc.y) < 3) this.finishQuest(T.DOG_BACK, '잃어버린 강아지를 찾아 줬다');
   }
 
-  private stepQuest(dt: number) {
+  private stepQuest(_dt: number) {
     const q = this.quest;
     if (!q) return;
     const b = this.c.hero.body;
@@ -872,7 +872,6 @@ export class Street {
       if (Math.hypot(q.npc.x - b.x, q.npc.y - b.y) < 2.2) { q.npc.state = 'chat'; q.npc.timer = 40; q.npc.followTarget = null; void this.questTalk(q); }
     }
     // 너무 멀어지면 포기
-    q.t += dt * 0;
     if (Math.hypot(q.npc.x - b.x, q.npc.y - b.y) > 160) this.endQuest(null);
   }
 

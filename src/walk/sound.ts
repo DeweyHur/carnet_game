@@ -161,3 +161,32 @@ export function music(level: number) {
     }, beat * 1000);
   }
 }
+
+// ───────── 지하철·버스 ─────────
+/** 문 닫힘 경고음(삐-) */
+export const doorBeep = () => { tone(1175, 0, 0.9, 0.045, 'square'); };
+/** 문 열림 */
+export const doorOpen = () => { hiss(0.5, 0.35, 2000, 600); tone(220, 0, 0.1, 0.05, 'triangle'); };
+/** 안내 방송 앞 차임 */
+export const chime = () => { tone(659, 0, 0.35, 0.05); tone(831, 0.22, 0.35, 0.05); tone(988, 0.44, 0.6, 0.05); };
+/** 개찰구 */
+export const validate = () => { tone(1760, 0, 0.08, 0.05, 'square'); tone(2349, 0.09, 0.12, 0.045, 'square'); };
+export const turnstile = () => { tone(140, 0, 0.1, 0.1, 'triangle'); hiss(0.2, 0.25, 900, 300); };
+let rumbleGain: GainNode | null = null;
+/** 달리는 소리(0..1) */
+export function rumble(level: number) {
+  if (!ctx) return;
+  if (!rumbleGain) {
+    const src = ctx.createBufferSource();
+    src.buffer = noise(3);
+    src.loop = true;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 260;
+    rumbleGain = ctx.createGain();
+    rumbleGain.gain.value = 0;
+    src.connect(lp).connect(rumbleGain).connect(ctx.destination);
+    src.start();
+  }
+  rumbleGain.gain.setTargetAtTime(level * 0.9, ctx.currentTime, 0.25);
+}

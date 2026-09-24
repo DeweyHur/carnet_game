@@ -406,3 +406,20 @@ body.hero-on .pl.curated { padding:3px; }
 body.talking .hhelp, body.talking .hprompt, body.talking .hpad { opacity:0 !important; pointer-events:none !important; }
 body.hero-on .mstation .nm { display:none; }
 body.hero-on .mstation { opacity:.85; }
+
+/* ───────── 지하철·버스 안(따로 그린 장면) ───────── */
+canvas.under { position:absolute; inset:0; width:100%; height:100%; display:none; background:#0b0a09; }
+canvas.under.on { display:block; }
+.under-fade { position:fixed; inset:0; background:#0b0a09; opacity:0; pointer-events:none; transition:opacity .45s; z-index:6; }
+.under-fade.on { opacity:1; }
+.transit-hud { position:fixed; left:50%; top:62px; translate:-50% -8px; width:min(620px, 94vw); background:#152a52ee; color:#fff; border-radius:14px; padding:10px 14px; z-index:4; opacity:0; pointer-events:none; transition:.3s; box-shadow:0 4px 18px #0006; }
+.transit-hud.on { opacity:1; translate:-50% 0; }
+.transit-hud .th-head { display:flex; align-items:center; gap:8px; font-size:15px; }
+.transit-hud .mline { display:inline-grid; place-items:center; min-width:26px; height:26px; border-radius:50%; font-style:normal; font-weight:800; font-size:14px; padding:0 4px; }
+.transit-hud p { margin:6px 0 0; font-size:13px; color:#d6e0f4; line-height:1.5; }
+.transit-hud .ride-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+.transit-hud .chip { font-size:12px; padding:3px 8px; border-radius:999px; background:#ffffff1f; color:#c9d6ee; }
+.transit-hud .chip.on { background:#ffd166; color:#1f1b16; font-weight:700; }
+.transit-hud .chip.past { opacity:.5; }
+body.underground .hud-right, body.underground .pl, body.underground .mstation, body.underground .mstay, body.underground .questline, body.underground .street-layer { opacity:0 !important; pointer-events:none !important; }
+body.underground #hint { top:160px; }

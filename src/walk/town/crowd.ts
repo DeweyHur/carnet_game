@@ -137,6 +137,10 @@ export class Crowd {
   target = 46;
   /** 길 가운데에서 보도로 비켜 걷는 최대 거리 */
   maxOffset = 3.4;
+  /** 비둘기를 둔다(지하에는 없다) */
+  birds = true;
+  /** 걸을 때 바닥 높이를 따라간다(계단·승강장) */
+  followGround = false;
   private easels: THREE.Group;
   private carts: THREE.Group;
 
@@ -312,6 +316,7 @@ export class Crowd {
       for (const [rr, w] of this.walkerRoles) { r -= w; if (r <= 0) { role = rr; break; } }
       const to = this.adj[i][Math.floor(Math.random() * this.adj[i].length)];
       const n = this.spawn(role, x, y, bearingOf(this.nodes[to][0] - x, this.nodes[to][1] - y));
+      if (this.followGround && this.world) n.z = this.world.ground(x, y, 6.5, 0.6);
       n.from = i; n.to = to;
       if (role === 'cyclist') n.side = 0.4;
       // 아이는 어른 한 명과 함께
@@ -390,7 +395,7 @@ export class Crowd {
       }
     }
     // 비둘기 떼: 벤치·분수 근처
-    for (const sp of this.spots) {
+    if (this.birds) for (const sp of this.spots) {
       if (sp.kind !== 'bench' && sp.kind !== 'fountain' && sp.kind !== 'terrace') continue;
       const d = Math.hypot(sp.x - hx, sp.y - hy);
       if (d > 70) continue;
@@ -443,7 +448,7 @@ export class Crowd {
   private easel(x: number, y: number, facing: number) {
     const g = new THREE.Group();
     const mat = (c: number) => new THREE.MeshToonMaterial({ color: c, gradientMap: this.ramp });
-    for (const [lx, rx] of [[-0.25, -0.12], [0.25, 0.12]]) g.add(new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 1.6).rotateY(lx > 0 ? -0.12 : 0.12).translate(lx + rx * 0, 0, 0.8), mat(0x8a5a33)));
+    for (const [lx] of [[-0.25, -0.12], [0.25, 0.12]]) g.add(new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 1.6).rotateY(lx > 0 ? -0.12 : 0.12).translate(lx, 0, 0.8), mat(0x8a5a33)));
     g.add(new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 1.5).rotateX(0.3).translate(0, 0.25, 0.75), mat(0x8a5a33)));
     const cv = document.createElement('canvas');
     cv.width = 64; cv.height = 80;
@@ -621,6 +626,7 @@ export class Crowd {
     // 사람은 건물 속으로 들어가지 않는다(길이 건물을 지나면 그 1층은 통로다)
     if (this.world && this.world.buildingTopAt(nx, ny) > 3 && !this.world.onLane(nx, ny, 1.4)) { n.facing = (n.facing + 25) % 360; return; }
     n.x = nx; n.y = ny;
+    if (this.followGround && this.world) n.z = this.world.ground(nx, ny, n.z + 0.5, 0.5);
   }
 
   private stepDog(n: Npc, dt: number) {
@@ -743,7 +749,7 @@ export class Crowd {
         // 페달
         bob = -0.1; lean = 0.35; tL = 1.2 + 0.4 * s; tR = 1.2 - 0.4 * s; kL = -1.4 - 0.4 * c; kR = -1.4 + 0.4 * c; aLx = 1.2; aRx = 1.2;
       } else if (act === 'sit') {
-        bob = -0.8 + n.z * 0; tL = 1.5; tR = 1.45; kL = -1.5; kR = -1.45; aLx = 0.6; aRx = 0.6;
+        bob = -0.8; tL = 1.5; tR = 1.45; kL = -1.5; kR = -1.45; aLx = 0.6; aRx = 0.6;
         if (L.prop === 3) { aLx = 1.1; aRx = 1.1; aLy = -0.3; aRy = 0.3; }
         if (L.prop === 4) aRx = 0.8 + 0.5 * Math.max(0, Math.sin(this.t * 0.7 + n.id));
       } else if (moving) {

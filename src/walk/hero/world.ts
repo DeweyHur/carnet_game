@@ -153,6 +153,9 @@ export class World {
     this.insert(s);
     return s;
   }
+  /** 뺐던 덩어리를 다시 넣는다 */
+  reinsert(s: Solid) { this.insert(s); }
+
   /** 넣었던 덩어리를 뺀다(지하철 문이 열리면 문짝을 치운다) */
   removeSolid(s: Solid) {
     for (let ix = Math.floor(s.minX / CELL); ix <= Math.floor(s.maxX / CELL); ix++)

@@ -13,7 +13,6 @@ import { loadDistrict } from './data';
 import { DISTRICTS, otherDistricts, planJourney, planOptions, stopPos, LINES } from './districts';
 import type { District, Gate, Journey } from './districts';
 import { ALL_RICH } from './rich';
-import { openMetro } from './metro';
 import { openDestination } from './destination';
 import { openArrival, openMorning } from './arrival';
 import type { StayMap } from './arrival';
@@ -30,6 +29,7 @@ import { openMenu, openVisit } from './inside';
 import type { Shot } from './inside';
 import { Hero } from './hero';
 import { Street } from './street';
+import { Transit } from './under';
 import type { BodyEvent } from './hero';
 import { angleDiff } from './hero/geo';
 import * as THREE from 'three';
@@ -92,6 +92,7 @@ let places: Place[] = [];
 let avatar: Marker;
 let hero: Hero;
 let street: Street;
+let transit: Transit;
 let guideTarget: Place | null = null; // 빛기둥으로 안내하는 곳(현지인이 알려 준 곳 등)
 let entering = false;
 let mapMode = false; // 🗺 지도 보기(위에서 내려다보며 목적지를 찍는다)
@@ -149,6 +150,7 @@ async function boot() {
       hero.hud.onPrompt = () => hero.input.press('interact');
       hero.hud.onPrompt2 = () => hero.input.press('secondary');
       street = makeStreet();
+      transit = new Transit({ hero, toast, hint: (s2) => hint(s2), fine: (eur, why) => toast(`🎫 검표원(contrôleur)! ${why} 벌금 €${eur}`) });
       status.textContent = '';
       $('#go').removeAttribute('disabled');
       $('#go').textContent = '파리에 도착했다';
@@ -304,6 +306,7 @@ function mapHandlers(on: boolean) {
 function frame(t: number) {
   const dt = Math.min(0.1, (t - lastT) / 1000 || 0);
   lastT = t;
+  if (transit?.active) { transit.frame(dt); requestAnimationFrame(frame); return; }
   if (hero) heroFrame(dt);
   lookAcc += dt;
   if (lookAcc > 0.12 && S.started && !metroOpen) { lookAcc = 0; look(); hud(); }
@@ -848,8 +851,8 @@ async function ride(target: Dest, gate: Gate) {
   let pre: Promise<unknown> | null = null;
   metroOpen = true;
   hint('');
-  const r = await openMetro(district, dest, j, gate, target.place ?? null, () => { pre = loadDistrict(dest, () => {}).catch(() => null); }, metroMap);
-  metroMap.clear();
+  // 지하철·버스도 직접 걷는다(역·전동차·버스 안 장면)
+  const r = await transit.run(district, dest, j, gate, target.place ?? null, () => { pre = loadDistrict(dest, () => {}).catch(() => null); });
   metroOpen = false;
   if (!r) return; // 타지 않고 돌아섰다 — 카메라는 사람 뒤로 돌아온다
   S.clock += r.mins;
@@ -1231,7 +1234,7 @@ window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (openPl
 // 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
 // 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
 window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
-if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, street: () => street, places: () => places, graph: () => graph, map: () => map };
+if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();
