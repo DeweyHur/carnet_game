@@ -13,7 +13,7 @@ export interface MetroResult { mins: number; cost: number; exit: Gate; wrong: nu
 /** 지하철을 타는 동안 뒤에 보이는 지도. main.ts가 구현한다. */
 export interface MetroMap {
   /** 이번 구간을 지도에 그리고 화면에 맞춘다 */
-  ride(color: string, stops: { name: string; pos: LngLat }[]): void;
+  ride(color: string, stops: { name: string; pos: LngLat }[], mode?: 'metro' | 'bus'): void;
   /** 전동차를 from에서 to까지 ms 동안 움직인다 */
   train(from: LngLat, to: LngLat, ms: number): void;
   /** 출구를 지도에 찍는다. 핀을 누르면 pick(i) */
@@ -122,6 +122,17 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
     };
     const bumpRun = (w: HTMLElement) => { const r = w.querySelector('.metro-run'); if (r) r.textContent = `여기까지 ${mins}분`; };
 
+    /** 이 구간에서 지나는 역·정류장. 버스는 STATION_POS에 없으니 stopPos로 푼다. */
+    const legStops = (l: Extract<Leg, { kind: 'ride' }>, r: Ride) => {
+      const dir = r.b > r.a ? 1 : -1;
+      const names: string[] = [];
+      for (let i = r.a; i !== r.b + dir; i += dir) names.push(r.stations[i]);
+      const stops = names
+        .map((n) => ({ name: n, pos: stopPos(l.line, n) }))
+        .filter((x): x is { name: string; pos: LngLat } => !!x.pos);
+      return { names, stops };
+    };
+
     // ── 0. 들어갈까
     const firstRide = j.legs.find((l) => l.kind === 'ride') as Extract<Leg, { kind: 'ride' }> | undefined;
     const startsByBus = !!firstRide && LINES[firstRide.line].mode === 'bus';
@@ -144,7 +155,11 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
       no.onclick = () => { blurActive(); close(null); };
       acts.append(go, no);
       w.appendChild(acts);
-      show(w);
+      // 버스는 지하로 내려가지 않는다 — 기다리는 동안에도 거리와 노선이 보여야 한다
+      const busStops = startsByBus && firstRide ? legStops(firstRide, rideInfo(firstRide)) : null;
+      const onMap = !!busStops && busStops.stops.length > 1;
+      show(w, onMap);
+      if (onMap && firstRide) gis.ride(rideInfo(firstRide).color, busStops!.stops, 'bus');
     };
 
     // ── 환승
@@ -194,15 +209,15 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
 
       const { wrap } = routeMap(r, pick);
       w.appendChild(wrap);
-      show(w);
+      const { stops } = legStops(l, r);
+      const onMap = bus && stops.length > 1;
+      show(w, onMap);
+      if (onMap) gis.ride(r.color, stops, 'bus');
     };
 
     /** 달리는 중: 지도가 뒤로 보이고, 지나는 역이 지도와 패널에 같이 표시된다 */
     const running = (l: Extract<Leg, { kind: 'ride' }>, r: Ride) => {
-      const stepDir = r.b > r.a ? 1 : -1;
-      const names: string[] = [];
-      for (let i = r.a; i !== r.b + stepDir; i += stepDir) names.push(r.stations[i]);
-      const stops = names.map((n) => ({ name: n, pos: STATION_POS[n] })).filter((x) => x.pos);
+      const { names, stops } = legStops(l, r);
 
       const w = el('div', 'metro-sheet riding');
       const badge = el('i', 'mline', l.line);
@@ -225,7 +240,7 @@ export function openMetro(from: District, dest: District, j: Journey, entered: G
       w.appendChild(run);
       show(w, stops.length > 1);
 
-      if (stops.length > 1) gis.ride(r.color, stops);
+      if (stops.length > 1) gis.ride(r.color, stops, r.mode);
       const HOP = 1500;
       let k = 0;
       const hop = () => {

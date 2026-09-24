@@ -197,6 +197,9 @@ button:disabled { opacity:.5; cursor:default; }
 /* 지하철을 타는 동안은 걷기용 표시를 치운다 */
 body.metro-mode .pl, body.metro-mode .mstation, body.metro-mode .me { opacity:0 !important; pointer-events:none; transition:opacity .4s; }
 body.metro-mode .hud-right { opacity:0; pointer-events:none; transition:opacity .3s; }
+/* 버스는 지하로 사라지지 않는다 — 거리가 계속 보이고 가게 핀도 흐릿하게 남는다 */
+body.bus-mode .pl { opacity:.5 !important; }
+body.bus-mode #metro.mapmode { background:linear-gradient(#0b0a0900 0 46%, #0b0a0999 68%, #0b0a09e8 88%); }
 
 /* ───────── 어디 갈까 ───────── */
 #dest { position:absolute; inset:0; z-index:9; display:flex; flex-direction:column; align-items:center; justify-content:safe center; overflow-y:auto; overscroll-behavior:contain;

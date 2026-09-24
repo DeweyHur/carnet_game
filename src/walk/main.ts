@@ -581,8 +581,9 @@ function quietMap(on: boolean) {
 }
 
 const metroMap: MetroMap = {
-  ride(color, stops) {
+  ride(color, stops, mode = 'metro') {
     quietMap(true);
+    document.body.classList.toggle('bus-mode', mode === 'bus');
     (map.getSource('metro') as GeoJSONSource).setData(line(stops.map((s) => s.pos)));
     map.setPaintProperty('metro', 'line-color', color);
     map.setLayoutProperty('metro', 'visibility', 'visible');
@@ -599,15 +600,15 @@ const metroMap: MetroMap = {
     if (!trainMarker) {
       const el = document.createElement('div');
       el.className = 'train';
-      el.textContent = '🚇';
       trainMarker = new maplibregl.Marker({ element: el }).setLngLat(stops[0].pos);
     }
+    trainMarker.getElement().textContent = mode === 'bus' ? '🚌' : '🚇';
     trainMarker.setLngLat(stops[0].pos).addTo(map);
     avatar.getElement().classList.add('hidden');
     map.setCenterClampedToGround(true);
     const b = stops.reduce((bb, s) => bb.extend(s.pos), new maplibregl.LngLatBounds(stops[0].pos, stops[0].pos));
     map.easeTo({ pitch: 0, bearing: 0, duration: 500 });
-    setTimeout(() => map.fitBounds(b, { padding: { top: 90, bottom: bottomPad(), left: 50, right: 50 }, maxZoom: 15.8, duration: 1100 }), 520);
+    setTimeout(() => map.fitBounds(b, { padding: { top: 90, bottom: bottomPad(), left: 50, right: 50 }, maxZoom: mode === 'bus' ? 16.2 : 15.8, duration: 1100 }), 520);
   },
   train(from, to, ms) {
     cancelAnimationFrame(trainAnim);
@@ -640,6 +641,7 @@ const metroMap: MetroMap = {
   },
   clear() {
     quietMap(false);
+    document.body.classList.remove('bus-mode');
     cancelAnimationFrame(trainAnim);
     map.setLayoutProperty('metro', 'visibility', 'none');
     (map.getSource('metro') as GeoJSONSource).setData(line([]));
