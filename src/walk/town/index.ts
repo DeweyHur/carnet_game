@@ -413,6 +413,7 @@ export class Town {
         if (ok) { cx = qx; cy = qy; break search; }
       }
       add('guimard', cx, cy, rot);
+      c.signs.push(this.metroSign(cx, cy, rot));
       const cs = Math.cos(rot), sn = Math.sin(rot);
       const at = (lx: number, ly: number) => [cx + lx * cs - ly * sn, cy + lx * sn + ly * cs] as const;
       const seg = (x0: number, y0: number, x1: number, y1: number) => { const [p, q] = at(x0, y0), [r, s] = at(x1, y1); const L = Math.hypot(r - p, s - q); W.addSolid([rectRing((p + r) / 2, (q + s) / 2, 0.12, L, Math.atan2(s - q, r - p) - Math.PI / 2)], 0, 1.0, 'prop'); };
@@ -504,6 +505,32 @@ export class Town {
     // 다시 짓는 칸이면 테라스 가구가 이미 placed에 있다 — 위에서 stamp는 buildCell이 한다
     for (const p of c.placed) if (p.t === 'terrace' && !c.mesh) void p;
   }
+
+  /** 기마르 입구 간판: 크림색 바탕에 초록 글씨 METROPOLITAIN (양면) */
+  private metroSign(cx: number, cy: number, rot: number): THREE.Object3D {
+    let tex = this.metroTex;
+    if (!tex) {
+      const cv = document.createElement('canvas');
+      cv.width = 512; cv.height = 80;
+      const g = cv.getContext('2d')!;
+      g.fillStyle = '#efe0a8'; g.fillRect(0, 0, 512, 80);
+      g.strokeStyle = '#1f4a38'; g.lineWidth = 6; g.strokeRect(3, 3, 506, 74);
+      g.fillStyle = '#1f4a38';
+      g.font = 'bold 50px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('METROPOLITAIN', 256, 44);
+      tex = this.metroTex = new THREE.CanvasTexture(cv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+    }
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.31), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    const c = Math.cos(rot), s = Math.sin(rot);
+    // 틀의 (0, 2.06, 2.72) — 입구 쪽 간판 바로 앞
+    m.position.set(cx - 2.06 * s, cy + 2.06 * c, 2.72);
+    m.up.set(0, 0, 1);
+    m.lookAt(m.position.x - s, m.position.y + c, 2.72);
+    this.scene.add(m);
+    return m;
+  }
+  private metroTex: THREE.CanvasTexture | null = null;
 
   private nameBoard(p: TownPlace, f: Front, tx: number, ty: number): THREE.Object3D {
     const grp = new THREE.Group();

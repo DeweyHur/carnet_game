@@ -153,6 +153,17 @@ export class World {
     this.insert(s);
     return s;
   }
+  /** 넣었던 덩어리를 뺀다(지하철 문이 열리면 문짝을 치운다) */
+  removeSolid(s: Solid) {
+    for (let ix = Math.floor(s.minX / CELL); ix <= Math.floor(s.maxX / CELL); ix++)
+      for (let iy = Math.floor(s.minY / CELL); iy <= Math.floor(s.maxY / CELL); iy++) {
+        const arr = this.grid.get(cellKey(ix, iy));
+        if (!arr) continue;
+        const i = arr.indexOf(s);
+        if (i >= 0) arr.splice(i, 1);
+      }
+  }
+
   /** 절차적 건물을 한꺼번에 넣고 알린다 */
   addBuildings(list: { rings: Float64Array[]; top: number }[]) {
     const fresh: Solid[] = [];

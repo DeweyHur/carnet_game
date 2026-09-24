@@ -12,6 +12,7 @@ import type { Frame as InputFrame } from './input';
 import { figureLayer } from './layer';
 import { World } from './world';
 import { Town } from '../town';
+import { Crowd } from '../town/crowd';
 import type { Theme } from '../town';
 
 const SOURCE = 'openmaptiles';
@@ -29,6 +30,11 @@ export class Hero {
   readonly figure = new Figure();
   readonly cam = new OrbitCam();
   readonly town = new Town();
+  readonly crowd = new Crowd();
+  /** 이번 프레임에 여행자와 부딪힌 사람(세게) */
+  bumped: import('../town/crowd').Npc | null = null;
+  private graphNodes: LngLat[] = [];
+  private graphAdj: number[][] = [];
   theme: Theme = 'marais';
   private ways: LngLat[][] = [];
   readonly input: Input;
@@ -42,6 +48,8 @@ export class Hero {
   private stuck = { t: 0, x: 0, y: 0 };
 
   private readonly map: MlMap;
+  /** 지하철·버스 안처럼 지도 밖의 장면. 있으면 몸은 이 세계에서 움직이고, 거리·사람들은 멈춘다. */
+  sceneWorld: World | null = null;
 
   constructor(map: MlMap, onMap: () => void) {
     this.map = map;
@@ -53,7 +61,7 @@ export class Hero {
 
   /** 스타일이 다 읽힌 뒤에 부른다 */
   attach() {
-    this.map.addLayer(this.town.layer(() => [this.frame.lng0, this.frame.lat0]));
+    this.map.addLayer(this.town.layer(() => [this.frame.lng0, this.frame.lat0], (cam, r) => r.render(this.crowd.scene, cam)));
     this.map.addLayer(figureLayer(this.figure, () => ({ at: this.lnglat, z: this.body.z, visible: this.visible }), (x, y, ok) => this.hud.anchor(x, y, ok)));
     window.setInterval(() => this.absorb(), 1000);
   }
@@ -82,6 +90,8 @@ export class Hero {
     this.world.setLanes(local);
     this.town.setLanes(local);
   }
+  /** 사람들이 걸어 다니는 길(거리 그래프) */
+  setGraph(nodes: LngLat[], adj: number[][]) { this.graphNodes = nodes; this.graphAdj = adj; }
   /** 걷는 길 폴리라인(타일이 없을 때 건물을 세우는 데 쓴다) */
   setWays(ways: LngLat[][]) { this.ways = ways; }
 
@@ -91,6 +101,9 @@ export class Hero {
     this.world = new World(this.frame);
     this.town.reset(this.world, this.frame, this.theme);
     this.setLanes(this.lanes);
+    this.crowd.reset(this.world, this.graphNodes.map((p) => this.frame.toLocal(p)), this.graphAdj, this.theme);
+    this.crowd.seats = this.town.seats;
+    this.crowd.spots = this.town.spots;
     this.body.place(0, 0, 0);
     if (facing !== undefined) this.body.facing = facing;
     this.cam.snap(this.body);
@@ -143,19 +156,52 @@ export class Hero {
       pace: o.pace,
       maxStamina: o.maxStamina,
     };
-    b.step(dt, this.world, intent);
+    const W = this.sceneWorld ?? this.world;
+    b.step(dt, W, intent);
     this.events = b.events.slice();
     if (user) this.hud.moved();
     if (f.recenter) this.cam.recenter();
     if (o.beacon) { const [x, y] = this.frame.toLocal(o.beacon); this.beaconLocal = [x - b.x, y - b.y]; } else this.beaconLocal = null;
-    const g = this.world.ground(b.x, b.y, b.z + 0.05, 0.05);
+    const g = W.ground(b.x, b.y, b.z + 0.05, 0.05);
     this.figure.update(b, dt, g, this.beaconLocal);
-    this.town.update(b.x, b.y);
     this.hud.update(b, dt);
     this.lastF = f;
+    if (this.sceneWorld) { this.bumped = null; return { user, f, arrivedWaypoint }; }
+    this.town.update(b.x, b.y);
+    this.crowd.seats = this.town.seats;
+    this.crowd.spots = this.town.spots;
+    this.crowd.update(dt, { x: b.x, y: b.y, z: b.z, speed: b.speed, mode: b.mode, crouch: b.crouch, facing: b.facing }, this.cam.yaw);
+    this.pushAgainst(this.crowd, this.world);
     return { user, f, arrivedWaypoint };
   }
   private lastF: InputFrame | null = null;
+
+  /** 사람과 부딪힘: 여행자는 밀려나고, 세게(달리다·구르다) 부딪히면 그 사람이 휘청이며 한마디 한다 */
+  pushAgainst(crowd: Crowd, W: World) {
+    const b = this.body;
+    this.bumped = null;
+    if (b.mode === 'climb' || b.mode === 'swim') return;
+    for (const n of crowd.npcs) {
+      if (n.hidden || n.bike || Math.abs(n.z - b.z) > 1.2) continue;
+      const dx = b.x - n.x, dy = b.y - n.y;
+      const d = Math.hypot(dx, dy);
+      const R0 = 0.3 + 0.24 * n.scale;
+      if (d >= R0 || d < 1e-4) continue;
+      const push = R0 - d;
+      b.shove((dx / d) * push, (dy / d) * push, W);
+      if ((b.speed > 4.9 || b.mode === 'roll' || b.mode === 'slide') && !this.bumped) {
+        this.bumped = n;
+        crowd.bump(n, b.x, b.y);
+        if (b.mode !== 'roll') b.stagger(dx / d, dy / d, 1.8);
+      }
+    }
+  }
+
+  /** 장면(지하철 등) 안에서의 카메라: 지도는 건드리지 않고 자리·방위·내려다보는 각만 준다 */
+  sceneShot(dt: number) {
+    const f = this.lastF;
+    return this.cam.update(dt, this.body, this.sceneWorld ?? this.world, f?.camYaw ?? 0, f?.camPitch ?? 0, f?.zoom ?? 0);
+  }
 
   /** 카메라를 몸 뒤에 둔다. resume() 직후에는 지금 지도 카메라에서 서서히 넘어온다. */
   drive(dt: number) {

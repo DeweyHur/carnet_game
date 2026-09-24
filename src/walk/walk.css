@@ -340,3 +340,69 @@ body.touch-play.hero-on #hint { top:170px; }
 .hprompt .v { white-space:nowrap; }
 /* 하루의 빛: 지도 위에 시간대 색을 곱한다(한낮은 흰색이라 그대로) */
 #map::after { content:''; position:absolute; inset:0; background:var(--daylight, #fff); mix-blend-mode:multiply; pointer-events:none; transition:background 2s; }
+
+/* ───────── 거리에서 주고받기: 말풍선·이름표·가게 안내판·대화·사진 ───────── */
+.street-layer { position:fixed; inset:0; pointer-events:none; z-index:3; overflow:hidden; }
+body:not(.hero-on) .street-layer { display:none; }
+.street-layer > * { position:absolute; left:0; top:0; will-change:transform; transition:opacity .2s; }
+.bubble { background:#fffdf7; color:#1f1b16; padding:6px 11px; border-radius:14px; font-size:14px; font-weight:600; white-space:nowrap; box-shadow:0 2px 8px #0005; margin-top:-8px; }
+.bubble::after { content:''; position:absolute; left:50%; bottom:-6px; margin-left:-6px; border:6px solid transparent; border-top-color:#fffdf7; border-bottom:0; }
+.bubble.found { background:#1f1b16e0; color:#ffe7a8; font-weight:700; }
+.bubble.found::after { border-top-color:#1f1b16e0; }
+.bubble.found.big { font-size:16px; padding:8px 14px; background:#e4b23a; color:#1f1b16; }
+.bubble.found.big::after { border-top-color:#e4b23a; }
+.bubble.poster { background:#d9483b; color:#fff; font-family:Georgia, serif; letter-spacing:.04em; }
+.bubble.poster::after { border-top-color:#d9483b; }
+.wtag { display:flex; align-items:center; gap:6px; padding:4px 10px 4px 5px; border-radius:999px; background:#1f1b16c8; color:#fff; font-size:13px; white-space:nowrap; opacity:0; margin-top:-6px; }
+.wtag.on { opacity:1; }
+.wtag .ic { width:22px; height:22px; display:grid; place-items:center; background:#fff; border-radius:50%; font-size:13px; }
+.wtag small { color:#e9dfcc; font-size:11px; }
+.wcard { width:min(300px, 80vw); background:var(--paper); border-radius:14px; padding:12px 14px; box-shadow:0 6px 24px #0006; opacity:0; pointer-events:none; font-size:14px; }
+.wcard.on { opacity:1; pointer-events:auto; }
+.wcard::after { content:''; position:absolute; left:50%; bottom:-8px; margin-left:-8px; border:8px solid transparent; border-top-color:var(--paper); border-bottom:0; }
+.wc-head { display:flex; gap:10px; align-items:center; }
+.wc-head .em { font-size:28px; width:42px; height:42px; display:grid; place-items:center; background:#fff; border-radius:12px; box-shadow:inset 0 0 0 1px #0001; }
+.wc-head b { display:block; font-size:16px; } .wc-head small { color:#7a6f60; font-size:12px; }
+.wcard p { margin:8px 0 0; line-height:1.55; } .wcard .meta { color:#7a6f60; font-size:12px; }
+.wc-acts { display:flex; gap:6px; margin-top:10px; } .wc-acts button { padding:8px 12px; font-size:13px; } .wc-acts .primary { flex:1; }
+.wc-acts kbd, .talk kbd { display:inline-grid; place-items:center; min-width:18px; height:18px; margin-right:6px; border-radius:5px; background:#fff3; font:700 11px/1 inherit; }
+.talk { position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); translate:-50% 20px; width:min(560px, 94vw); background:#1f1b16f0; color:#fff; border-radius:18px; padding:14px 18px 16px; z-index:6; opacity:0; pointer-events:none; transition:.25s; box-shadow:0 8px 30px #0007; }
+.talk.on { opacity:1; translate:-50% 0; pointer-events:auto; }
+.talk .who { margin:0 0 4px; font-size:12px; color:#ffd166; font-weight:700; letter-spacing:.04em; }
+.talk .fr { margin:0; font-size:17px; font-style:italic; font-family:Georgia, serif; }
+.talk .ko { margin:6px 0 12px; font-size:14px; line-height:1.55; color:#e9dfcc; }
+.talk .choices { display:flex; flex-wrap:wrap; gap:8px; }
+.talk .choices button { background:#ffffff1a; color:#fff; box-shadow:none; font-size:14px; padding:9px 14px; }
+.talk .choices button.primary { background:var(--accent); }
+.talk kbd { background:#0004; }
+.fade { position:fixed; inset:0; z-index:6; opacity:0; pointer-events:none; transition:opacity .4s; }
+.fade.on { opacity:1; }
+.flash { position:fixed; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:7; }
+.flash.go { animation:flash .5s ease-out; }
+@keyframes flash { 0% { opacity:0; } 8% { opacity:.9; } 100% { opacity:0; } }
+.polaroid { position:fixed; left:50%; top:50%; width:220px; height:150px; margin:-75px 0 0 -110px; background:#ddd center/cover; border:8px solid #fff; border-bottom-width:26px; box-shadow:0 8px 30px #0007; z-index:7; rotate:-4deg; transition:transform .9s cubic-bezier(.5,0,.3,1), opacity .9s; pointer-events:none; }
+.polaroid.fly { transform:translate(calc(50vw - 150px), calc(-50vh + 90px)) scale(.3); opacity:0; }
+.questline { position:fixed; left:12px; top:58px; max-width:min(420px, 80vw); background:#1f1b16d8; color:#ffe7a8; padding:7px 12px; border-radius:12px; font-size:13px; font-weight:600; z-index:3; opacity:0; pointer-events:none; transition:.3s; }
+.questline.on { opacity:1; }
+body:not(.hero-on) .questline, body:not(.hero-on) .talk { display:none; }
+.hprompt.second { bottom:40px; padding:5px 12px 5px 5px; font-size:13px; background:#1f1b16bb; }
+.hprompt.second kbd { min-width:24px; height:24px; font-size:12px; }
+body.touch-play .hprompt.second { top:166px; bottom:auto; }
+/* 걷는 동안 가까운 곳은 핀 대신 진짜 간판이 보인다. 멀리 있는 알던 곳·찜·알려 받은 곳만 핀으로. */
+body.hero-on .pl:not(.known):not(.saved):not(.revealed) { opacity:0; pointer-events:none; }
+body.hero-on .pl.near { opacity:0; pointer-events:none; }
+body.hero-on .pl .nm { display:none; }
+body.hero-on .pl.curated { padding:3px; }
+.pl.revealed { outline:2px solid #e4b23a; }
+/* 터치: 구르기·웅크리기·몸짓 */
+.hpad .roll, .hpad .crouch { width:56px; height:56px; font-size:12px; }
+.hpad .crouch.held { background:#ffd166; }
+.hpad .face { width:48px; height:48px; font-size:20px; grid-column:1; justify-self:end; }
+.hpad .emotes { position:absolute; right:0; bottom:calc(100% + 8px); display:none; gap:6px; }
+.hpad .emotes.on { display:flex; }
+.hpad .emotes button { width:48px; height:48px; font-size:22px; }
+.hpad { grid-template-columns:auto auto auto; }
+.hpad .map { grid-column:2 / 4; }
+body.talking .hhelp, body.talking .hprompt, body.talking .hpad { opacity:0 !important; pointer-events:none !important; }
+body.hero-on .mstation .nm { display:none; }
+body.hero-on .mstation { opacity:.85; }

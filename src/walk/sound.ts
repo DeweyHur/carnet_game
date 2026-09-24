@@ -97,3 +97,67 @@ export const stroke = () => hiss(0.3, 0.35, 1200, 400, 'lowpass');
 export const exhausted = () => { for (let i = 0; i < 3; i++) setTimeout(() => hiss(0.28, 0.28, 900, 500), i * 420); };
 export const recovered = () => { tone(784, 0, 0.12, 0.04); tone(1046, 0.08, 0.2, 0.04); };
 export const staminaTick = () => tone(1760, 0, 0.05, 0.025, 'square');
+
+// ───────── 거리에서: 인사·동전·물·개·부딪힘·문·앉기·구르기 ─────────
+export const bonjour = () => { tone(587, 0, 0.14, 0.05, 'triangle'); tone(784, 0.12, 0.22, 0.05, 'triangle'); };
+export const coin = () => { tone(1976, 0, 0.12, 0.05, 'square'); tone(2637, 0.06, 0.25, 0.04, 'triangle'); };
+export const drink = () => { for (let i = 0; i < 4; i++) setTimeout(() => hiss(0.16, 0.35, 600 + i * 120, 300, 'lowpass'), i * 260); };
+export const feed = () => { for (let i = 0; i < 3; i++) setTimeout(() => hiss(0.08, 0.2, 3000, 1500), i * 90); };
+export const bark = () => { tone(420, 0, 0.08, 0.08, 'sawtooth'); tone(330, 0.09, 0.1, 0.07, 'sawtooth'); };
+export const bump = () => { tone(90, 0, 0.12, 0.14, 'triangle'); hiss(0.1, 0.25, 1200, 400); };
+export const door = () => { tone(180, 0, 0.3, 0.05, 'sawtooth'); tone(1568, 0.25, 0.4, 0.03); tone(2093, 0.32, 0.5, 0.025); };
+export const sit = () => { tone(110, 0, 0.12, 0.08, 'triangle'); hiss(0.12, 0.15, 800, 300); };
+export const roll = () => { hiss(0.35, 0.45, 400, 1400); tone(95, 0.3, 0.1, 0.1, 'triangle'); };
+export const slide = () => hiss(0.55, 0.5, 2400, 500);
+export const crouch = () => hiss(0.1, 0.18, 1400, 700);
+export const vault = () => { hiss(0.2, 0.35, 700, 1800); tone(150, 0.12, 0.08, 0.08, 'triangle'); };
+
+// ───────── 아코디언 왈츠(거리 악사 근처에서만) ─────────
+// 오른손 선율 + 왼손 쿵짝짝. 가까울수록 크게.
+const MELODY = [76, 79, 84, 83, 81, 79, 77, 76, 74, 76, 77, 79, 76, 74, 72, 0, 76, 79, 84, 86, 84, 83, 81, 79, 77, 79, 81, 83, 84, 0, 84, 0];
+const BASS = [48, 43, 45, 41];
+let musicGain: GainNode | null = null;
+let musicTimer = 0;
+let musicStep = 0;
+let musicLevel = 0;
+const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
+function reed(freq: number, at: number, dur: number, gain: number) {
+  if (!ctx || !musicGain) return;
+  const t = ctx.currentTime + at;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + 0.03);
+  g.gain.setValueAtTime(gain, t + dur * 0.7);
+  g.gain.linearRampToValueAtTime(0, t + dur);
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 2200;
+  for (const det of [-6, 7]) {
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.value = freq;
+    o.detune.value = det;
+    o.connect(lp);
+    o.start(t);
+    o.stop(t + dur + 0.05);
+  }
+  lp.connect(g).connect(musicGain);
+}
+/** level 0..1 — 0이면 멈춘다 */
+export function music(level: number) {
+  musicLevel = level;
+  if (!ctx) return;
+  if (!musicGain) { musicGain = ctx.createGain(); musicGain.gain.value = 0; musicGain.connect(ctx.destination); }
+  musicGain.gain.setTargetAtTime(level * 0.09, ctx.currentTime, 0.4);
+  if (level > 0 && !musicTimer) {
+    const beat = 0.24;
+    musicTimer = window.setInterval(() => {
+      if (musicLevel <= 0.01) { clearInterval(musicTimer); musicTimer = 0; return; }
+      const i = musicStep++;
+      const m = MELODY[i % MELODY.length];
+      if (m) reed(midi(m), 0, beat * 0.95, 0.5);
+      if (i % 3 === 0) reed(midi(BASS[Math.floor(i / 6) % BASS.length]), 0, beat * 0.9, 0.45);
+      else { const r = BASS[Math.floor(i / 6) % BASS.length] + 12; reed(midi(r + 4), 0, beat * 0.6, 0.18); reed(midi(r + 7), 0, beat * 0.6, 0.18); }
+    }, beat * 1000);
+  }
+}

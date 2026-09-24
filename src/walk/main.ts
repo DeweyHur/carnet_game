@@ -2,7 +2,6 @@
 // 질문하지 않는다. 어디로 걸었고, 어디서 멈췄고, 무엇을 지나쳤는지만 기록한다.
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource, Map as MlMap, Marker, StyleSpecification } from 'maplibre-gl';
-import type { Feature, MultiPolygon, Polygon } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import './walk.css';
@@ -30,6 +29,7 @@ import type { Dish } from './content';
 import { openMenu, openVisit } from './inside';
 import type { Shot } from './inside';
 import { Hero } from './hero';
+import { Street } from './street';
 import type { BodyEvent } from './hero';
 import { angleDiff } from './hero/geo';
 import * as THREE from 'three';
@@ -48,7 +48,7 @@ const SIGHT = 60;
 const STREET = 24;
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
-interface Visit { place: Place; at: number; mins: number; cost: number; dishes?: Dish[]; seen?: number; total?: number }
+interface Visit { place: Place; at: number; mins: number; cost: number; dishes?: Dish[]; seen?: number; total?: number; note?: string }
 const S = {
   pos: START as LngLat,
   node: 0,
@@ -77,6 +77,8 @@ const S = {
   travelGate: null as Gate | null,
   restAt: false,
   dest: null as Dest | null,
+  buys: [] as { what: string; cost: number; at: number }[],
+  told: new Map<string, string>(), // 누가 알려 준 곳
   started: false,
   finished: false,
 };
@@ -89,6 +91,9 @@ let graph: Graph;
 let places: Place[] = [];
 let avatar: Marker;
 let hero: Hero;
+let street: Street;
+let guideTarget: Place | null = null; // 빛기둥으로 안내하는 곳(현지인이 알려 준 곳 등)
+let entering = false;
 let mapMode = false; // 🗺 지도 보기(위에서 내려다보며 목적지를 찍는다)
 const markers = new Map<string, Marker>();
 let openPlace: Place | null = null;
@@ -135,12 +140,15 @@ async function boot() {
       hero = new Hero(map, () => setMapMode(!mapMode));
       hero.theme = district.id;
       hero.setWays(ways);
+      hero.setGraph(graph.nodes, graph.adj.map((es) => es.map((e) => e.to)));
       hero.attach();
       hero.setLanes(laneSegments(graph));
       hero.reset(S.pos);
       hero.town.setFar(st.fallback ? 300 : 1e6);
       dressTown();
-      hero.hud.onPrompt = () => prompt?.act();
+      hero.hud.onPrompt = () => hero.input.press('interact');
+      hero.hud.onPrompt2 = () => hero.input.press('secondary');
+      street = makeStreet();
       status.textContent = '';
       $('#go').removeAttribute('disabled');
       $('#go').textContent = '파리에 도착했다';
@@ -176,9 +184,6 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
     map.addSource('streets', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: ways } } });
     map.addLayer({ id: 'streets', type: 'line', source: 'streets', paint: { 'line-color': '#fff', 'line-width': 7 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
   }
-  // 눈에 들어온 가게의 건물을 색칠하는 층(아이콘 대신). 건물 폴리곤은 타일에서 찾아 온다.
-  map.addSource('hl', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  map.addLayer({ id: 'hl', type: 'fill-extrusion', source: 'hl', layout: { visibility: 'none' }, paint: { 'fill-extrusion-color': ['get', 'color'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.92 } }); // 가게는 이제 거리(Town)가 차양·간판으로 보여 준다
   map.addSource('vision', { type: 'geojson', data: circle(S.pos, VISION) });
   map.addLayer({ id: 'vision', type: 'fill', source: 'vision', paint: { 'fill-color': '#ffd166', 'fill-opacity': 0.16 } });
   map.addSource('trail', { type: 'geojson', data: line(S.trail) });
@@ -199,60 +204,11 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
   map.on('click', (e) => {
     if (!S.started || S.finished || metroOpen) return;
     if (openPlace) { closeCard('pass'); return; }
-    // 색칠된 건물을 눌렀나? 가까우면 들여다보고, 멀면 카드에서 걸어갈지 고른다.
-    const hit = map.queryRenderedFeatures(e.point, { layers: ['hl'] })[0];
-    const pl = hit && places.find((p) => p.id === hit.properties?.pid);
-    if (pl) { openCard(pl); return; }
     // 땅을 찍어 걸어가는 건 지도 보기에서만. 평소에는 직접 걷는다.
     if (!mapMode) return;
     walkTo([e.lngLat.lng, e.lngLat.lat], null);
     setMapMode(false);
   });
-}
-
-const CAT_COLOR: Record<string, string> = { eat: '#e4572e', bakery: '#e08a2e', sweet: '#e0669c', gourmet: '#c9822c', cafe: '#b5651d', bar: '#8e3b8e', museum: '#5b4bd6', sight: '#3f7fc4', park: '#3a9d5d', shop: '#2f9e9e' };
-const buildingOf = new Map<string, Feature | null>(); // place id → 건물 폴리곤(없으면 null)
-const litIds = new Set<string>();
-
-/** 그 자리의 건물 폴리곤을 타일에서 찾는다(화면에 그려진 것만 찾을 수 있다). */
-function findBuilding(p: Place): Feature | null {
-  if (buildingOf.has(p.id)) return buildingOf.get(p.id)!;
-  const layers = (map.getStyle().layers ?? []).filter((l) => l.type === 'fill-extrusion' && l.id !== 'hl').map((l) => l.id);
-  if (!layers.length) { buildingOf.set(p.id, null); return null; }
-  const pt = map.project(p.pos);
-  if (pt.x < 0 || pt.y < 0 || pt.x > map.getCanvas().clientWidth || pt.y > map.getCanvas().clientHeight) return null; // 아직 화면 밖 — 다음에 다시
-  let f = map.queryRenderedFeatures(pt, { layers })[0];
-  if (!f) {
-    // 문 앞 점이 길 위에 찍힌 경우: 주변 몇 m 안의 건물을 찾는다
-    const r = 10;
-    f = map.queryRenderedFeatures([[pt.x - r, pt.y - r], [pt.x + r, pt.y + r]], { layers })[0];
-  }
-  if (!f || (f.geometry.type !== 'Polygon' && f.geometry.type !== 'MultiPolygon')) { buildingOf.set(p.id, null); return null; }
-  const h = Number(f.properties?.render_height ?? f.properties?.height ?? 12) || 12;
-  const feat: Feature = { type: 'Feature', geometry: inflate(f.geometry as Polygon | MultiPolygon, 0.25), properties: { pid: p.id, color: CAT_COLOR[p.cat] ?? '#e4572e', h: h + 0.6 } };
-  buildingOf.set(p.id, feat);
-  return feat;
-}
-
-/** 폴리곤을 중심에서 m미터쯤 부풀린다 — 원래 건물 벽과 겹쳐 줄무늬(z-fighting)가 생기지 않게 */
-function inflate(g: Polygon | MultiPolygon, m: number): Polygon | MultiPolygon {
-  const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
-  const out = polys.map((rings) => {
-    const outer = rings[0];
-    let cx = 0, cy = 0;
-    for (const p of outer) { cx += p[0]; cy += p[1]; }
-    cx /= outer.length; cy /= outer.length;
-    const r = Math.max(...outer.map((p) => dist([cx, cy], [p[0], p[1]]))) || 1;
-    const k = 1 + m / r;
-    return rings.map((ring) => ring.map((p) => [cx + (p[0] - cx) * k, cy + (p[1] - cy) * k]));
-  });
-  return g.type === 'Polygon' ? { type: 'Polygon', coordinates: out[0] } : { type: 'MultiPolygon', coordinates: out };
-}
-
-function paintBuildings() {
-  const feats: Feature[] = [];
-  for (const id of litIds) { const f = buildingOf.get(id); if (f) feats.push(f); }
-  (map.getSource('hl') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: feats });
 }
 
 function showMarker(p: Place, pop: boolean) {
@@ -267,27 +223,22 @@ function showMarker(p: Place, pop: boolean) {
 }
 
 function look() {
-  let changed = false;
   for (const p of places) {
-    const vis = inSight(p);
     const m = markers.get(p.id);
-    if (!vis) {
-      // 시야에서 벗어나면 지도에서도 사라진다(알던 곳의 핀과 이미 들어간 곳은 남는다)
-      if (m && !p.known && !S.visits.some((v) => v.place.id === p.id)) m.getElement().classList.add('off');
-      if (litIds.delete(p.id)) changed = true;
-      continue;
-    }
-    // 보이는 곳: 건물이 있으면 건물을 색칠하고, 없으면(광장·길가 노점 등) 아이콘으로
-    const b = p.minor ? null : findBuilding(p);
-    if (b) { if (!litIds.has(p.id)) { litIds.add(p.id); changed = true; } if (m && !p.known) m.getElement().classList.add('off'); }
-    else if (m) m.getElement().classList.remove('off');
-    if (S.seen.has(p.id)) continue;
+    // 걷는 동안 가까운 곳은 핀 대신 진짜 간판·차양이 보인다(핀은 멀리 있는 알던 곳·찜한 곳만)
+    if (m) m.getElement().classList.toggle('near', dist(S.pos, p.pos) < 30);
+    if (!inSight(p) || S.seen.has(p.id)) continue;
     S.seen.set(p.id, S.clock);
-    if (!b) { if (m) m.getElement().classList.add('pop', 'found'); else showMarker(p, true); }
-    else if (p.known && m) m.getElement().classList.add('found');
+    if (!m) showMarker(p, true); else m.getElement().classList.add('found');
+    // 발견: 간판 위에 반짝 이름이 뜬다
+    if (hero && street) {
+      const [px, py] = hero.frame.toLocal(p.pos);
+      const f = p.minor ? null : hero.town.front({ id: p.id, x: px, y: py });
+      const ax = f ? f.x + f.nx * 0.8 : px, ay = f ? f.y + f.ny * 0.8 : py;
+      street.ui.say(() => ({ x: ax, y: ay, z: f ? 5.4 : 2.6 }), `✨ ${p.emoji} ${p.name}`, p.curated ? 3.2 : 2.2, p.curated ? 'found big' : 'found');
+    }
     if (p.curated) { sfx.spotBig(); toast(`${p.emoji} ${p.name}`); } else sfx.spot();
   }
-  if (changed) paintBuildings();
 }
 
 function walkTo(dest: LngLat, target: Place | null) {
@@ -342,7 +293,6 @@ let wasCamOn = false;
 let lastTrail: LngLat = START;
 let splashed = false;
 let climbT = 0;
-let prompt: { verb: string; what: string; act: () => void } | null = null;
 const MODALS = ['inside', 'dest', 'trip', 'metro', 'summary'];
 const modalOpen = () => MODALS.some((id) => document.getElementById(id)?.classList.contains('on'));
 const HANDLERS = ['dragPan', 'dragRotate', 'scrollZoom', 'boxZoom', 'doubleClickZoom', 'keyboard', 'touchZoomRotate', 'touchPitch'] as const;
@@ -356,7 +306,7 @@ function frame(t: number) {
   lastT = t;
   if (hero) heroFrame(dt);
   lookAcc += dt;
-  if (lookAcc > 0.12 && S.started && !metroOpen) { lookAcc = 0; look(); hud(); findPrompt(); }
+  if (lookAcc > 0.12 && S.started && !metroOpen) { lookAcc = 0; look(); hud(); }
   requestAnimationFrame(frame);
 }
 
@@ -409,18 +359,23 @@ function heroFrame(dt: number) {
   }
   if (!S.started) return;
   const auto = S.path.length > 1 && S.seg + 1 < S.path.length ? S.path[S.seg + 1] : null;
-  const frozen = !live || !!openPlace || modal || mapMode;
+  const talking = !!street?.holding;
+  const frozen = !live || !!openPlace || modal || mapMode || talking || entering;
+  // 빛기둥: 자동으로 걷는 길의 끝 > 사건(풍선·강아지) > 현지인이 알려 준 곳
+  const qb = street?.beacon;
+  const beacon = S.path.length > 1 ? S.path[S.path.length - 1] : qb ? hero.frame.toLngLat(qb[0], qb[1]) : guideTarget ? guideTarget.pos : null;
   const r = hero.tick(dt, {
     waypoint: auto,
     frozen,
     pace: paceFactor(S),
     maxStamina: 1 - 0.45 * (S.tired / 100), // 지칠수록 기력 바퀴가 작아진다
-    beacon: S.path.length > 1 ? S.path[S.path.length - 1] : null,
+    beacon,
   });
-  if (r.f.map && live && !modal) { setMapMode(!mapMode); return; } // 이번 프레임에 카메라를 잡으면 지도 보기 전환(easeTo)이 끊긴다
+  if (r.f.map && live && !modal && !talking) { setMapMode(!mapMode); return; } // 이번 프레임에 카메라를 잡으면 지도 보기 전환(easeTo)이 끊긴다
+  street?.update(dt, r.f, live && !modal && !mapMode && !openPlace && !entering);
   if (!live) { if (camOn) hero.drive(dt); map.triggerRepaint(); return; }
   if (r.user && S.path.length > 1) cancelAuto();
-  if (r.f.interact && prompt && !frozen) prompt.act();
+  if (guideTarget && dist(S.pos, guideTarget.pos) < 18) { toast(`${guideTarget.emoji} ${guideTarget.name}에 왔다`); guideTarget = null; }
 
   const b = hero.body;
   S.pos = hero.lnglat;
@@ -444,6 +399,15 @@ function heroFrame(dt: number) {
     if (S.seg + 1 >= S.path.length) arrive();
   }
   for (const e of hero.events) onBodyEvent(e);
+  if (b.mode === 'sit' || (b.mode === 'act' && b.act?.kind === 'lie')) {
+    // 앉아 있으면 시간이 조금씩 흐르고 다리가 쉰다(실제 15초 ≈ 4분)
+    const mins = dt * 0.25;
+    S.clock += mins;
+    rest(S, mins * 0.35);
+    drain(S, mins, 0);
+  }
+  const mus = hero.crowd.nearest(b.x, b.y, 0, 30, (n) => n.role === 'musician');
+  sfx.music(mus ? Math.max(0, 1 - Math.hypot(mus.x - b.x, mus.y - b.y) / 30) : 0);
   if (b.mode === 'climb' && b.climbMove > 0.1) { climbT += dt; if (climbT > 0.38) { climbT = 0; sfx.climbStep(); } }
   if (camOn) hero.drive(dt);
   map.triggerRepaint();
@@ -457,7 +421,7 @@ function onBodyEvent(e: BodyEvent) {
     case 'hurt':
       sfx.hurt();
       S.tired = Math.min(100, S.tired + 6);
-      toast('쿵! 높은 데서 그냥 뛰어내렸다. 다리가 저릿하다 (지침 +6)');
+      toast('쿵! 높은 데서 그냥 뛰어내렸다 (지침 +6) — 착지 직전에 V를 누르면 굴러서 안 다친다');
       break;
     case 'glide': sfx.glide(); break;
     case 'unglide': sfx.unglide(); break;
@@ -475,31 +439,14 @@ function onBodyEvent(e: BodyEvent) {
       break;
     case 'exhausted': sfx.exhausted(); break;
     case 'recovered': sfx.recovered(); break;
+    case 'roll': sfx.roll(); break;
+    case 'rollLand': sfx.roll(); toast('낙법! 굴러서 충격을 흘렸다'); break;
+    case 'slide': sfx.slide(); break;
+    case 'vault': sfx.vault(); break;
+    case 'crouch': case 'uncrouch': sfx.crouch(); break;
+    case 'shutter': sfx.shutter(); street?.onShutter(); break;
+    case 'stagger': break;
   }
-}
-
-/** 가까이 있는 것 중 하나를 골라 "E 살펴보기" 같은 안내를 띄운다 */
-function findPrompt() {
-  prompt = null;
-  if (hero && S.started && !S.finished && !metroOpen && !openPlace && !mapMode && hero.body.mode === 'ground' && !modalOpen()) {
-    let bd = Infinity;
-    for (const p of places) {
-      const d = dist(S.pos, p.pos);
-      if (d > 16) continue;
-      const score = d + (Math.abs(angleDiff(S.heading, bearing(S.pos, p.pos))) > 80 && d > 4 ? 12 : 0);
-      if (score < bd) { bd = score; prompt = { verb: S.visits.some((v) => v.place.id === p.id) ? '다시 보기' : '살펴보기', what: `${p.emoji} ${p.name}`, act: () => openCard(p) }; }
-    }
-    for (const { st, g } of allGates(district)) {
-      const d = dist(S.pos, g.pos);
-      if (d < 12 && d < bd) { bd = d; prompt = { verb: '지하철 타기', what: `Ⓜ ${st.name}`, act: chooseDestination }; }
-    }
-    const st = S.stay;
-    if (st && st.district === district.id) {
-      const d = dist(S.pos, st.pos);
-      if (d < 16 && d < bd) { bd = d; prompt = { verb: '들어가 쉬기', what: `🛏 ${st.name}`, act: goRest }; }
-    }
-  }
-  hero?.hud.setPrompt(prompt);
 }
 
 /** 🗺 지도 보기: 위에서 내려다보고, 찍은 곳까지 알아서 걸어간다. 여는 동안 시간은 멈춘다. */
@@ -517,6 +464,124 @@ function setMapMode(on: boolean) {
   } else hint('');
 }
 
+
+// ───────── 거리에서 주고받기(Street) ─────────
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function makeStreet(): Street {
+  return new Street({
+    hero,
+    S,
+    places: () => places,
+    visited: (p) => S.visits.some((v) => v.place.id === p.id),
+    info: (p) => {
+      const info = CAT_INFO[p.cat];
+      const hasMenu = !!menuFor(p);
+      const mins = p.mins ?? info.mins, cost = p.cost ?? info.cost;
+      return {
+        label: `${info.label}${p.tags.cuisine ? ' · ' + p.tags.cuisine.replace(/[;_]/g, ' ') : ''}${p.known ? ' · 알던 곳' : ''}`,
+        blurb: p.blurb ?? describe(p),
+        meta: `${hasMenu ? '들어가서 메뉴를 보고 고른다' : `약 ${mins}분 · ${cost ? `입장 €${cost} 안팎` : '무료'}`}${p.tags.opening_hours ? ' · ' + p.tags.opening_hours : ''}`,
+      };
+    },
+    toast,
+    hint: (s2) => hint(s2),
+    enter: (p) => void enterPlace(p),
+    metro: chooseDestination,
+    bus: () => chooseDestination(),
+    reveal: revealPlace,
+    guide: (p) => { guideTarget = p; toast(`${p.emoji} ${p.name} 쪽에 빛기둥을 세웠다`); },
+    toggleSave: (p) => {
+      if (S.saved.has(p.id)) S.saved.delete(p.id); else { S.saved.add(p.id); sfx.heart(); showMarker(p, false); }
+      markers.get(p.id)?.getElement().classList.toggle('saved', S.saved.has(p.id));
+      return S.saved.has(p.id);
+    },
+    pay: (eur, what) => {
+      if (S.money < eur) { toast(`돈이 모자라요 (${what} €${eur})`); return false; }
+      S.money = Math.round((S.money - eur) * 100) / 100;
+      S.buys.push({ what, cost: eur, at: S.clock });
+      sfx.coin();
+      hud();
+      return true;
+    },
+    eat: (amount, sat = 0) => { eat(S, amount, sat); S.ate++; hud(); },
+    rest: (amount) => { rest(S, amount); hud(); },
+    passTime: (mins) => { S.clock += mins; drain(S, mins, 0); hud(); },
+    shot: (label) => captureShot(label),
+    terrace: (p, what, cost, mins) => {
+      const at = S.clock;
+      S.clock += mins;
+      drain(S, mins, 0);
+      rest(S, 12);
+      eat(S, i2n(what));
+      if (p) { S.visits.push({ place: p, at, mins, cost, note: `테라스 · ${what}` }); markers.get(p.id)?.getElement().classList.add('visited'); }
+      hud();
+    },
+    frozen: () => modalOpen() || mapMode || metroOpen || !!openPlace,
+  });
+}
+/** 테라스에서 시킨 것이 배를 얼마나 채우나 */
+const i2n = (what: string) => (/와인/.test(what) ? 2 : /크렘/.test(what) ? 6 : 3);
+
+/** 누가(포스터·지도·현지인) 알려 줘서 알게 된 곳 */
+function revealPlace(p: Place, how: string) {
+  p.known = true;
+  if (!S.seen.has(p.id)) S.seen.set(p.id, S.clock);
+  S.told.set(p.id, how);
+  const m = markers.get(p.id);
+  if (m) { m.getElement().classList.add('known', 'revealed'); m.getElement().classList.remove('off'); }
+  else showMarker(p, true);
+  markers.get(p.id)?.getElement().classList.add('revealed');
+}
+
+/** 문 앞까지 가서 문을 밀고 들어간다. 나오면 문 앞에 선다. */
+async function enterPlace(p: Place) {
+  if (entering || openPlace || !S.started || S.finished) return;
+  const b = hero.body;
+  const [px, py] = hero.frame.toLocal(p.pos);
+  const f = p.minor ? null : hero.town.front({ id: p.id, x: px, y: py });
+  const info = CAT_INFO[p.cat];
+  const cost = p.cost ?? info.cost;
+  if (!menuFor(p) && cost > S.money) { toast('돈이 모자라요'); return; }
+  entering = true;
+  try {
+    const dx = (f?.x ?? px) - b.x, dy = (f?.y ?? py) - b.y;
+    b.facing = ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360;
+    if (p.cat !== 'park') { b.doAct('push'); sfx.door(); }
+    await wait(p.cat === 'park' ? 100 : 480);
+    await street.ui.fade(true);
+    S.opened.add(p.id);
+    if (!S.seen.has(p.id)) S.seen.set(p.id, S.clock);
+    openPlace = p;
+    sfx.inside(true);
+    await goInside(p, cost);
+    sfx.inside(false);
+    if (f) { b.place(f.x + f.nx * 1.2, f.y + f.ny * 1.2, 0); b.facing = ((Math.atan2(f.nx, f.ny) * 180) / Math.PI + 360) % 360; hero.cam.yaw = b.facing; }
+    await street.ui.fade(false);
+  } finally {
+    entering = false;
+  }
+}
+
+/** 지금 화면을 한 장 찍어 둔다(오늘의 사진) */
+function captureShot(label: string) {
+  const src = map.getCanvas();
+  map.once('render', () => {
+    let url: string | null = null;
+    try {
+      const c = document.createElement('canvas');
+      c.width = 480;
+      c.height = Math.round((480 * src.height) / src.width);
+      c.getContext('2d')!.drawImage(src, 0, 0, c.width, c.height);
+      url = c.toDataURL('image/jpeg', 0.82);
+    } catch { url = null; }
+    if (url) S.shots.push({ src: url, x: 0.5, place: label, credit: '내가 찍은 사진' });
+    street.ui.shutter(url);
+    toast(`📷 ${label}`);
+  });
+  map.triggerRepaint();
+}
+
 function arrive() {
   S.path = [];
   (map.getSource('route') as GeoJSONSource).setData(line([]));
@@ -524,7 +589,7 @@ function arrive() {
   S.target = null;
   if (S.restAt) { S.restAt = false; goRest(); return; }
   if (S.travelTo) { const d = S.travelTo; const g = S.travelGate ?? nearestGate(); S.travelTo = null; S.travelGate = null; void ride(d, g); return; }
-  if (t) openCard(t);
+  if (t) street.inspectPlace(t);
 }
 
 // ───────── 지구 사이 이동 ─────────
@@ -820,9 +885,6 @@ async function enterDistrict(d: District, at: LngLat) {
   for (const p of places) allPlaces.set(p.id, p);
   for (const m of markers.values()) m.remove();
   markers.clear();
-  buildingOf.clear();
-  litIds.clear();
-  paintBuildings();
   S.node = nearestNode(graph, at);
   S.pos = graph.nodes[S.node];
   S.path = [];
@@ -833,9 +895,12 @@ async function enterDistrict(d: District, at: LngLat) {
   const next = graph.adj[S.node]?.[0];
   hero.theme = d.id;
   hero.setWays(data.ways);
+  hero.setGraph(graph.nodes, graph.adj.map((es) => es.map((e) => e.to)));
   hero.setLanes(laneSegments(graph));
   hero.reset(S.pos, next ? bearing(S.pos, graph.nodes[next.to]) : 0);
   dressTown();
+  street?.reset(d.id);
+  guideTarget = null;
   wasCamOn = false; // 다음 프레임에 위에서 내려오며 사람 뒤로 붙는다
   avatar.setLngLat(S.pos);
   (map.getSource('trail') as GeoJSONSource).setData(line(S.trail));
@@ -891,6 +956,8 @@ function paintSky() {
     const sunI = (a.sunI + (b.sunI - a.sunI) * k) * 0.42, ambI = (a.ambI + (b.ambI - a.ambI) * k) * 0.5;
     const scale = (hex: string, f: number) => { const c = new THREE.Color(hex); c.multiplyScalar(f); return `#${c.getHexString()}`; };
     hero.town.daylight(sun, scale(mixHex(a.sun, b.sun, k), Math.min(1, sunI)), scale(mixHex(a.amb, b.amb, k), Math.min(1, ambI)), night, mixHex(a.fog, b.fog, k));
+    hero.crowd.light(mixHex(a.sun, b.sun, k), Math.max(1.2, sunI * 2.2), mixHex(a.amb, b.amb, k), Math.max(0.9, ambI * 2.4));
+    hero.crowd.density = 1 - night * 0.55;
   }
 }
 
@@ -1103,11 +1170,14 @@ function finish() {
   else if (S.tired <= 35) lines.push('여유 있게 다녔어요. 하루에 한 곳쯤 더 넣어도 괜찮았겠어요.');
   if (S.ate === 0) lines.push('오늘 아무것도 먹지 않았어요. 실제로 이렇게 다니면 오후에 무너집니다.');
   else if (S.ate >= 3) lines.push(`${S.ate}번 먹었어요. 먹으러 다니는 여행이네요.`);
+  if (street) lines.push(...street.summary());
+  if (S.buys.length) lines.push(`길에서 산 것: ${S.buys.slice(0, 4).map((x) => `${x.what} €${x.cost}`).join(', ')}.`);
   if (!lines.length) lines.push('아직 기록이 적어요. 조금 더 걸어 보면 당신이 어디서 멈추는 사람인지 보이기 시작해요.');
 
   $('#sum-stats').textContent = `${fmtClock(7 * 60 + 40)} → ${fmtClock(S.clock)} · ${(S.walked / 1000).toFixed(1)} km · ${S.seen.size}곳 발견 · ${S.visits.length}곳 들어감 · €${(320 - S.money).toFixed(2)} 씀${S.stay ? ` · ${S.stay.name}` : ''}`;
   $('#sum-lines').replaceChildren(...lines.map((s) => { const li = document.createElement('li'); li.textContent = s; return li; }));
-  const stops = [...S.visits.map((v) => ({ p: v.place, note: `${fmtClock(v.at)} · ${v.mins}분${v.cost ? ` · €${v.cost}` : ''}${v.dishes ? ` · ${v.dishes.map((d) => d.name).join(', ')}` : ''}` })),
+  const stops = [...S.visits.map((v) => ({ p: v.place, note: `${fmtClock(v.at)} · ${v.mins}분${v.cost ? ` · €${v.cost}` : ''}${v.dishes ? ` · ${v.dishes.map((d) => d.name).join(', ')}` : ''}${v.note ? ` · ${v.note}` : ''}` })),
+    ...[...S.told.keys()].map((id) => byId.get(id)).filter((p): p is Place => !!p && !S.visits.some((v) => v.place.id === p.id) && !S.saved.has(p.id)).map((p) => ({ p, note: `${S.told.get(p.id)} — 다음에` })),
     ...[...S.saved].map((id) => byId.get(id)).filter((p): p is Place => !!p && !S.visits.some((v) => v.place.id === p.id)).map((p) => ({ p, note: '찜 — 다음에' }))];
   $('#sum-stops').replaceChildren(...stops.map(({ p, note }) => { const li = document.createElement('li'); li.textContent = `${p.emoji} ${p.name} — ${note}`; return li; }));
   const link = $<HTMLAnchorElement>('#sum-maps');
@@ -1161,7 +1231,7 @@ window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (openPl
 // 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
 // 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
 window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
-if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, places: () => places, graph: () => graph, map: () => map };
+if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, street: () => street, places: () => places, graph: () => graph, map: () => map };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();
