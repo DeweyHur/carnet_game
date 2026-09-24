@@ -34,7 +34,7 @@ import * as THREE from 'three';
 
 maplibregl.setWorkerUrl(workerUrl);
 
-let district: District = DISTRICTS.marais;
+let district: District = DISTRICTS['champs-elysees']; // 에펠탑에서 뛰어내려 여기서 시작한다
 const START: LngLat = district.start; // 메트로 1호선 Saint-Paul 출구 부근
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 const VISION = 45; // m — 이 안에 들어와야 가게가 "눈에 띈다"
@@ -151,8 +151,7 @@ async function boot() {
       street = makeStreet();
       transit = new Transit({ hero, toast, hint: (s2) => hint(s2), fine: (eur, why) => toast(`🎫 검표원(contrôleur)! ${why} 벌금 €${eur}`) });
       status.textContent = '';
-      $('#go').removeAttribute('disabled');
-      $('#go').textContent = '🪂 뛰어내리기';
+      void prepare(st.fallback);
     });
   } catch (e) {
     status.textContent = e instanceof Error ? e.message : String(e);
@@ -426,6 +425,13 @@ function heroFrame(dt: number) {
     if (camOn) { hero.resume(S.walked ? 1.3 : 2.6); mapHandlers(false); avatar.getElement().classList.add('hidden'); }
     else { map.setCenterClampedToGround(true); mapHandlers(true); if (mapMode) avatar.getElement().classList.remove('hidden'); }
     if (map.getLayer('vision')) map.setLayoutProperty('vision', 'visibility', camOn || quiet ? 'none' : 'visible');
+  }
+  if (preparing) {
+    hero.visible = true;
+    hero.tick(dt, { waypoint: null, frozen: true, hold: true, pace: 1, maxStamina: 1, beacon: null });
+    hero.drive(dt);
+    map.triggerRepaint();
+    return;
   }
   if (!S.started) return;
   const auto = S.path.length > 1 && S.seg + 1 < S.path.length ? S.path[S.seg + 1] : null;
@@ -1085,32 +1091,76 @@ function closeCard(_why: 'enter' | 'pass') {
 }
 
 const EIFFEL: LngLat = [2.29448, 48.85826];
-async function start() {
-  sfx.unlock();
-  sfx.startMusic();
-  $('#intro').classList.add('gone');
-  S.started = true;
-  $('#hud').classList.add('on');
-  try {
-    // 에펠탑에서 가장 가까운 동네를 읽어 두고, 몸은 탑 꼭대기 한참 위에 둔다
-    await enterDistrict(DISTRICTS['champs-elysees'], DISTRICTS['champs-elysees'].start);
-  } catch (e) {
-    toast(e instanceof Error ? e.message : '지도를 펴지 못했어요');
-    return;
-  }
-  // 탑 꼭대기 바로 옆 위에서, 파리 시내(동북동) 쪽을 보며 — 탑이 눈앞에, 도시가 그 너머에
-  const [x, y] = hero.frame.toLocal(EIFFEL);
+/** 시작 전 준비: 몸을 하늘에 세워 두고(멈춤), 보이는 칸을 다 짓고 지도 타일을 다 받고, 화면을 몇 번 그려 둔다.
+ *  첫 화면(에펠탑 위)에서 읽고 짓느라 끊기지 않게 — 인트로 뒤에서 미리 한다. */
+let preparing = false;
+async function prepare(fallback: boolean) {
+  const go = $<HTMLButtonElement>('#go');
+  const status = $('#status');
+  preparing = true;
   // 탑에서 150 m 뒤, 430 m 높이(탑 꼭대기보다 100 m 위) — 내려다보면 탑 전체와 그 너머 시내가 보인다
-  const B = (44 * Math.PI) / 180; // 바라보는 방향(58°)과 조금 어긋나게 — 탑이 주인공 몸에 가리지 않고 오른쪽 아래에
+  const [x, y] = hero.frame.toLocal(EIFFEL);
+  const B = (44 * Math.PI) / 180; // 바라보는 방향(58°)과 조금 어긋나게 — 탑이 주인공 몸에 가리지 않게
   hero.body.skydive(x - Math.sin(B) * 150, y - Math.cos(B) * 150, 430, 58);
   hero.cam.snap(hero.body);
   hero.cam.yaw = 58;
   hero.cam.pitch = 36;
   hero.cam.wantDist = 13;
+  map.setCenterClampedToGround(false);
+  if (map.getLayer('vision')) map.setLayoutProperty('vision', 'visibility', 'none');
+  // 다른 동네 거리 데이터도 미리 받아 둔다 — 낙하산으로 경계를 넘을 때 기다리지 않게
+  let fetched = false;
+  void Promise.all(Object.values(DISTRICTS).map((d) => loadDistrict(d, () => undefined).catch(() => null))).then(() => { fetched = true; });
+  const town = hero.town;
+  town.budget = 40; // 인트로가 가리고 있으니 한 프레임에 많이 지어도 된다
+  const t0 = performance.now();
+  let calm = 0, shown = 0, lastBacklog = -1, lastMove = t0;
+  await new Promise<void>((done) => {
+    const check = () => {
+      const tiles = fallback || map.areTilesLoaded();
+      const built = town.inView ? 1 - town.backlog / town.inView : 0;
+      const pct = Math.round(Math.min(0.98, built * 0.85 + (tiles ? 0.1 : 0) + Math.min(calm, 20) * 0.0025) * 100);
+      shown = Math.max(shown, pct);
+      go.textContent = `준비 중… ${shown}%`;
+      status.textContent = !tiles ? '지도를 받는 중' : !fetched ? '파리 거리 지도를 받는 중' : town.backlog ? `거리를 세우는 중 (${town.inView - town.backlog}/${town.inView})` : '사람들을 불러 모으는 중';
+      // 다 지은 뒤에도 20프레임 더 그려 둔다(셰이더 준비·사람 채우기·첫 그림)
+      if (tiles && town.inView > 0 && town.backlog === 0) calm++; else calm = 0;
+      // 지도 밖이라 영영 준비되지 않는 칸이 있을 수 있다 — 5초 동안 줄지 않으면 그만 기다린다
+      const now = performance.now();
+      if (town.backlog !== lastBacklog) { lastBacklog = town.backlog; lastMove = now; }
+      const stuck = tiles && now - lastMove > 5000;
+      if ((calm > 20 || stuck) && fetched) done();
+      else if (now - t0 > 30000) done();
+      else requestAnimationFrame(check);
+    };
+    check();
+  });
+  town.budget = 5;
   S.pos = hero.lnglat;
   S.origin = S.pos;
   S.trail = [S.pos];
   lastTrail = S.pos;
+  status.textContent = '';
+  go.removeAttribute('disabled');
+  go.textContent = '🪂 뛰어내리기';
+}
+
+async function start() {
+  const go = $<HTMLButtonElement>('#go');
+  if (go.disabled) return;
+  go.disabled = true;
+  sfx.unlock();
+  sfx.startMusic();
+  preparing = false;
+  S.started = true;
+  wasCamOn = true; // 카메라는 이미 몸 뒤에 있다 — 지도에서 내려오는 전환 없이 바로
+  hero.visible = true;
+  // 이미 그려진 하늘 위 장면 위로 인트로가 걷힌다
+  $('#intro').classList.add('rise');
+  setTimeout(() => $('#intro').classList.add('gone'), 2600);
+  $('#hud').classList.add('on');
+  mapHandlers(false);
+  avatar.getElement().classList.add('hidden');
   sfx.wind(1);
   hud();
   const touch = hero.input.touched || matchMedia('(pointer: coarse)').matches;

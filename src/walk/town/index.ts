@@ -79,6 +79,11 @@ export class Town {
   private heroX = 0; private heroY = 0;
   private procedural = false;
   private builtOnce = false;
+  /** 프레임당 짓는 데 쓸 시간(ms). 시작 전 준비 동안에는 크게 준다. */
+  budget = 5;
+  /** 반경 안에서 아직 못 지은 칸 수와 전체 칸 수(준비 진행률) */
+  backlog = 0;
+  inView = 0;
   /** 이 동네 원점 기준 랜드마크(로컬 m) */
   landmarks: { id: string; name: string; emoji: string; x: number; y: number; clear: number; zone?: { style: string; r: number } }[] = [];
   private landmarkMesh: THREE.Mesh | null = null;
@@ -226,17 +231,21 @@ export class Town {
     const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
     const span = Math.ceil(R / CELL);
     const want: { c: Cell; d: number }[] = [];
+    let inView = 0, waiting = 0;
     for (let ix = cx - span; ix <= cx + span; ix++) for (let iy = cy - span; iy <= cy + span; iy++) {
       const mx = (ix + 0.5) * CELL, my = (iy + 0.5) * CELL;
       const d = Math.hypot(mx - x, my - y);
       if (d > R + CELL * 0.7) continue;
       const c = this.cellOf(mx, my, true)!;
+      inView++;
       if (c.built && !c.dirty) continue;
-      if (!this.procedural && !this.world.tileReady(mx, my)) continue;
+      if (!this.procedural && !this.world.tileReady(mx, my)) { waiting++; continue; }
       want.push({ c, d });
     }
     want.sort((a, b) => a.d - b.d);
-    const budget = this.builtOnce ? 5 : 60; // 처음엔 한꺼번에(화면이 비지 않게), 그다음은 조금씩(끊기지 않게)
+    this.backlog = want.length + waiting;
+    this.inView = inView;
+    const budget = this.builtOnce ? this.budget : 60; // 처음엔 한꺼번에(화면이 비지 않게), 그다음은 조금씩(끊기지 않게)
     // 한 칸도 여러 프레임에 나눠 짓는다 — 칸 하나가 수십 ms라 통째로 지으면 뚝 끊긴다
     let wi = 0;
     while (performance.now() - t0 < budget) {

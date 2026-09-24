@@ -37,6 +37,7 @@ const SAFE_ROLL = 16; // m — 착지 직전에 구르면 이 높이까지는 �
 const SWIM = 1.9, SWIM_FAST = 3.6;
 const CLIMB_UP = 1.4, CLIMB_SIDE = 1.25;
 const GLIDE_FWD = 6.4, GLIDE_SINK = 1.9;
+const PARA_FWD = 20, PARA_DIVE = 30; // 낙하산 순항·급강하 앞으로 속도(m/s)
 const HURT_FALL = 7; // m — 이보다 높이서 그냥 떨어지면 주저앉는다
 
 const approach = (v: number, to: number, d: number) => (v < to ? Math.min(to, v + d) : Math.max(to, v - d));
@@ -348,13 +349,18 @@ export class Body {
       else if (this.z - floor > 1.3 && this.canExert) { this.mode = 'glide'; this.events.push('glide'); gliding = true; }
     }
     if (gliding) {
-      const sink = this.parachute ? (it.sprint ? 9 : 3.2) : GLIDE_SINK;
+      // 낙하산: 파리 어디로든 갈 수 있게 빠르게 난다(순항 20 m/s, 3 m/s씩 가라앉음 → 430 m에서 약 2.8 km).
+      // 달리기 = 급강하(빨리 내려가며 더 빠르게), 손을 떼도 앞으로 흘러간다.
+      const chute = this.parachute;
+      const sink = chute ? (it.sprint ? 11 : 3.1) : GLIDE_SINK;
       this.vz += (-sink - this.vz) * Math.min(1, dt * 3.5);
-      if (m >= 0.08) this.turn(bearingOf(ix, iy), 150 * dt);
-      const want = (m >= 0.08 ? GLIDE_FWD * m * (this.parachute ? 1.5 : 1) : 2.2) * Math.max(0.7, it.pace);
+      if (m >= 0.08) this.turn(bearingOf(ix, iy), (chute ? 110 : 150) * dt);
+      const want = chute
+        ? (it.sprint ? PARA_DIVE : m >= 0.08 ? PARA_FWD * (0.55 + 0.45 * m) : PARA_FWD * 0.45)
+        : (m >= 0.08 ? GLIDE_FWD * m : 2.2) * Math.max(0.7, it.pace);
       const [fx, fy] = dirOf(this.facing);
       const s = Math.hypot(this.vx, this.vy);
-      const ns = approach(s, want, dt * 5);
+      const ns = approach(s, want, dt * (chute ? 9 : 5));
       this.vx = fx * ns; this.vy = fy * ns;
       if (!this.parachute) this.spend(dt * 0.06);
       if (this.exhausted && !this.parachute) { this.mode = 'air'; this.fallTopZ = this.z; this.events.push('unglide'); }
@@ -395,7 +401,7 @@ export class Body {
       // 착지 직전에 구르면 충격을 흘려 보낸다(낙법)
       if (!gliding && buffered && fell < SAFE_ROLL) { this.startRoll(Math.hypot(this.vx, this.vy) > 0.5 ? bearingOf(this.vx, this.vy) : this.facing, true); return; }
       if (!gliding && fell > HURT_FALL) { this.mode = 'down'; this.downT = 1.1; this.speed = 0; this.events.push('hurt'); }
-      else { this.mode = 'ground'; this.events.push('land'); this.speed *= gliding ? 0.5 : 0.8; }
+      else { this.mode = 'ground'; this.events.push('land'); this.speed = gliding ? Math.min(this.speed * 0.5, 4) : this.speed * 0.8; } // 빨리 날다 내려앉아도 몇 걸음에 선다
       return;
     }
     this.z = nz;

@@ -24,6 +24,7 @@ export interface TickOptions {
   pace: number;
   maxStamina: number;
   beacon: LngLat | null;
+  hold?: boolean; // 몸을 움직이지 않는다(시작 전 준비 — 화면·동네만 미리 그린다)
 }
 
 export class Hero {
@@ -177,7 +178,8 @@ export class Hero {
       maxStamina: o.maxStamina,
     };
     const W = this.sceneWorld ?? this.world;
-    b.step(dt, W, intent);
+    if (o.hold) b.events.length = 0;
+    else b.step(dt, W, intent);
     this.events = b.events.slice();
     if (user) this.hud.moved();
     if (f.recenter) this.cam.recenter();
