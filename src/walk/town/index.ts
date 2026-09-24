@@ -16,6 +16,7 @@ import { GeoBuilder, hash, lin } from './geom';
 import { poolMaterial, townMaterial, townUniforms } from './material';
 import { awning, circleRing, rectRing, rotFacing, stamp, template } from './props';
 import { procedural } from './procedural';
+import { LANDMARKS, LB } from './landmarks';
 import { sharedRenderer } from './renderer';
 
 export type { Theme };
@@ -76,6 +77,14 @@ export class Town {
   private heroX = 0; private heroY = 0;
   private procedural = false;
   private builtOnce = false;
+  /** 이 동네 원점 기준 랜드마크(로컬 m) */
+  landmarks: { id: string; name: string; emoji: string; x: number; y: number; clear: number; zone?: { style: string; r: number } }[] = [];
+  private landmarkMesh: THREE.Mesh | null = null;
+  private movers: THREE.Object3D[] = [];
+  private extras: THREE.Object3D[] = [];
+  private readonly farUniforms = { ...this.uniforms, uFar: { value: 30000 } };
+  private readonly farMat = townMaterial(this.farUniforms);
+  private lastT = performance.now();
 
   constructor() {
     this.scene.matrixAutoUpdate = false;
@@ -96,7 +105,43 @@ export class Town {
     this.procedural = false;
     this.builtOnce = false;
     world.onBuildings = (list) => this.absorb(list);
+    this.buildLandmarks();
   }
+
+  /** 랜드마크를 세운다(7 km 안). 멀리서도 보이게 따로 한 덩어리, 안개도 멀리. */
+  private buildLandmarks() {
+    if (this.landmarkMesh) { this.scene.remove(this.landmarkMesh); this.landmarkMesh.geometry.dispose(); this.landmarkMesh = null; }
+    for (const m of this.movers) this.scene.remove(m);
+    this.movers = [];
+    for (const m of this.extras) this.scene.remove(m);
+    this.extras = [];
+    this.landmarks = [];
+    const g = new GeoBuilder();
+    for (const L of LANDMARKS) {
+      const [x, y] = this.frame.toLocal(L.pos);
+      if (Math.hypot(x, y) > 7000) continue;
+      this.landmarks.push({ id: L.id, name: L.name, emoji: L.emoji, x, y, clear: L.clear, zone: L.zone });
+      if (!L.build) continue;
+      const rot = ((90 - L.bearing) * Math.PI) / 180;
+      const b = new LB(g, x, y, rot, (rings, base, top) => { this.world.addSolid(rings, base, top, 'building'); });
+      L.build(b);
+      for (const m of b.movers) { this.scene.add(m); this.movers.push(m); }
+      for (const m of b.extras) { this.scene.add(m); this.extras.push(m); }
+    }
+    const geo = g.build();
+    if (geo) { this.landmarkMesh = new THREE.Mesh(geo, this.farMat); this.landmarkMesh.frustumCulled = false; this.scene.add(this.landmarkMesh); }
+  }
+
+  /** 랜드마크 자리라서 보통 건물을 세우지 않는 곳인가 */
+  cleared(x: number, y: number) {
+    for (const l of this.landmarks) if (l.clear && Math.abs(l.x - x) < l.clear && Math.abs(l.y - y) < l.clear && Math.hypot(l.x - x, l.y - y) < l.clear) return true;
+    return false;
+  }
+
+  private zone = (x: number, y: number): string | null => {
+    for (const l of this.landmarks) if (l.zone && Math.hypot(l.x - x, l.y - y) < l.zone.r) return l.zone.style;
+    return null;
+  };
 
   /** 걷는 길(로컬 m 선분) */
   setLanes(lanes: [number, number, number, number][]) {
@@ -125,7 +170,7 @@ export class Town {
     this.procedural = true;
     this.ways = ways;
     const t0 = performance.now();
-    const list = procedural(this.world, ways, this.theme);
+    const list = procedural(this.world, ways, this.theme).filter((b) => { const r = b.rings[0]; return !this.cleared((r[0] + r[4]) / 2, (r[1] + r[5]) / 2); });
     this.world.addBuildings(list);
     if (import.meta.env.DEV) console.debug(`[town] procedural ${list.length} buildings in ${Math.round(performance.now() - t0)} ms`);
   }
@@ -167,6 +212,10 @@ export class Town {
   update(x: number, y: number) {
     this.heroX = x; this.heroY = y;
     this.uniforms.uEye.value.set(x, y, 0);
+    const now = performance.now();
+    const dt = Math.min(0.1, (now - this.lastT) / 1000);
+    this.lastT = now;
+    for (const m of this.movers) { const sails = m.children[0]; if (sails) sails.rotation.y += dt * 0.5; }
     if (!this.enabled || !this.world) return;
     const R = this.procedural ? 250 : 300, DROP = R + 120;
     const t0 = performance.now();
@@ -230,8 +279,8 @@ export class Town {
     this.dropCell(c);
     const g = new GeoBuilder();
     const pools = new GeoBuilder();
-    const env = { world: this.world, theme: this.theme, street: this.street, shopAt: this.shopAt };
-    for (const s of c.solids) addBuilding(g, s, env);
+    const env = { world: this.world, theme: this.theme, street: this.street, shopAt: this.shopAt, zone: this.zone };
+    for (const s of c.solids) if (!this.cleared(s.render!.cx, s.render!.cy)) addBuilding(g, s, env);
     if (!c.props) { this.layoutProps(c); c.props = true; }
     for (const p of c.placed) {
       stamp(g, template(p.t, p.k), p.x, p.y, p.z, p.rot, p.s);

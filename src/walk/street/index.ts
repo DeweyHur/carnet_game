@@ -79,6 +79,8 @@ export class Street {
   private danceAcc = 0;
   private amazeT = 0;
   private cardPlace: Place | null = null;
+  private landmarkT = 0;
+  readonly landmarksSeen = new Set<string>();
   private readonly c: StreetCtx;
   district = '';
 
@@ -126,6 +128,8 @@ export class Street {
     this.items.visible = true;
     this.stepItems(dt);
     this.stepQuest(dt);
+    this.landmarkT -= dt;
+    if (this.landmarkT < 0) { this.landmarkT = 1; this.spotLandmarks(); }
     this.ambient(dt);
     // 몸짓
     if (f.emote && !this.busy) this.emote(f.emote);
@@ -376,6 +380,21 @@ export class Street {
     if (b.sit({ x: seat.x, y: seat.y, z: seat.z, facing: seat.facing })) sfx.sit();
   }
 
+  /** 랜드마크에 가까이 오면(또는 지붕 위에서 보이면) 알린다 */
+  private spotLandmarks() {
+    const b = this.c.hero.body;
+    for (const l of this.c.hero.town.landmarks) {
+      if (this.landmarksSeen.has(l.id) || !l.clear) continue;
+      const d = Math.hypot(l.x - b.x, l.y - b.y);
+      const high = b.z > 12 && d < 1500;
+      if (d > l.clear + 90 && !high) continue;
+      this.landmarksSeen.add(l.id);
+      sfx.spotBig();
+      this.ui.say(() => ({ x: l.x, y: l.y, z: 30 }), `✨ ${l.emoji} ${l.name}`, 4, 'found big');
+      this.c.toast(`${l.emoji} ${l.name}${high ? ' — 지붕 위에서 보인다' : ''}`);
+    }
+  }
+
   /** 사진이 찍혔다(몸의 셔터 이벤트) — 무엇을 찍었나 본다 */
   onShutter() {
     const h = this.c.hero, b = h.body;
@@ -390,6 +409,16 @@ export class Street {
     if (!label) {
       const n = h.crowd.nearest(b.x, b.y, yaw, 12, (x) => x.role === 'musician' || x.role === 'mime' || x.role === 'painter');
       if (n) label = ROLE_NAME[n.role];
+    }
+    if (!label) {
+      // 화면 가운데 가까이 보이는 랜드마크(멀어도 된다)
+      let bd = Infinity;
+      for (const l of h.town.landmarks) {
+        if (!l.clear) continue;
+        const d = Math.hypot(l.x - b.x, l.y - b.y);
+        if (d > 6000 || Math.abs(angleDiff(yaw, bearingOf(l.x - b.x, l.y - b.y))) > 22) continue;
+        if (d < bd) { bd = d; label = l.name; }
+      }
     }
     if (!label) {
       let bd = Infinity;
@@ -916,6 +945,7 @@ export class Street {
     if (s.told) out.push(`현지인이 알려 준 곳이 ${s.told}곳이에요.`);
     if (s.tips.length) out.push(`들은 이야기: ${s.tips.slice(0, 2).join(' / ')}`);
     if (s.danced > 5) out.push(`거리에서 ${Math.round(s.danced)}초 동안 춤췄어요.`);
+    if (this.landmarksSeen.size) out.push(`본 랜드마크: ${[...this.landmarksSeen].map((id) => this.c.hero.town.landmarks.find((l) => l.id === id)?.name).filter(Boolean).join(', ')}.`);
     if (s.drinks) out.push(`월리스 분수에서 물을 ${s.drinks}번 마셨어요 — 물병 하나면 물값이 안 들어요.`);
     if (s.bumps >= 3) out.push(`사람과 ${s.bumps}번 부딪혔어요. 붐비는 보도에선 천천히!`);
     return out;

@@ -17,7 +17,10 @@ export const T = {
   // 지붕·장식
   mansard: 32, mansardPlain: 33, zinc: 34, gravel: 35, terracotta: 36, railing: 37, cornice: 38, paves: 39,
   asphalt: 40, sidewalk: 41, ghostSign: 42, brickShop: 43, marche: 44, epicerie: 45, fleuriste: 46, fromagerie: 47,
+  // 개성 있는 윗층
+  vosges: 48, artNouveau: 49, plasterBlue: 50, ochreRed: 51, slate: 52, cream: 53, mint: 54, lilac: 55,
 } as const;
+const UPPER_EXTRA = new Set<number>([48, 49, 50, 51, 53, 54, 55]);
 
 // 결정적인 난수(칸마다 같은 그림)
 function rng(seed: number) {
@@ -168,6 +171,30 @@ function upper(g: Ctx, x: number, y: number, kind: number) {
       g.fillStyle = '#fff'; g.font = 'bold 22px sans-serif'; g.fillText('PARIS', x + 22, y + 104);
       break;
     }
+    case T.vosges: {
+      // 보주 광장: 붉은 벽돌에 흰 돌 창틀과 모서리
+      brick(g, x, y, W, H, 60);
+      g.fillStyle = '#efe6d3'; g.fillRect(x + 34, y + 12, 60, 96); g.fillRect(x, y, 10, H); g.fillRect(x + W - 10, y, 10, H);
+      for (let k = 0; k < H; k += 16) { g.fillStyle = '#e2d7c2'; g.fillRect(x, y + k, 16, 8); g.fillRect(x + W - 16, y + k + 8, 16, 8); }
+      frenchWindow(g, x + 40, y + 18, 48, 84, '#f5f1e8');
+      break;
+    }
+    case T.artNouveau: {
+      plaster(g, x, y, W, H, '#ece2cc', 61);
+      // 둥근 창 + 초록 곡선 쇠장식
+      g.fillStyle = '#e0d2b4'; g.beginPath(); g.moveTo(x + 30, y + 110); g.lineTo(x + 30, y + 40); g.quadraticCurveTo(x + 64, y + 2, x + 98, y + 40); g.lineTo(x + 98, y + 110); g.fill();
+      glass(g, x + 38, y + 30, 52, 76);
+      g.fillStyle = '#f5efe2'; g.fillRect(x + 62, y + 30, 3, 76);
+      g.strokeStyle = '#2f6b4f'; g.lineWidth = 3;
+      for (let k = 0; k < 3; k++) { g.beginPath(); g.moveTo(x + 34, y + 104); g.bezierCurveTo(x + 44 + k * 14, y + 86, x + 50 + k * 14, y + 120, x + 64 + k * 10, y + 100); g.stroke(); }
+      g.beginPath(); g.moveTo(x + 34, y + 96); g.lineTo(x + 94, y + 96); g.stroke();
+      break;
+    }
+    case T.plasterBlue: plaster(g, x, y, W, H, '#efe7d6', 62); frenchWindow(g, x + 42, y + 22, 44, 74, '#f4efe3'); shutters(g, x + 42, y + 22, 44, 74, '#4f79a8'); break;
+    case T.ochreRed: plaster(g, x, y, W, H, '#e2b477', 63); frenchWindow(g, x + 42, y + 22, 44, 74, '#f4efe3'); shutters(g, x + 42, y + 22, 44, 74, '#a6342b'); break;
+    case T.cream: stone(g, x, y, W, H, '#f1e6cc', 'rgba(130,110,80,0.28)', 16, 64); frenchWindow(g, x + 38, y + 22, 52, 84, '#fbf8f1', '#f7eedc'); guard(g, x + 36, y + 90, 56); break;
+    case T.mint: plaster(g, x, y, W, H, '#cfe0cf', 65); frenchWindow(g, x + 42, y + 24, 44, 70, '#fbf7f0', '#e8f0e4'); shutters(g, x + 42, y + 24, 44, 70, '#f3efe6'); break;
+    case T.lilac: plaster(g, x, y, W, H, '#dcd0e2', 66); frenchWindow(g, x + 42, y + 24, 44, 70, '#fbf7f0', '#ece4f0'); shutters(g, x + 42, y + 24, 44, 70, '#5f6f86'); break;
     case T.ghostSign: {
       brick(g, x, y, W, H, 28);
       g.fillStyle = 'rgba(240,226,190,0.55)'; g.fillRect(x + 6, y + 30, W - 12, 56);
@@ -263,6 +290,11 @@ function roofs(g: Ctx, x: number, y: number, kind: number) {
       }
       break;
     }
+    case T.slate: {
+      g.fillStyle = '#4c5763'; g.fillRect(x, y, W, H);
+      for (let yy = 0; yy < H; yy += 8) for (let xx = (yy / 8) % 2 ? -6 : 0; xx < W; xx += 12) { g.fillStyle = `rgba(${yy % 16 ? '255,255,255' : '0,0,0'},0.06)`; g.fillRect(x + xx, y + yy, 11, 7); }
+      break;
+    }
     case T.zinc: g.fillStyle = '#8e99a3'; g.fillRect(x, y, W, H); g.fillStyle = 'rgba(40,55,70,0.3)'; for (let xx = 0; xx < W; xx += 10) g.fillRect(x + xx, y, 2, H); speckle(g, x, y, W, H, 40); break;
     case T.gravel: g.fillStyle = '#9c968c'; g.fillRect(x, y, W, H); speckle(g, x, y, W, H, 41, 0.25); break;
     case T.terracotta: {
@@ -315,8 +347,9 @@ export function facadeAtlas(): THREE.CanvasTexture {
     const x = (i % ATLAS_N) * PX, y = Math.floor(i / ATLAS_N) * PX;
     g.save();
     g.beginPath(); g.rect(x, y, PX, PX); g.clip();
-    if (i < 16 || i === T.ghostSign) upper(g, x, y, i);
-    else if (i < 32 || i >= 43) shop(g, x, y, i);
+    if (i < 16 || i === T.ghostSign || UPPER_EXTRA.has(i)) upper(g, x, y, i);
+    else if (i === T.slate) roofs(g, x, y, i);
+    else if (i < 32 || (i >= 43 && i < 48)) shop(g, x, y, i);
     else roofs(g, x, y, i);
     g.restore();
   }

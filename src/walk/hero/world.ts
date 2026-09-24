@@ -15,7 +15,7 @@ export interface Solid {
   /** 무엇인가: 건물 · 물 · 거리 가구 · 지붕(망사르드) */
   kind?: 'building' | 'water' | 'prop' | 'roof';
   /** 그리기용(건물만): 타일 경계에서 잘라 낸 고리. cut[i][k] = 1이면 k번째 변은 타일 경계라 벽을 세우지 않는다. */
-  render?: { rings: Float64Array[]; cut: Uint8Array[]; full: boolean; cx: number; cy: number; seed: number; roofAdded?: boolean };
+  render?: { rings: Float64Array[]; cut: Uint8Array[]; full: boolean; cx: number; cy: number; seed: number; roofAdded?: boolean; turretAdded?: boolean };
 }
 
 interface Bridge { ax: number; ay: number; bx: number; by: number; half: number }
