@@ -2,9 +2,6 @@
 // 건물 모양은 World(지도와 같은 타일, 또는 타일이 없을 때 절차적으로 세운 줄집)에서 오고,
 // 겉모습·거리 가구·가게 앞(차양·테라스·간판)은 여기서 정한다. 지도(MapLibre)와 같은 깊이 버퍼에 그린다.
 import * as THREE from 'three';
-import { MercatorCoordinate } from 'maplibre-gl';
-import type { CustomLayerInterface, CustomRenderMethodInput } from 'maplibre-gl';
-import type { LngLat } from '../graph';
 import type { Cat } from '../places';
 import { World } from '../hero/world';
 import type { Solid } from '../hero/world';
@@ -21,7 +18,7 @@ import { EIFFEL_ZONES } from '../eiffel';
 import { G_SIZE, Ground } from './ground';
 import { Grass } from './grass';
 import { inRing as inRingT, ringOf } from '../hero/terrain';
-import { sharedRenderer } from './renderer';
+import { FarCity } from './far';
 
 export type { Theme };
 
@@ -104,6 +101,9 @@ export class Town {
   /** 하늘에서 내려다볼 때 보이는 먼 땅(4 km) */
   readonly farGround: Ground;
   readonly grass: Grass;
+  /** 먼 도시(단순한 상자) — 지도 엔진의 입체 건물 대신 */
+  readonly far: FarCity;
+  private readonly cityUniforms = { ...this.uniforms, uFar: { value: 3400 } };
   /** 지도 보기(위에서 내려다봄) 중에는 땅을 숨긴다 — 지도의 길·경로 선이 보이게 */
   mapView = false;
   constructor() {
@@ -111,7 +111,8 @@ export class Town {
     this.ground = new Ground(this.uniforms, { size: G_SIZE, spacing: 2.5, px: 1024 });
     this.farGround = new Ground(this.uniforms, { size: 4096, spacing: 16, px: 2048, far: true });
     this.grass = new Grass(this.uniforms, this.ground);
-    this.scene.add(this.farGround.group, this.ground.group, this.grass.group);
+    this.far = new FarCity(townMaterial(this.cityUniforms));
+    this.scene.add(this.farGround.group, this.ground.group, this.grass.group, this.far.group);
   }
 
   /** 새 동네(또는 새 원점) */
@@ -130,7 +131,8 @@ export class Town {
     this.theme = theme;
     this.procedural = false;
     this.builtOnce = false;
-    world.onBuildings = (list) => this.absorb(list);
+    world.onBuildings = (list) => { this.absorb(list); this.far.absorb(list); };
+    this.far.reset(world, (x, y) => this.cleared(x, y));
     this.open = EIFFEL_ZONES.map((z) => { const r = new Float64Array(z.ring.length * 2); z.ring.forEach((p, i) => { const [x, y] = frame.toLocal(p); r[i * 2] = x; r[i * 2 + 1] = y; }); return r; });
     this.buildLandmarks();
   }
@@ -263,6 +265,7 @@ export class Town {
     if (this.world) {
       this.ground.update(this.world, this.lanes, x, y);
       this.farGround.update(this.world, this.lanes, x, y);
+      this.far.update(x, y, this.builtOnce ? Math.max(2, this.budget * 0.5) : 30);
       // 먼 땅은 가까운 땅이 덮는 사각형을 비운다(겹쳐 깜빡이지 않게) — 가장자리 1 m는 겹친다
       const o = this.ground.origin;
       this.farGround.hole.set(o.x + 1, o.y + 1, o.x + G_SIZE - 1, o.y + G_SIZE - 1);
@@ -724,35 +727,11 @@ export class Town {
   }
   private cw = 1; private ch = 1;
 
-  /** MapLibre 커스텀 레이어. origin은 로컬 (0,0)의 경위도(= Frame 원점). */
-  layer(origin: () => LngLat, extra?: (cam: THREE.Camera, renderer: THREE.WebGLRenderer) => void): CustomLayerInterface {
-    let renderer: THREE.WebGLRenderer;
-    const cam = new THREE.Camera();
-    const main = new THREE.Matrix4();
-    const model = new THREE.Matrix4();
-    let canvas: HTMLCanvasElement;
-    return {
-      id: 'town',
-      type: 'custom',
-      renderingMode: '3d',
-      onAdd: (m, gl) => { renderer = sharedRenderer(m.getCanvas(), gl); canvas = m.getCanvas(); },
-      render: (_gl, args: CustomRenderMethodInput) => {
-        const o = origin();
-        const mc = MercatorCoordinate.fromLngLat(o, 0);
-        const s = mc.meterInMercatorCoordinateUnits();
-        model.makeTranslation(mc.x, mc.y, mc.z).scale(new THREE.Vector3(s, -s, s));
-        main.fromArray(args.defaultProjectionData.mainMatrix as unknown as number[]);
-        cam.projectionMatrix.multiplyMatrices(main, model);
-        cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
-        this.matrix.copy(cam.projectionMatrix);
-        this.matrixOk = true;
-        this.cw = canvas.clientWidth; this.ch = canvas.clientHeight;
-        if (!this.enabled) return;
-        renderer.resetState();
-        renderer.render(this.scene, cam);
-        extra?.(cam, renderer);
-      },
-    };
+  /** 화면 좌표 계산용 (투영 × 보기) 행렬과 화면 크기 — 걷기 화면(View)이 매 프레임 넘겨준다 */
+  setView(viewProj: THREE.Matrix4, w: number, h: number) {
+    this.matrix.copy(viewProj);
+    this.matrixOk = true;
+    this.cw = w; this.ch = h;
   }
 
   get heroPos() { return { x: this.heroX, y: this.heroY }; }

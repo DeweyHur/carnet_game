@@ -27,6 +27,8 @@ import type { Dish } from './content';
 import { openMenu, openVisit } from './inside';
 import type { Shot } from './inside';
 import { Hero } from './hero';
+import { Pins } from './pins';
+import type { Pin } from './pins';
 import { Street } from './street';
 import { Transit } from './under';
 import type { BodyEvent } from './hero';
@@ -88,14 +90,15 @@ const allPlaces = new Map<string, Place>();
 let map: MlMap;
 let graph: Graph;
 let places: Place[] = [];
-let avatar: Marker;
+let avatar: Pin;
+let pins: Pins;
 let hero: Hero;
 let street: Street;
 let transit: Transit;
 let guideTarget: Place | null = null; // 빛기둥으로 안내하는 곳(현지인이 알려 준 곳 등)
 let entering = false;
 let mapMode = false; // 🗺 지도 보기(위에서 내려다보며 목적지를 찍는다)
-const markers = new Map<string, Marker>();
+const markers = new Map<string, Pin>();
 let openPlace: Place | null = null;
 
 const fmtClock = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.floor(m % 60)).padStart(2, '0')}`;
@@ -136,8 +139,9 @@ async function boot() {
 
     map = new maplibregl.Map({ container: 'map', style: st.style, center: S.pos, zoom: 18.4, pitch: 25, bearing: -20, attributionControl: { compact: true }, maxPitch: 85, maxZoom: 24, clickTolerance: 10, pixelRatio: Q_DPR[quality] }); // 살짝 끌린 손가락은 클릭으로 치지 않는다
     map.on('load', () => {
-      dressMap(st.fallback, ways);
       hero = new Hero(map, () => setMapMode(!mapMode));
+      pins = new Pins(map, hero.view.pins);
+      dressMap(st.fallback, ways);
       hero.theme = district.id;
       hero.setWays(ways);
       hero.setGraph(graph.nodes, graph.adj.map((es) => es.map((e) => e.to)));
@@ -201,7 +205,8 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
   const el = document.createElement('div');
   el.className = 'me';
   el.innerHTML = '<i></i>';
-  avatar = new maplibregl.Marker({ element: el }).setLngLat(S.pos).addTo(map);
+  avatar = pins.add(el, S.pos);
+  el.classList.add('hidden');
 
   for (const p of places) if (p.known) showMarker(p, false);
   showStationMarker();
@@ -223,7 +228,7 @@ function showMarker(p: Place, pop: boolean) {
   if (p.curated) el.querySelector('.nm')!.textContent = p.name;
   el.title = p.name;
   el.addEventListener('click', (ev) => { ev.stopPropagation(); openCard(p); });
-  markers.set(p.id, new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(p.pos).addTo(map));
+  markers.set(p.id, pins.add(el, p.pos, 'bottom'));
 }
 
 function look() {
@@ -321,7 +326,13 @@ function frameBody(t: number) {
   soundAcc += dt;
   if (soundAcc > 0.25 && S.started) { soundAcc = 0; soundscape(); }
   if (transit?.active) { transit.frame(dt); return; }
-  if (hero) heroFrame(dt);
+  if (hero) {
+    heroFrame(dt);
+    // 걷기 화면을 그린다(지도 보기 중엔 지도 엔진이 그린다)
+    hero.view.visible = !mapMode && !document.body.classList.contains('metro-mode');
+    hero.render(dt);
+    if (!mapMode) pins.update((p) => hero.frame.toLocal(p), (x, y) => hero.world.terrain(x, y), [hero.body.x, hero.body.y], (x, y, z, o) => hero.view.project(x, y, z, o));
+  }
   districtAcc += dt;
   if (districtAcc > 1.5) { districtAcc = 0; autoDistrict(); }
   lookAcc += dt;
@@ -362,7 +373,7 @@ function govern(dt: number) {
   else if (fastT > 12 && quality > (COARSE ? 1 : 0)) { quality--; fastT = 0; applyQuality(); }
 }
 function applyQuality() {
-  if (Math.abs(map.getPixelRatio() - Q_DPR[quality]) > 0.01) map.setPixelRatio(Q_DPR[quality]); // 캔버스 크기 바꾸기는 비싸다 — 같으면 건너뛴다
+  hero.view.setPixelRatio(Q_DPR[quality]); // 걷기 화면 해상도(지도 엔진은 지도 보기에서만 쓴다)
   hero.town.radius = Q_RADIUS[quality];
   hero.crowd.target = Q_CROWD[quality];
   hero.crowd.outlines = quality < 2;
@@ -436,7 +447,6 @@ function heroFrame(dt: number) {
     hero.visible = true;
     hero.tick(dt, { waypoint: null, frozen: true, hold: true, pace: 1, maxStamina: 1, beacon: null });
     hero.drive(dt);
-    map.triggerRepaint();
     return;
   }
   if (!S.started) return;
@@ -455,7 +465,7 @@ function heroFrame(dt: number) {
   });
   if (r.f.map && live && !modal && !talking) { setMapMode(!mapMode); return; } // 이번 프레임에 카메라를 잡으면 지도 보기 전환(easeTo)이 끊긴다
   street?.update(dt, r.f, live && !modal && !mapMode && !openPlace && !entering);
-  if (!live) { if (camOn) hero.drive(dt); map.triggerRepaint(); return; }
+  if (!live) { if (camOn) hero.drive(dt); return; }
   if (r.user && S.path.length > 1) cancelAuto();
   if (guideTarget && dist(S.pos, guideTarget.pos) < 18) { toast(`${guideTarget.emoji} ${guideTarget.name}에 왔다`); guideTarget = null; }
 
@@ -471,13 +481,13 @@ function heroFrame(dt: number) {
   if (dist(lastTrail, S.pos) > 3) {
     lastTrail = S.pos;
     S.trail.push(S.pos);
-    (map.getSource('trail') as GeoJSONSource).setData(line(S.trail));
+    if (mapMode) (map.getSource('trail') as GeoJSONSource).setData(line(S.trail)); // 걷는 동안엔 지도를 그리지 않는다(지도 보기로 갈 때 한 번에)
   }
   avatar.setLngLat(S.pos);
   if (mapMode) (map.getSource('vision') as GeoJSONSource).setData(circle(S.pos, VISION));
   if (S.path.length > 1) {
     if (r.arrivedWaypoint) S.seg++;
-    (map.getSource('route') as GeoJSONSource).setData(line([S.pos, ...S.path.slice(S.seg + 1)]));
+    if (mapMode) (map.getSource('route') as GeoJSONSource).setData(line([S.pos, ...S.path.slice(S.seg + 1)]));
     if (S.seg + 1 >= S.path.length) arrive();
   }
   for (const e of hero.events) onBodyEvent(e);
@@ -492,7 +502,6 @@ function heroFrame(dt: number) {
   sfx.music(mus ? Math.max(0, 1 - Math.hypot(mus.x - b.x, mus.y - b.y) / 30) : 0);
   if (b.mode === 'climb' && b.climbMove > 0.1) { climbT += dt; if (climbT > 0.38) { climbT = 0; sfx.climbStep(); } }
   if (camOn) hero.drive(dt);
-  map.triggerRepaint();
 }
 
 function onBodyEvent(e: BodyEvent) {
@@ -539,10 +548,17 @@ function setMapMode(on: boolean) {
   hero.town.mapView = on;
   document.body.classList.toggle('map-mode', on);
   paintEye();
+  pins.setWalk(!on);
   if (on) {
+    // 지도 엔진이 그리는 위에서 본 지도로 바꾼다(걷는 동안 멈춰 있던 자취·경로를 한 번에 채운다)
     map.stop();
     map.setCenterClampedToGround(true);
-    map.easeTo({ center: S.pos, zoom: 16.4, pitch: 0, bearing: 0, elevation: 0, roll: 0, duration: 900 });
+    (map.getSource('trail') as GeoJSONSource).setData(line(S.trail));
+    (map.getSource('route') as GeoJSONSource).setData(line(S.path.length > 1 ? [S.pos, ...S.path.slice(S.seg + 1)] : []));
+    (map.getSource('vision') as GeoJSONSource).setData(circle(S.pos, VISION));
+    avatar.setLngLat(S.pos);
+    map.jumpTo({ center: S.pos, zoom: 17.6, pitch: 30, bearing: hero.cam.yaw, elevation: 0, roll: 0 });
+    map.easeTo({ zoom: 16.4, pitch: 0, bearing: 0, duration: 900 });
     hint('가고 싶은 곳을 누르면 거기까지 알아서 걸어갑니다. M 또는 🗺으로 돌아가기.');
   } else hint('');
 }
@@ -648,21 +664,12 @@ async function enterPlace(p: Place) {
 
 /** 지금 화면을 한 장 찍어 둔다(오늘의 사진) */
 function captureShot(label: string) {
-  const src = map.getCanvas();
-  map.once('render', () => {
-    let url: string | null = null;
-    try {
-      const c = document.createElement('canvas');
-      c.width = 480;
-      c.height = Math.round((480 * src.height) / src.width);
-      c.getContext('2d')!.drawImage(src, 0, 0, c.width, c.height);
-      url = c.toDataURL('image/jpeg', 0.82);
-    } catch { url = null; }
+  // 걷기 화면(three.js)이 다음에 그린 그림을 그대로 뜬다
+  hero.view.capture((url) => {
     if (url) S.shots.push({ src: url, x: 0.5, place: label, credit: '내가 찍은 사진' });
     street.ui.shutter(url);
     toast(`📷 ${label}`);
   });
-  map.triggerRepaint();
 }
 
 function arrive() {
@@ -726,14 +733,14 @@ function chooseDestination() {
 
 // ───────── 지하철을 탈 때의 지도 ─────────
 let metroOpen = false;
-const gateMarkers: Marker[] = [];
+const gateMarkers: Pin[] = [];
 let trainMarker: Marker | null = null;
 const stopMarkers: Marker[] = [];
 const exitMarkers: Marker[] = [];
 let trainAnim = 0;
 
 /** 지금 지구의 지하철 출입구를 전부 지도에 찍는다. 눌러 둔 그 구멍으로 들어간다. */
-let stayMarker: Marker | null = null;
+let stayMarker: Pin | null = null;
 /** 숙소를 지도에 찍는다. 눌러서 돌아가 쉴 수 있다. */
 function showStayMarker() {
   stayMarker?.remove();
@@ -746,7 +753,7 @@ function showStayMarker() {
   el.querySelector('.nm')!.textContent = st.name;
   el.title = '숙소 — 눌러서 돌아가 쉬기';
   el.addEventListener('click', (ev) => { ev.stopPropagation(); goRest(); });
-  stayMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(st.pos).addTo(map);
+  stayMarker = pins.add(el, st.pos, 'bottom');
 }
 
 /** 숙소로 돌아가 쉰다. 멀면 먼저 걸어간다. */
@@ -774,7 +781,7 @@ function showStationMarker() {
     el.querySelector('.nm')!.textContent = `${st.name} · ${g.label.split('—')[0].trim()}`;
     el.title = `${st.name} ${st.lines.map((l) => l + '호선').join('·')} · sortie ${g.ref}`;
     el.addEventListener('click', (ev) => { ev.stopPropagation(); chooseDestination(); });
-    gateMarkers.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(g.pos).addTo(map));
+    gateMarkers.push(pins.add(el, g.pos, 'bottom'));
   }
 }
 
@@ -979,6 +986,14 @@ function paintSky() {
     hero.town.daylight(sun, scale(mixHex(a.sun, b.sun, k), Math.min(1, sunI)), scale(mixHex(a.amb, b.amb, k), Math.min(1, ambI)), night, mixHex(a.fog, b.fog, k));
     hero.crowd.light(mixHex(a.sun, b.sun, k), Math.max(1.2, sunI * 2.2), mixHex(a.amb, b.amb, k), Math.max(0.9, ambI * 2.4));
     hero.crowd.density = 1 - night * 0.55;
+    // 걷기 화면의 하늘(구름·해·별)
+    const u = hero.view.skyU;
+    u.uTop.value.set(mixHex(a.sky, b.sky, k));
+    u.uHorizon.value.set(mixHex(a.horizon, b.horizon, k));
+    u.uFog.value.set(mixHex(a.fog, b.fog, k));
+    u.uSun.value.copy(sun).normalize();
+    u.uSunCol.value.set(mixHex(a.sun, b.sun, k));
+    u.uNight.value = night;
   }
 }
 
@@ -1124,14 +1139,14 @@ async function prepare(fallback: boolean) {
   let calm = 0, shown = 0, lastBacklog = -1, lastMove = t0;
   await new Promise<void>((done) => {
     const check = () => {
-      const tiles = fallback || map.areTilesLoaded();
+      const tiles = fallback || hero.world.tilesReady();
       const built = town.inView ? 1 - town.backlog / town.inView : 0;
       const pct = Math.round(Math.min(0.98, built * 0.85 + (tiles ? 0.1 : 0) + Math.min(calm, 20) * 0.0025) * 100);
       shown = Math.max(shown, pct);
       go.textContent = `준비 중… ${shown}%`;
-      status.textContent = !tiles ? '지도를 받는 중' : !fetched ? '파리 거리 지도를 받는 중' : town.backlog ? `거리를 세우는 중 (${town.inView - town.backlog}/${town.inView})` : '사람들을 불러 모으는 중';
+      status.textContent = !tiles ? '지도를 받는 중' : !fetched ? '파리 거리 지도를 받는 중' : town.far.backlog ? `먼 도시를 세우는 중 (${town.far.backlog})` : town.backlog ? `거리를 세우는 중 (${town.inView - town.backlog}/${town.inView})` : '사람들을 불러 모으는 중';
       // 다 지은 뒤에도 20프레임 더 그려 둔다(셰이더 준비·사람 채우기·첫 그림)
-      if (tiles && town.inView > 0 && town.backlog === 0) calm++; else calm = 0;
+      if (tiles && town.inView > 0 && town.backlog === 0 && town.far.backlog === 0) calm++; else calm = 0;
       // 지도 밖이라 영영 준비되지 않는 칸이 있을 수 있다 — 5초 동안 줄지 않으면 그만 기다린다
       const now = performance.now();
       if (town.backlog !== lastBacklog) { lastBacklog = town.backlog; lastMove = now; }
@@ -1295,7 +1310,7 @@ window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (openPl
 // 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
 // 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
 window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
-if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map };
+if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();

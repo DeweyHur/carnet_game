@@ -340,6 +340,13 @@ body.touch-play.hero-on #hint { top:170px; }
 .hprompt .v { white-space:nowrap; }
 /* 하루의 빛: 지도 위에 시간대 색을 곱한다(한낮은 흰색이라 그대로) */
 #map::after { content:''; position:absolute; inset:0; background:var(--daylight, #fff); mix-blend-mode:multiply; pointer-events:none; transition:background 2s; }
+/* 걷기 화면(three.js가 전부 그린다). 지도 보기·지하철 노선도에서는 지도 엔진이 보이게 숨긴다. */
+#view { position:absolute; inset:0; }
+#view > canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; outline:none; }
+#view::after { content:''; position:absolute; inset:0; background:var(--daylight, #fff); mix-blend-mode:multiply; pointer-events:none; transition:background 2s; }
+#view .pins { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+#view .pins > * { pointer-events:auto; position:absolute; left:0; top:0; transform-origin:50% 100%; }
+body.map-mode #view, body.metro-mode #view { visibility:hidden; }
 
 /* ───────── 거리에서 주고받기: 말풍선·이름표·가게 안내판·대화·사진 ───────── */
 .street-layer { position:fixed; inset:0; pointer-events:none; z-index:3; overflow:hidden; }

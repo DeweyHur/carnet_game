@@ -27,7 +27,7 @@ export class OrbitCam {
   update(dt: number, b: Body, w: World, dYaw: number, dPitch: number, zoom: number): Shot {
     if (dYaw || dPitch) this.idle = 0; else this.idle += dt;
     this.yaw = (this.yaw + dYaw + 360) % 360;
-    this.pitch = Math.max(4, Math.min(68, this.pitch + dPitch)); // 지도 엔진이 지평선 위를 올려다보지 못한다(85° 넘으면 깨진다)
+    this.pitch = Math.max(-35, Math.min(75, this.pitch + dPitch)); // 음수 = 발밑에서 올려다본다(하늘·탑 꼭대기)
     if (zoom) this.wantDist = Math.max(2.4, Math.min(22, this.wantDist * Math.exp(zoom * 0.0012)));
 
     if (this.recenterT > 0) {
@@ -60,8 +60,10 @@ export class OrbitCam {
     const [lx, ly] = dirOf(this.yaw);
     const cp = Math.cos((this.pitch * Math.PI) / 180), sp = Math.sin((this.pitch * Math.PI) / 180);
     const bx = -lx * cp, by = -ly * cp, bz = sp; // 초점에서 카메라 쪽
-    let free = this.wantDist;
-    for (let d = 0.6; d <= this.wantDist; d += 0.35) {
+    // 올려다볼수록 카메라가 사람 가까이 내려온다(땅에 박히지 않고 하늘이 보이게)
+    const want = this.pitch < 0 ? this.wantDist * Math.max(0.4, 1 + this.pitch / 50) : this.wantDist;
+    let free = want;
+    for (let d = 0.6; d <= want; d += 0.35) {
       if (w.solidAt(this.fx + bx * d, this.fy + by * d, this.fz + bz * d)) { free = Math.max(1.1, d - 0.45); break; }
     }
     this.dist = free < this.dist ? free : this.dist + (free - this.dist) * Math.min(1, dt * 2.5);

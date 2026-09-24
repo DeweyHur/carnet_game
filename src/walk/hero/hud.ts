@@ -95,7 +95,7 @@ export class HeroHud {
     this.cap.style.strokeDashoffset = `${RING * (1 - b.maxStamina)}`;
     this.cap.style.opacity = tired ? '1' : '0';
     this.dropBtn.hidden = b.mode !== 'climb';
-    this.pad.querySelector('.jump')!.textContent = b.mode === 'air' ? '글라이더' : b.mode === 'glide' ? '접기' : b.mode === 'climb' ? '도약' : b.mode === 'sit' ? '일어서기' : '점프';
+    this.pad.querySelector('.jump')!.textContent = b.freefall ? '낙하산' : b.mode === 'air' ? '글라이더' : b.mode === 'glide' ? '접기' : b.mode === 'climb' ? '도약' : b.mode === 'sit' ? '일어서기' : '점프';
     this.crouchBtn.classList.toggle('held', b.crouch);
     this.pad.classList.toggle('crouched', b.crouch);
   }

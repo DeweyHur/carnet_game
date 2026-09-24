@@ -1,16 +1,15 @@
 // 직접 걷는 사람: 몸(물리) + 세계(건물 충돌) + 모습(3D) + 카메라 + 손(입력) + 화면 안내를 묶는다.
-import type { CameraOptions, Map as MlMap } from 'maplibre-gl';
-import { LngLat as LngLatM } from 'maplibre-gl';
+import type { Map as MlMap } from 'maplibre-gl';
 import type { LngLat } from '../graph';
 import { Body } from './body';
 import type { BodyEvent, Intent } from './body';
 import { OrbitCam } from './camera';
 import { Figure } from './figure';
-import { Frame, angleDiff, dirOf } from './geo';
+import { Frame, dirOf } from './geo';
 import { HeroHud } from './hud';
 import { Input } from './input';
 import type { Frame as InputFrame } from './input';
-import { figureLayer } from './layer';
+import { View } from '../view';
 import { World } from './world';
 import { Town } from '../town';
 import { Crowd } from '../town/crowd';
@@ -46,7 +45,10 @@ export class Hero {
   visible = false;
   events: BodyEvent[] = [];
   private beaconLocal: [number, number] | null = null;
-  private blend: { from: { lng: number; lat: number; zoom: number; pitch: number; bearing: number; elevation: number }; t0: number; secs: number } | null = null;
+  /** 다른 화면(지도 보기)에서 돌아올 때: 위에서 내려오며 몸 뒤로 붙는다 */
+  private blend: { from: { x: number; y: number; z: number; fx: number; fy: number; fz: number }; t0: number; secs: number } | null = null;
+  /** 걷기 화면(three.js가 전부 그린다) */
+  readonly view: View;
   private stuck = { t: 0, x: 0, y: 0 };
 
   private readonly map: MlMap;
@@ -57,14 +59,13 @@ export class Hero {
     this.map = map;
     this.frame = new Frame([map.getCenter().lng, map.getCenter().lat]);
     this.world = new World(this.frame);
-    this.input = new Input(map.getCanvasContainer());
+    this.view = new View(document.getElementById('map')!);
+    this.input = new Input(this.view.el);
     this.hud = new HeroHud(this.input, onMap);
   }
 
   /** 스타일이 다 읽힌 뒤에 부른다 */
   attach() {
-    this.map.addLayer(this.town.layer(() => [this.frame.lng0, this.frame.lat0], (cam, r) => r.render(this.crowd.scene, cam)));
-    this.map.addLayer(figureLayer(this.figure, () => ({ at: this.lnglat, z: this.body.z, visible: this.visible }), (x, y, ok) => this.hud.anchor(x, y, ok)));
     window.setInterval(() => this.absorb(), 1000);
   }
 
@@ -226,35 +227,35 @@ export class Hero {
     return this.cam.update(dt, this.body, this.sceneWorld ?? this.world, f?.camYaw ?? 0, f?.camPitch ?? 0, f?.zoom ?? 0);
   }
 
-  /** 카메라를 몸 뒤에 둔다. resume() 직후에는 지금 지도 카메라에서 서서히 넘어온다. */
+  /** 카메라를 몸 뒤에 둔다. resume() 직후에는 위에서 서서히 내려와 붙는다. */
   drive(dt: number) {
     const f = this.lastF;
     const s = this.cam.update(dt, this.body, this.world, f?.camYaw ?? 0, f?.camPitch ?? 0, f?.zoom ?? 0);
-    // 지도 중심을 사람 머리(그 높이)에 둔다. 땅에 두면 높이 날 때 중심이 1 km 앞 땅에 찍혀 가까운 절단면에 사람이 잘린다.
-    const target = this.map.calculateCameraOptionsFromTo(LngLatM.convert(this.frame.toLngLat(s.x, s.y)), s.z, LngLatM.convert(this.frame.toLngLat(s.fx, s.fy)), s.fz);
-    if (!this.blend) { this.map.jumpTo({ ...target, roll: 0 }); return; }
     const bl = this.blend;
+    if (!bl) { this.view.look(s.x, s.y, s.z, s.fx, s.fy, s.fz); return; }
     const t = Math.min(1, (performance.now() - bl.t0) / 1000 / bl.secs);
     const w = t * t * (3 - 2 * t);
-    const tc = target.center as { lng: number; lat: number };
-    const opts: CameraOptions = {
-      center: [bl.from.lng + (tc.lng - bl.from.lng) * w, bl.from.lat + (tc.lat - bl.from.lat) * w],
-      zoom: bl.from.zoom + ((target.zoom ?? bl.from.zoom) - bl.from.zoom) * w,
-      pitch: bl.from.pitch + ((target.pitch ?? bl.from.pitch) - bl.from.pitch) * w,
-      bearing: bl.from.bearing + angleDiff(bl.from.bearing, target.bearing ?? bl.from.bearing) * w,
-      elevation: bl.from.elevation + ((target.elevation ?? 0) - bl.from.elevation) * w,
-      roll: 0,
-    };
-    this.map.jumpTo(opts);
+    const m = (a: number, b: number) => a + (b - a) * w;
+    const F = bl.from;
+    this.view.look(m(F.x, s.x), m(F.y, s.y), m(F.z, s.z), m(F.fx, s.fx), m(F.fy, s.fy), m(F.fz, s.fz));
     if (t >= 1) this.blend = null;
   }
 
-  /** 다른 카메라(지하철·지도 보기)에서 돌아올 때 */
+  /** 다른 화면(지도 보기)에서 돌아올 때: 머리 위 높은 곳에서 내려온다 */
   resume(secs = 1.4) {
-    const c = this.map.getCenter();
-    this.map.stop();
-    this.map.setCenterClampedToGround(false);
-    this.blend = { from: { lng: c.lng, lat: c.lat, zoom: this.map.getZoom(), pitch: this.map.getPitch(), bearing: this.map.getBearing(), elevation: this.map.getCenterElevation?.() ?? 0 }, t0: performance.now(), secs };
+    const b = this.body;
+    this.blend = { from: { x: b.x - 20, y: b.y - 30, z: b.z + 140, fx: b.x, fy: b.y, fz: b.z }, t0: performance.now(), secs };
+  }
+
+  /** 한 장 그린다(지하철 장면 중엔 그 장면이 따로 그린다) */
+  render(dt: number) {
+    const b = this.body;
+    this.view.render({ scenes: [this.town.scene, this.crowd.scene], figure: { scene: this.figure.scene, x: b.x, y: b.y, z: b.z, visible: this.visible } }, dt);
+    this.town.setView(this.view.viewProj, this.view.el.clientWidth, this.view.el.clientHeight);
+    // 기력 바퀴를 머리 옆에
+    const o = { x: 0, y: 0 };
+    const ok = this.visible && this.view.project(b.x, b.y, b.z + 1.5, o);
+    this.hud.anchor(o.x, o.y, ok);
   }
 }
 

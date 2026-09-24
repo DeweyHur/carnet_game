@@ -47,6 +47,8 @@ export class World {
   /** 땅의 높낮이(공원 둔덕·강바닥) */
   readonly relief: Relief;
   constructor(frame: Frame) { this.frame = frame; this.relief = new Relief(this); }
+  /** 둘레 타일을 다 받았나(시작 전 준비가 기다린다) */
+  tilesReady() { return this.tiles.size > 0 && [...this.tiles].every((k) => this.loaded.has(k)); }
   /** 이 자리 땅 높이 */
   terrain(x: number, y: number) { return this.relief.height(x, y); }
 

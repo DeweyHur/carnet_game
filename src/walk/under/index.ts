@@ -71,8 +71,9 @@ export class Transit {
     this.c = c;
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'under';
-    const map = document.getElementById('map')!;
-    map.after(this.canvas);
+    // 걷기 화면(#view) 위에 — 지하철·버스 장면이 거리를 덮는다
+    const host = document.getElementById('view') ?? document.getElementById('map')!;
+    host.after(this.canvas);
     this.hud = document.createElement('div');
     this.hud.className = 'transit-hud';
     document.body.appendChild(this.hud);
