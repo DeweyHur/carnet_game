@@ -335,3 +335,6 @@ body.touch-play.hero-on .hpad { display:grid; }
 body.touch-play .hprompt { bottom:auto; top:118px; }
 body.hero-on #hint { bottom:auto; top:110px; }
 body.touch-play.hero-on #hint { top:170px; }
+/* 터치로 조이스틱을 끄는 동안 브라우저가 화면 끌기로 가로채지(pointercancel) 않게 */
+.maplibregl-canvas-container, .maplibregl-canvas { touch-action:none; }
+.hprompt .v { white-space:nowrap; }

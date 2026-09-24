@@ -64,10 +64,18 @@ export class Hero {
   get lnglat(): LngLat { return this.frame.toLngLat(this.body.x, this.body.y); }
   get heading() { return this.body.facing; }
 
+  private lanes: LngLat[][] = [];
+  /** 걸어 다니는 길(거리 그래프의 선분들). 건물 밑 통로를 뚫어 주는 데 쓴다. */
+  setLanes(segs: LngLat[][]) {
+    this.lanes = segs;
+    this.world.setLanes(segs.map(([a, b]) => [...this.frame.toLocal(a), ...this.frame.toLocal(b)] as [number, number, number, number]));
+  }
+
   /** 새 자리에 선다(동네를 옮기면 세계도 새로 읽는다) */
   reset(at: LngLat, facing?: number) {
     this.frame = new Frame(at);
     this.world = new World(this.frame);
+    this.setLanes(this.lanes);
     this.body.place(0, 0, 0);
     if (facing !== undefined) this.body.facing = facing;
     this.cam.snap(this.body);

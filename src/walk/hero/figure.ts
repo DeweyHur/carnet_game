@@ -45,6 +45,7 @@ export class Figure {
   private readonly glider = new THREE.Group();
   private readonly shadow: THREE.Mesh;
   private readonly ripple: THREE.Mesh;
+  private readonly surface: THREE.Mesh; // 헤엄칠 때 물속 몸을 가리는 수면(지도의 물은 평면이라 깊이를 쓰지 않는다)
   private readonly beacon: THREE.Group;
   private readonly legs: THREE.Object3D[] = [];
   private readonly ramp = toonRamp();
@@ -67,6 +68,17 @@ export class Figure {
     this.ripple = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.62, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false }));
     this.ripple.visible = false;
     this.flip.add(this.ripple);
+    const fade = document.createElement('canvas');
+    fade.width = fade.height = 64;
+    const g2 = fade.getContext('2d')!;
+    const grad = g2.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0.6, '#fff');
+    grad.addColorStop(1, '#fff0');
+    g2.fillStyle = grad;
+    g2.fillRect(0, 0, 64, 64);
+    this.surface = new THREE.Mesh(new THREE.CircleGeometry(1.5, 40), new THREE.MeshBasicMaterial({ color: 0x9ebdff, alphaMap: new THREE.CanvasTexture(fade), transparent: true }));
+    this.surface.visible = false;
+    this.flip.add(this.surface);
 
     this.beacon = new THREE.Group();
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 90, 20, 1, true).rotateX(Math.PI / 2).translate(0, 0, 45),
@@ -212,7 +224,7 @@ export class Figure {
         break;
       case 'swim': {
         const s = Math.sin(ph);
-        Object.assign(want, { pitch: b.speed > 0.4 ? 1.15 : 0.35, bob: b.speed > 0.4 ? -1.02 : -1.1, sLx: b.speed > 0.4 ? 1.6 + 1.5 * s : 0.9 + 0.4 * s, sRx: b.speed > 0.4 ? 1.6 - 1.5 * s : 0.9 - 0.4 * s, sLy: 0.5, sRy: -0.5, eL: 0.3, eR: 0.3, tL: 0.25 * Math.sin(ph * 3), tR: -0.25 * Math.sin(ph * 3), headX: b.speed > 0.4 ? -0.9 : -0.25 });
+        Object.assign(want, { pitch: b.speed > 0.4 ? 0.95 : 0.3, bob: b.speed > 0.4 ? -0.92 : -1.12, sLx: b.speed > 0.4 ? 1.6 + 1.5 * s : 0.9 + 0.4 * s, sRx: b.speed > 0.4 ? 1.6 - 1.5 * s : 0.9 - 0.4 * s, sLy: 0.5, sRy: -0.5, eL: 0.3, eR: 0.3, tL: 0.25 * Math.sin(ph * 3), tR: -0.25 * Math.sin(ph * 3), headX: b.speed > 0.4 ? -1.0 : -0.3 }); // 고개는 물 밖으로
         break;
       }
     }
@@ -241,7 +253,8 @@ export class Figure {
     this.shadow.position.set(0, 0, groundZ - b.z + 0.03);
     this.shadow.scale.setScalar(Math.max(0.45, 1 - hgt * 0.03));
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = b.mode === 'swim' ? 0 : Math.max(0.08, 0.32 - hgt * 0.012);
-    this.ripple.visible = b.mode === 'swim';
+    this.ripple.visible = this.surface.visible = b.mode === 'swim';
+    this.surface.position.set(0, 0, 0.01);
     if (this.ripple.visible) {
       const r = (t * 0.8) % 1;
       this.ripple.position.set(0, 0, 0.03);

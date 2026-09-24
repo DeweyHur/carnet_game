@@ -27,6 +27,7 @@ export class World {
   private grid = new Map<number, Solid[]>();
   private bridges: Bridge[] = [];
   private tiles = new Set<string>();
+  private lanes = new Map<number, Float64Array[]>(); // 걸어 다니는 길(OSM) — 건물 밑 통로·아케이드는 1층이 뚫려 있다
   private stamp = 1;
   count = 0;
   onLoad?: (key: string, ms: number) => void;
@@ -111,6 +112,34 @@ export class World {
       }
   }
 
+  /** 걷는 길을 등록한다. 건물을 가로지르는 구간은 1층 통로(아케이드·파사주)로 본다. */
+  setLanes(segs: [number, number, number, number][]) {
+    this.lanes.clear();
+    for (const [ax, ay, bx, by] of segs) {
+      const seg = new Float64Array([ax, ay, bx, by]);
+      for (let ix = Math.floor(Math.min(ax, bx) / CELL); ix <= Math.floor(Math.max(ax, bx) / CELL); ix++)
+        for (let iy = Math.floor(Math.min(ay, by) / CELL); iy <= Math.floor(Math.max(ay, by) / CELL); iy++) {
+          const k = cellKey(ix, iy);
+          let arr = this.lanes.get(k);
+          if (!arr) this.lanes.set(k, (arr = []));
+          arr.push(seg);
+        }
+    }
+  }
+
+  /** 길 한가운데서 w m 안인가 */
+  onLane(x: number, y: number, w: number): boolean {
+    const arr = this.lanes.get(cellKey(Math.floor(x / CELL), Math.floor(y / CELL)));
+    if (!arr) return false;
+    for (const s of arr) {
+      const dx = s[2] - s[0], dy = s[3] - s[1];
+      const L = dx * dx + dy * dy;
+      const t = L ? Math.max(0, Math.min(1, ((x - s[0]) * dx + (y - s[1]) * dy) / L)) : 0;
+      if ((x - s[0] - dx * t) ** 2 + (y - s[1] - dy * t) ** 2 < w * w) return true;
+    }
+    return false;
+  }
+
   /** (x,y) 주변 r m 안에 걸치는 것들 */
   near(x: number, y: number, r: number): Solid[] {
     const st = ++this.stamp;
@@ -190,6 +219,7 @@ export class World {
         if (s.top <= z + step || s.base >= z + h) continue; // 올라설 수 있는 높이이거나 머리 위에 떠 있다
         const c = World.closest(s, p.x, p.y);
         if (c.d >= r) continue;
+        if (z < 3 && this.onLane(p.x, p.y, 1.4) && (c.d < 0 || this.onLane(c.cx - c.nx * 1.5, c.cy - c.ny * 1.5, 1.6))) continue; // 건물 밑으로 난 길(이미 들어와 있거나, 길이 벽 안으로 이어진다)
         const push = r - c.d;
         p.x += c.nx * push;
         p.y += c.ny * push;

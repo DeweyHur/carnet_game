@@ -133,6 +133,7 @@ async function boot() {
       dressMap(st.fallback, ways);
       hero = new Hero(map, () => setMapMode(!mapMode));
       hero.attach();
+      hero.setLanes(laneSegments(graph));
       hero.reset(S.pos);
       hero.hud.onPrompt = () => prompt?.act();
       status.textContent = '';
@@ -335,6 +336,9 @@ function frame(t: number) {
   if (lookAcc > 0.12 && S.started && !metroOpen) { lookAcc = 0; look(); hud(); findPrompt(); }
   requestAnimationFrame(frame);
 }
+
+/** 거리 그래프를 선분으로 — 건물을 가로지르는 길은 1층이 뚫린 통로다 */
+const laneSegments = (g: Graph) => g.adj.flatMap((es, a) => es.filter((e) => e.to > a).map((e) => [g.nodes[a], g.nodes[e.to]]));
 
 /** 자동으로 걷던 걸 멈춘다(사람이 직접 움직이면) */
 function cancelAuto() {
@@ -786,6 +790,7 @@ async function enterDistrict(d: District, at: LngLat) {
   S.trail = [S.pos];
   lastTrail = S.pos;
   const next = graph.adj[S.node]?.[0];
+  hero.setLanes(laneSegments(graph));
   hero.reset(S.pos, next ? bearing(S.pos, graph.nodes[next.to]) : 0);
   wasCamOn = false; // 다음 프레임에 위에서 내려오며 사람 뒤로 붙는다
   avatar.setLngLat(S.pos);
@@ -1068,7 +1073,7 @@ window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (openPl
 // 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
 // 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
 window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
-if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, quick: async () => { $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, places: () => places, graph: () => graph, map: () => map };
+if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, places: () => places, graph: () => graph, map: () => map };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();
