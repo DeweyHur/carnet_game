@@ -4,6 +4,7 @@ import { MercatorCoordinate } from 'maplibre-gl';
 import type { CustomLayerInterface, CustomRenderMethodInput, Map as MlMap } from 'maplibre-gl';
 import type { LngLat } from '../graph';
 import type { Figure } from './figure';
+import { sharedRenderer } from '../town/renderer';
 
 export interface Anchor { at: LngLat; z: number; visible: boolean }
 
@@ -20,9 +21,7 @@ export function figureLayer(fig: Figure, anchor: () => Anchor, onScreen: (x: num
     renderingMode: '3d',
     onAdd(m, gl) {
       map = m;
-      renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true });
-      renderer.autoClear = false;
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer = sharedRenderer(m.getCanvas(), gl);
     },
     render(_gl, args: CustomRenderMethodInput) {
       const a = anchor();

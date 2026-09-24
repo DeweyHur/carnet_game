@@ -11,6 +11,8 @@ import { Input } from './input';
 import type { Frame as InputFrame } from './input';
 import { figureLayer } from './layer';
 import { World } from './world';
+import { Town } from '../town';
+import type { Theme } from '../town';
 
 const SOURCE = 'openmaptiles';
 
@@ -26,6 +28,9 @@ export class Hero {
   readonly body = new Body();
   readonly figure = new Figure();
   readonly cam = new OrbitCam();
+  readonly town = new Town();
+  theme: Theme = 'marais';
+  private ways: LngLat[][] = [];
   readonly input: Input;
   readonly hud: HeroHud;
   frame: Frame;
@@ -48,6 +53,7 @@ export class Hero {
 
   /** 스타일이 다 읽힌 뒤에 부른다 */
   attach() {
+    this.map.addLayer(this.town.layer(() => [this.frame.lng0, this.frame.lat0]));
     this.map.addLayer(figureLayer(this.figure, () => ({ at: this.lnglat, z: this.body.z, visible: this.visible }), (x, y, ok) => this.hud.anchor(x, y, ok)));
     window.setInterval(() => this.absorb(), 1000);
   }
@@ -56,7 +62,11 @@ export class Hero {
   absorb() {
     const src = this.map.getSource(SOURCE) as { tiles?: string[] } | undefined;
     const template = src?.tiles?.[0];
-    if (!template) return;
+    if (!template) {
+      // 타일이 없다(오프라인·폴백 지도): 걷는 길을 따라 건물을 세운다
+      if (this.ways.length) this.town.buildProcedural(this.ways.map((w) => w.map((p) => this.frame.toLocal(p))));
+      return;
+    }
     const [lng, lat] = this.lnglat;
     this.world.ensure(lng, lat, template);
   }
@@ -68,13 +78,18 @@ export class Hero {
   /** 걸어 다니는 길(거리 그래프의 선분들). 건물 밑 통로를 뚫어 주는 데 쓴다. */
   setLanes(segs: LngLat[][]) {
     this.lanes = segs;
-    this.world.setLanes(segs.map(([a, b]) => [...this.frame.toLocal(a), ...this.frame.toLocal(b)] as [number, number, number, number]));
+    const local = segs.map(([a, b]) => [...this.frame.toLocal(a), ...this.frame.toLocal(b)] as [number, number, number, number]);
+    this.world.setLanes(local);
+    this.town.setLanes(local);
   }
+  /** 걷는 길 폴리라인(타일이 없을 때 건물을 세우는 데 쓴다) */
+  setWays(ways: LngLat[][]) { this.ways = ways; }
 
   /** 새 자리에 선다(동네를 옮기면 세계도 새로 읽는다) */
   reset(at: LngLat, facing?: number) {
     this.frame = new Frame(at);
     this.world = new World(this.frame);
+    this.town.reset(this.world, this.frame, this.theme);
     this.setLanes(this.lanes);
     this.body.place(0, 0, 0);
     if (facing !== undefined) this.body.facing = facing;
@@ -94,7 +109,7 @@ export class Hero {
   tick(dt: number, o: TickOptions): { user: boolean; f: InputFrame; arrivedWaypoint: boolean } {
     const f = this.input.read(dt);
     const b = this.body;
-    const user = Math.hypot(f.mx, f.my) > 0.15 || f.jump;
+    const user = Math.hypot(f.mx, f.my) > 0.15 || f.jump || f.roll || f.crouch;
     let mx = 0, my = 0;
     let arrivedWaypoint = false;
     if (!o.frozen) {
@@ -123,6 +138,8 @@ export class Hero {
       sprint: !o.frozen && f.sprint,
       jump: !o.frozen && f.jump,
       drop: !o.frozen && f.drop,
+      crouch: !o.frozen && f.crouch,
+      roll: !o.frozen && f.roll,
       pace: o.pace,
       maxStamina: o.maxStamina,
     };
@@ -133,6 +150,7 @@ export class Hero {
     if (o.beacon) { const [x, y] = this.frame.toLocal(o.beacon); this.beaconLocal = [x - b.x, y - b.y]; } else this.beaconLocal = null;
     const g = this.world.ground(b.x, b.y, b.z + 0.05, 0.05);
     this.figure.update(b, dt, g, this.beaconLocal);
+    this.town.update(b.x, b.y);
     this.hud.update(b, dt);
     this.lastF = f;
     return { user, f, arrivedWaypoint };
@@ -171,3 +189,5 @@ export class Hero {
 }
 
 export type { BodyEvent };
+export type { Act, Carry, Seat } from './body';
+export type { Emote } from './input';

@@ -32,6 +32,7 @@ import type { Shot } from './inside';
 import { Hero } from './hero';
 import type { BodyEvent } from './hero';
 import { angleDiff } from './hero/geo';
+import * as THREE from 'three';
 
 maplibregl.setWorkerUrl(workerUrl);
 
@@ -111,7 +112,7 @@ async function resolveStyle(): Promise<{ style: StyleSpecification; fallback: bo
     clearTimeout(timer);
     if (r.ok) return { style: await r.json(), fallback: false };
   } catch { /* 폴백 */ }
-  return { style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#efe9dc' } }] }, fallback: true };
+  return { style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#cdc6b8' } }] }, fallback: true };
 }
 
 async function boot() {
@@ -132,9 +133,13 @@ async function boot() {
     map.on('load', () => {
       dressMap(st.fallback, ways);
       hero = new Hero(map, () => setMapMode(!mapMode));
+      hero.theme = district.id;
+      hero.setWays(ways);
       hero.attach();
       hero.setLanes(laneSegments(graph));
       hero.reset(S.pos);
+      hero.town.setFar(st.fallback ? 300 : 1e6);
+      dressTown();
       hero.hud.onPrompt = () => prompt?.act();
       status.textContent = '';
       $('#go').removeAttribute('disabled');
@@ -156,6 +161,9 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
     map.setPaintProperty(l.id, 'fill-extrusion-opacity', 1);
     map.setPaintProperty(l.id, 'fill-extrusion-color', ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 10], 4, '#e3d6bd', 14, '#ece2cc', 30, '#f3ecdc']);
   }
+  // 밤에 땅을 어둡게 덮는 층(입체 건물 아래)
+  map.addSource('night', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]]] } } });
+  map.addLayer({ id: 'night', type: 'fill', source: 'night', paint: { 'fill-color': '#0b1030', 'fill-opacity': 0 } });
   // 도로 선·글자가 건물 벽을 뚫고 보이지 않게, 입체 건물을 평면 층들 위로 올린다
   for (const l of layers) if (l.type === 'fill-extrusion') map.moveLayer(l.id);
   map.setVerticalFieldOfView(52); // 게임처럼 넓게
@@ -170,7 +178,7 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
   }
   // 눈에 들어온 가게의 건물을 색칠하는 층(아이콘 대신). 건물 폴리곤은 타일에서 찾아 온다.
   map.addSource('hl', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  map.addLayer({ id: 'hl', type: 'fill-extrusion', source: 'hl', paint: { 'fill-extrusion-color': ['get', 'color'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.92 } });
+  map.addLayer({ id: 'hl', type: 'fill-extrusion', source: 'hl', layout: { visibility: 'none' }, paint: { 'fill-extrusion-color': ['get', 'color'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.92 } }); // 가게는 이제 거리(Town)가 차양·간판으로 보여 준다
   map.addSource('vision', { type: 'geojson', data: circle(S.pos, VISION) });
   map.addLayer({ id: 'vision', type: 'fill', source: 'vision', paint: { 'fill-color': '#ffd166', 'fill-opacity': 0.16 } });
   map.addSource('trail', { type: 'geojson', data: line(S.trail) });
@@ -350,6 +358,24 @@ function frame(t: number) {
   lookAcc += dt;
   if (lookAcc > 0.12 && S.started && !metroOpen) { lookAcc = 0; look(); hud(); findPrompt(); }
   requestAnimationFrame(frame);
+}
+
+/** 거리(Town)에 이 동네의 장소·지하철 입구·버스 정류장을 알려 준다 */
+function dressTown() {
+  const f = hero.frame;
+  hero.town.setPlaces(places.map((p) => { const [x, y] = f.toLocal(p.pos); return { id: p.id, x, y, cat: p.cat, name: p.name, emoji: p.emoji, tags: p.tags, minor: p.minor }; }));
+  const [s0, w0, n0, e0] = district.bbox;
+  const bus: { x: number; y: number; name: string }[] = [];
+  for (const [lk, def] of Object.entries(LINES)) {
+    if (def.mode !== 'bus') continue;
+    for (const st of def.stations) {
+      const p = stopPos(lk, st);
+      if (!p || p[1] < s0 || p[1] > n0 || p[0] < w0 || p[0] > e0) continue;
+      const [x, y] = f.toLocal(p);
+      if (!bus.some((b) => Math.hypot(b.x - x, b.y - y) < 25)) bus.push({ x, y, name: st });
+    }
+  }
+  hero.town.setGates(allGates(district).map(({ st, g }) => { const [x, y] = f.toLocal(g.pos); return { x, y, station: st.name, label: g.label }; }), bus);
 }
 
 /** 거리 그래프를 선분으로 — 건물을 가로지르는 길은 1층이 뚫린 통로다 */
@@ -805,8 +831,11 @@ async function enterDistrict(d: District, at: LngLat) {
   S.trail = [S.pos];
   lastTrail = S.pos;
   const next = graph.adj[S.node]?.[0];
+  hero.theme = d.id;
+  hero.setWays(data.ways);
   hero.setLanes(laneSegments(graph));
   hero.reset(S.pos, next ? bearing(S.pos, graph.nodes[next.to]) : 0);
+  dressTown();
   wasCamOn = false; // 다음 프레임에 위에서 내려오며 사람 뒤로 붙는다
   avatar.setLngLat(S.pos);
   (map.getSource('trail') as GeoJSONSource).setData(line(S.trail));
@@ -848,10 +877,21 @@ function paintSky() {
   const k = b.t > a.t ? Math.max(0, (m - a.t) / (b.t - a.t)) : 0;
   map.setSky({ 'sky-color': mixHex(a.sky, b.sky, k), 'horizon-color': mixHex(a.horizon, b.horizon, k), 'fog-color': mixHex(a.fog, b.fog, k), 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.9 });
   hero?.figure.light(mixHex(a.sun, b.sun, k), Math.max(1.7, a.sunI + (b.sunI - a.sunI) * k), mixHex(a.amb, b.amb, k), Math.max(1.2, a.ambI + (b.ambI - a.ambI) * k)); // 어둡게 하는 건 위의 색 곱하기가 맡는다
-  // 지도 전체(땅·건물·사람)에 같은 빛깔을 곱해 한 장면으로 보이게 한다
-  const tint = mixHex(a.tint, b.tint, k);
+  // 밤이 깊을수록(0..1): 창에 불이 켜지고 가로등이 빛난다
+  const night = m >= 19.5 * 60 ? Math.min(1, (m - 19.5 * 60) / 120) : m < 6.5 * 60 ? 1 - Math.max(0, (m - 5.5 * 60) / 60) : 0;
+  // 지도 전체(땅·건물·사람)에 같은 빛깔을 곱해 한 장면으로 보이게 한다. 밤에는 덜 곱하고 대신 거리(Town)가 스스로 어두워진다 — 불 켜진 창이 살아 있게.
+  const tint = mixHex(mixHex(a.tint, b.tint, k), '#ffffff', night * 0.5);
   document.documentElement.style.setProperty('--daylight', tint);
   map.setLight({ anchor: 'map', color: mixHex('#ffffff', tint, 0.6), intensity: 0.45, position: [1.15, 210, 30] });
+  if (map.getLayer('night')) map.setPaintProperty('night', 'fill-opacity', night * 0.5);
+  if (hero) {
+    // 해: 아침엔 동쪽, 한낮엔 남쪽 높이, 저녁엔 서쪽
+    const ang = Math.max(0, Math.min(Math.PI, ((m - 6 * 60) / (15 * 60)) * Math.PI));
+    const sun = new THREE.Vector3(Math.cos(ang), -0.75 * Math.sin(ang), 0.18 + 0.62 * Math.sin(ang));
+    const sunI = (a.sunI + (b.sunI - a.sunI) * k) * 0.42, ambI = (a.ambI + (b.ambI - a.ambI) * k) * 0.5;
+    const scale = (hex: string, f: number) => { const c = new THREE.Color(hex); c.multiplyScalar(f); return `#${c.getHexString()}`; };
+    hero.town.daylight(sun, scale(mixHex(a.sun, b.sun, k), Math.min(1, sunI)), scale(mixHex(a.amb, b.amb, k), Math.min(1, ambI)), night, mixHex(a.fog, b.fog, k));
+  }
 }
 
 function hud() {

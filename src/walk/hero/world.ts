@@ -12,6 +12,10 @@ export interface Solid {
   minX: number; minY: number; maxX: number; maxY: number;
   stamp: number;
   water?: boolean;
+  /** 무엇인가: 건물 · 물 · 거리 가구 · 지붕(망사르드) */
+  kind?: 'building' | 'water' | 'prop' | 'roof';
+  /** 그리기용(건물만): 타일 경계에서 잘라 낸 고리. cut[i][k] = 1이면 k번째 변은 타일 경계라 벽을 세우지 않는다. */
+  render?: { rings: Float64Array[]; cut: Uint8Array[]; full: boolean; cx: number; cy: number; seed: number; roofAdded?: boolean };
 }
 
 interface Bridge { ax: number; ay: number; bx: number; by: number; half: number }
@@ -29,8 +33,11 @@ export class World {
   private tiles = new Set<string>();
   private lanes = new Map<number, Float64Array[]>(); // 걸어 다니는 길(OSM) — 건물 밑 통로·아케이드는 1층이 뚫려 있다
   private stamp = 1;
+  private loaded = new Set<string>();
   count = 0;
   onLoad?: (key: string, ms: number) => void;
+  /** 새 건물이 읽혔다(타일 하나 분량) */
+  onBuildings?: (list: Solid[]) => void;
 
   constructor(frame: Frame) { this.frame = frame; }
 
@@ -48,7 +55,7 @@ export class World {
       const t0 = performance.now();
       fetch(url)
         .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error(String(res.status)))))
-        .then((buf) => { this.read(new VectorTile(new PbfReader(buf)), x, y); this.onLoad?.(key, performance.now() - t0); })
+        .then((buf) => { this.read(new VectorTile(new PbfReader(buf)), x, y); this.loaded.add(key); this.onLoad?.(key, performance.now() - t0); })
         .catch(() => this.tiles.delete(key)); // 다음에 다시
     }
   }
@@ -58,17 +65,114 @@ export class World {
       const layer = vt.layers[name];
       if (layer) for (let i = 0; i < layer.length; i++) f(layer.feature(i));
     };
+    const fresh: Solid[] = [];
     each('building', (f) => {
       if (f.properties.hide_3d) return;
       const s = this.solidOf(f, x, y, Number(f.properties.render_height ?? 10) || 10, Number(f.properties.render_min_height ?? 0) || 0);
-      if (s) this.insert(s);
+      if (!s) return;
+      s.kind = 'building';
+      s.render = this.renderRings(f, x, y);
+      if (s.render.rings.length) fresh.push(s);
+      this.insert(s);
     });
-    each('water', (f) => { const s = this.solidOf(f, x, y, 0, -3); if (s) { s.water = true; this.insert(s); } });
+    if (fresh.length) this.onBuildings?.(fresh);
+    each('water', (f) => { const s = this.solidOf(f, x, y, 0, -3); if (s) { s.water = true; s.kind = 'water'; this.insert(s); } });
     each('transportation', (f) => {
       if (f.properties.brunnel !== 'bridge') return;
       const half = /motorway|trunk|primary|secondary/.test(String(f.properties.class)) ? 13 : 8;
       for (const line of this.ringsOf(f, x, y)) for (let i = 0; i + 3 < line.length; i += 2) this.bridges.push({ ax: line[i], ay: line[i + 1], bx: line[i + 2], by: line[i + 3], half });
     });
+  }
+
+  /** 타일 칸 안쪽만 남긴 고리(서덜랜드–호지먼). 이웃 타일과 겹치는 여백을 잘라 벽이 두 번 그려지지 않게. */
+  private renderRings(f: VectorTileFeature, tx: number, ty: number): NonNullable<Solid['render']> {
+    const E = f.extent;
+    const n = 2 ** Z;
+    const rings: Float64Array[] = [];
+    const cut: Uint8Array[] = [];
+    let full = true;
+    for (const ring of f.loadGeometry()) {
+      let pts = ring.map((p) => [p.x, p.y]);
+      if (pts.length > 1 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1]) pts.pop();
+      if (pts.some(([px, py]) => px < 0 || py < 0 || px > E || py > E)) full = false;
+      for (const [axis, lim, keepBelow] of [[0, 0, false], [0, E, true], [1, 0, false], [1, E, true]] as const) {
+        const out: number[][] = [];
+        const inside = (p: number[]) => (keepBelow ? p[axis] <= lim : p[axis] >= lim);
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i], b = pts[(i + 1) % pts.length];
+          const ia = inside(a), ib = inside(b);
+          if (ia) out.push(a);
+          if (ia !== ib) {
+            const t = (lim - a[axis]) / (b[axis] - a[axis]);
+            const q = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+            q[axis] = lim;
+            out.push(q);
+          }
+        }
+        pts = out;
+        if (pts.length < 3) break;
+      }
+      if (pts.length < 3) continue;
+      const flat = new Float64Array(pts.length * 2);
+      const c = new Uint8Array(pts.length);
+      pts.forEach(([px, py], i) => {
+        const wx = (tx + px / E) / n, wy = (ty + py / E) / n;
+        const [lx, ly] = this.frame.toLocal([wx * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - 2 * wy))) * 180) / Math.PI]);
+        flat[i * 2] = lx; flat[i * 2 + 1] = ly;
+        const q = pts[(i + 1) % pts.length];
+        const onEdge = (v: number, w: number) => (v === 0 && w === 0) || (v === E && w === E);
+        c[i] = onEdge(px, q[0]) || onEdge(py, q[1]) ? 1 : 0;
+      });
+      rings.push(flat);
+      cut.push(c);
+    }
+    let cx = 0, cy = 0, k = 0;
+    for (const r of rings) for (let i = 0; i < r.length; i += 2) { cx += r[i]; cy += r[i + 1]; k++; }
+    cx /= k || 1; cy /= k || 1;
+    return { rings, cut, full, cx, cy, seed: Math.abs(Math.round(cx * 7.3 + cy * 3.1)) % 9973 };
+  }
+
+  /** 이 자리(로컬 m)를 덮는 z14 타일이 다 읽혔나 */
+  tileReady(x: number, y: number): boolean {
+    const [lng, lat] = this.frame.toLngLat(x, y);
+    const n = 2 ** Z;
+    const tx = Math.floor(((lng + 180) / 360) * n);
+    const r = (lat * Math.PI) / 180;
+    const ty = Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n);
+    return this.loaded.has(`${Z}/${tx}/${ty}`);
+  }
+
+  /** 직접 만든 덩어리(거리 가구·절차적 건물·망사르드 지붕)를 넣는다 */
+  addSolid(rings: Float64Array[], base: number, top: number, kind: Solid['kind'], render?: Solid['render']): Solid {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const r of rings) for (let i = 0; i < r.length; i += 2) {
+      if (r[i] < minX) minX = r[i]; if (r[i] > maxX) maxX = r[i];
+      if (r[i + 1] < minY) minY = r[i + 1]; if (r[i + 1] > maxY) maxY = r[i + 1];
+    }
+    const s: Solid = { rings, top, base, minX, minY, maxX, maxY, stamp: 0, kind, render };
+    this.insert(s);
+    return s;
+  }
+  /** 절차적 건물을 한꺼번에 넣고 알린다 */
+  addBuildings(list: { rings: Float64Array[]; top: number }[]) {
+    const fresh: Solid[] = [];
+    for (const b of list) {
+      let cx = 0, cy = 0;
+      const r0 = b.rings[0];
+      for (let i = 0; i < r0.length; i += 2) { cx += r0[i]; cy += r0[i + 1]; }
+      cx /= r0.length / 2; cy /= r0.length / 2;
+      fresh.push(this.addSolid(b.rings, 0, b.top, 'building', { rings: b.rings, cut: b.rings.map((r) => new Uint8Array(r.length / 2)), full: true, cx, cy, seed: Math.abs(Math.round(cx * 7.3 + cy * 3.1)) % 9973 }));
+    }
+    this.procedural = true;
+    if (fresh.length) this.onBuildings?.(fresh);
+  }
+  procedural = false;
+
+  /** 그 점을 덮는 건물 중 가장 높은 지붕(없으면 0) — 벽이 이웃 건물에 붙어 있는지 알아볼 때 */
+  buildingTopAt(x: number, y: number, except?: Solid): number {
+    let t = 0;
+    for (const s of this.near(x, y, 0.1)) if (s !== except && s.kind === 'building' && s.top > t && World.contains(s, x, y)) t = s.top;
+    return t;
   }
 
   /** 타일 좌표(0..extent) → 이 세계의 미터 좌표 */

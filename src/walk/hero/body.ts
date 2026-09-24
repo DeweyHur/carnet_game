@@ -4,14 +4,23 @@ import { World } from './world';
 import type { Solid } from './world';
 import { angleDiff, bearingOf, dirOf } from './geo';
 
-export type Mode = 'ground' | 'air' | 'glide' | 'climb' | 'mantle' | 'swim' | 'down';
-export type BodyEvent = 'jump' | 'land' | 'hurt' | 'glide' | 'unglide' | 'grab' | 'mantle' | 'climbjump' | 'drop' | 'splash' | 'drown' | 'exhausted' | 'recovered' | 'stepL' | 'stepR' | 'stroke';
+export type Mode = 'ground' | 'air' | 'glide' | 'climb' | 'mantle' | 'swim' | 'down' | 'roll' | 'slide' | 'sit' | 'act' | 'stagger';
+export type BodyEvent = 'jump' | 'land' | 'hurt' | 'glide' | 'unglide' | 'grab' | 'mantle' | 'vault' | 'climbjump' | 'drop' | 'splash' | 'drown' | 'exhausted' | 'recovered' | 'stepL' | 'stepR' | 'stroke'
+  | 'roll' | 'rollLand' | 'slide' | 'crouch' | 'uncrouch' | 'sit' | 'stand' | 'shutter' | 'stagger' | 'actDone';
+/** 제자리에서 하는 동작. dance·lie는 움직이면 끝나고, 나머지는 정해진 시간이 지나면 끝난다. */
+export type Act = 'dance' | 'photo' | 'drink' | 'eat' | 'clap' | 'lie' | 'push' | 'tip' | 'feed' | 'pet' | 'stretch' | 'think';
+/** 손에 든 것 */
+export type Carry = null | 'crepe' | 'baguette' | 'coffee' | 'balloon' | 'flowers' | 'book';
+const ACT_SECS: Record<Act, number> = { dance: Infinity, lie: Infinity, photo: 1.25, drink: 2.2, eat: 1.9, clap: 2.2, push: 0.7, tip: 1.1, feed: 2.4, pet: 2.2, stretch: 2.4, think: 1.8 };
+export interface Seat { x: number; y: number; z: number; facing: number }
 
 export interface Intent {
   mx: number; my: number; // 가고 싶은 방향(세계 좌표, 크기 0..1)
   sprint: boolean;
   jump: boolean; // 이번 프레임에 눌렀다
   drop: boolean;
+  crouch?: boolean; // 이번 프레임에 눌렀다 — 웅크리기 전환(달리는 중이면 미끄러지기)
+  roll?: boolean; // 이번 프레임에 눌렀다 — 앞구르기(공중에서 누르면 착지 구르기)
   pace: number; // 지치면 느려진다
   maxStamina: number;
 }
@@ -21,7 +30,10 @@ const H = 1.75;
 const STEP = 0.45;
 const G = 21;
 const JUMP_V = 7.4;
-const WALK = 1.7, RUN = 4.6, SPRINT = 7.2, TIRED = 1.4;
+const WALK = 1.7, RUN = 4.6, SPRINT = 7.2, TIRED = 1.4, SNEAK = 1.25;
+const ROLL_SECS = 0.62, ROLL_V = 5.4;
+const SLIDE_SECS = 0.95;
+const SAFE_ROLL = 16; // m — 착지 직전에 구르면 이 높이까지는 다치지 않는다
 const SWIM = 1.9, SWIM_FAST = 3.6;
 const CLIMB_UP = 1.4, CLIMB_SIDE = 1.25;
 const GLIDE_FWD = 6.4, GLIDE_SINK = 1.9;
@@ -43,6 +55,17 @@ export class Body {
   private mantle = { t: 0, x0: 0, y0: 0, z0: 0, x1: 0, y1: 0, z1: 0 };
   private climbJump = { t: 0, ux: 0, uz: 0 };
   private downT = 0;
+  private rollT = 0; private rollV = 0;
+  private slideT = 0; private slideV = 0;
+  private rollBuf = 0; // 공중에서 구르기를 눌러 둔 시간
+  private staggerT = 0;
+  crouch = false;
+  act: { kind: Act; t: number; dur: number } | null = null;
+  waveT = 0; // 걸으면서도 손을 흔든다(윗몸만)
+  pointT = 0; // 방향을 가리킨다(윗몸만)
+  carry: Carry = null;
+  seatZ = 0;
+  idleT = 0; // 가만히 서 있은 시간 — 두리번거리기
   fallTopZ = 0;
   safe = { x: 0, y: 0, z: 0 };
   speed = 0; // 수평 속력(m/s)
@@ -58,7 +81,48 @@ export class Body {
     this.vx = this.vy = this.vz = 0;
     this.mode = 'ground';
     this.wall = null;
+    this.act = null;
+    this.crouch = false;
     this.safe = { x, y, z };
+  }
+
+  // ───────── 밖(게임)에서 시키는 동작 ─────────
+  /** 제자리 동작을 시작한다. 땅 위(또는 앉아 있을 때 사진)만 된다. */
+  doAct(kind: Act): boolean {
+    if (this.mode !== 'ground' && !(this.mode === 'sit' && (kind === 'photo' || kind === 'eat' || kind === 'clap'))) return false;
+    if (this.mode === 'sit') { this.act = { kind, t: 0, dur: ACT_SECS[kind] }; return true; }
+    this.mode = 'act';
+    this.act = { kind, t: 0, dur: ACT_SECS[kind] };
+    this.speed = 0; this.vx = this.vy = 0;
+    this.crouch = kind === 'pet' || kind === 'feed' ? this.crouch : false;
+    return true;
+  }
+  /** 손을 흔든다(봉주르). 걸으면서도 된다. */
+  wave() { if (this.mode === 'ground' || this.mode === 'sit' || this.mode === 'act') { this.waveT = 1.6; return true; } return false; }
+  /** 어느 쪽을 가리킨다. */
+  point(facing: number) { if (this.mode !== 'ground' && this.mode !== 'act') return false; this.facing = facing; this.pointT = 1.8; this.speed = 0; return true; }
+  /** 앉는다. seat가 없으면 그 자리 바닥에. */
+  sit(seat: Seat | null): boolean {
+    if (this.mode !== 'ground' && this.mode !== 'act') return false;
+    this.act = null;
+    this.mode = 'sit';
+    this.crouch = false;
+    if (seat) { this.x = seat.x; this.y = seat.y; this.z = seat.z; this.facing = seat.facing; this.seatZ = seat.z; }
+    else this.seatZ = -1; // 바닥에 앉는다
+    this.vx = this.vy = this.vz = 0;
+    this.speed = 0;
+    this.events.push('sit');
+    return true;
+  }
+  /** 사람과 부딪혀 휘청인다 */
+  stagger(nx: number, ny: number, power = 2.2) {
+    if (this.mode !== 'ground' && this.mode !== 'act') return;
+    this.mode = 'stagger';
+    this.act = null;
+    this.staggerT = 0.55;
+    this.vx = nx * power; this.vy = ny * power;
+    this.speed = 0;
+    this.events.push('stagger');
   }
 
   step(dt: number, w: World, it: Intent) {
@@ -77,7 +141,15 @@ export class Body {
       case 'mantle': this.doMantle(dt); break;
       case 'swim': this.swim(dt, w, it, m, ix, iy); break;
       case 'down': this.downT -= dt; this.speed = 0; if (this.downT <= 0) this.mode = 'ground'; this.rest(dt); break;
+      case 'roll': this.rolling(dt, w, it, m, ix, iy); break;
+      case 'slide': this.sliding(dt, w, it, m, ix, iy); break;
+      case 'sit': this.sitting(dt, it, m); break;
+      case 'act': this.acting(dt, w, it, m); break;
+      case 'stagger': this.staggering(dt, w); break;
     }
+    if (this.waveT > 0) this.waveT -= dt;
+    if (this.pointT > 0) this.pointT -= dt;
+    this.idleT = (this.mode === 'ground' && this.speed < 0.1) ? this.idleT + dt : 0;
     this.gliderOpen = approach(this.gliderOpen, this.mode === 'glide' ? 1 : 0, dt * 4);
     this.moved = Math.hypot(this.x - x0, this.y - y0);
     this.lift = Math.max(0, this.z - z0);
@@ -113,9 +185,18 @@ export class Body {
 
   // ───────── 땅 위 ─────────
   private ground(dt: number, w: World, it: Intent, m: number, ix: number, iy: number) {
-    const sprinting = it.sprint && m > 0.2 && this.canExert;
+    if (it.roll && this.stamina > 0.05 && !this.exhausted) { this.startRoll(m >= 0.08 ? bearingOf(ix, iy) : this.facing, false); return; }
+    if (it.crouch) {
+      if (this.speed > RUN * 0.8 && !this.crouch) { this.startSlide(); return; }
+      this.crouch = !this.crouch;
+      this.events.push(this.crouch ? 'crouch' : 'uncrouch');
+    }
+    if (this.crouch && it.sprint && m > 0.2) { this.crouch = false; this.events.push('uncrouch'); }
+    const sprinting = it.sprint && m > 0.2 && this.canExert && !this.crouch;
     let want = m < 0.08 ? 0 : m < 0.6 ? WALK + (RUN - WALK) * ((m - 0.08) / 0.52) : RUN;
     if (sprinting) want = SPRINT;
+    if (this.crouch) want = Math.min(want, SNEAK * Math.max(0.4, m));
+    if (this.pointT > 0) want = 0;
     if (this.exhausted) want = Math.min(want, TIRED);
     want *= it.pace;
     if (m >= 0.08) {
@@ -143,16 +224,113 @@ export class Body {
     this.stride(dt, this.speed > RUN + 0.5 ? 2.1 : 1.5);
 
     const g = w.ground(this.x, this.y, this.z, STEP + 0.1);
-    if (this.z - g > 0.08) { this.mode = 'air'; this.fallTopZ = this.z; this.vz = 0; return; } // 지붕 끝에서 발을 헛디뎠다
+    // 계단·턱 한 칸 정도는 걸어서 내려간다. 그보다 높으면 발을 헛디딘 것.
+    if (this.z - g > STEP + 0.06) { this.mode = 'air'; this.fallTopZ = this.z; this.vz = 0; this.crouch = false; return; }
     this.z = g;
     if (g < 0.3 && w.water(this.x, this.y)) { this.enterWater(); return; }
     this.safe = { x: this.x, y: this.y, z: this.z };
-    if (it.jump) { this.vz = JUMP_V; this.mode = 'air'; this.fallTopZ = this.z; this.events.push('jump'); }
+    if (it.jump) { this.vz = JUMP_V * (this.crouch ? 0.8 : 1); this.mode = 'air'; this.fallTopZ = this.z; this.crouch = false; this.rollBuf = 0; this.events.push('jump'); }
+  }
+
+  // ───────── 구르기 · 미끄러지기 ─────────
+  private startRoll(dir: number, landing: boolean) {
+    this.mode = 'roll';
+    this.rollT = 0;
+    this.facing = dir;
+    this.crouch = false;
+    this.rollV = Math.max(landing ? 4 : ROLL_V, Math.min(SPRINT, this.speed * (landing ? 0.9 : 1.05)));
+    if (!landing) this.spend(0.1);
+    this.events.push(landing ? 'rollLand' : 'roll');
+  }
+  private rolling(dt: number, w: World, it: Intent, m: number, ix: number, iy: number) {
+    this.rollT += dt;
+    if (m >= 0.08) this.turn(bearingOf(ix, iy), 120 * dt);
+    const k = this.rollT / ROLL_SECS;
+    this.speed = this.rollV * (1 - 0.55 * k);
+    const [fx, fy] = dirOf(this.facing);
+    const p = { x: this.x + fx * this.speed * dt, y: this.y + fy * this.speed * dt };
+    const hit = w.collide(p, this.z, R, 1.0, STEP);
+    if (hit && -(fx * hit.nx + fy * hit.ny) > 0.5) this.rollV *= 0.5; // 벽에 부딪히면 멈춘다
+    this.x = p.x; this.y = p.y;
+    this.phase += dt * 10;
+    const g = w.ground(this.x, this.y, this.z, STEP + 0.1);
+    if (this.z - g > STEP + 0.06) { this.mode = 'air'; this.fallTopZ = this.z; this.vz = 0; this.vx = fx * this.speed; this.vy = fy * this.speed; return; }
+    this.z = g;
+    if (g < 0.3 && w.water(this.x, this.y)) { this.enterWater(); return; }
+    if (this.rollT >= ROLL_SECS) { this.mode = 'ground'; this.speed = Math.min(this.speed, RUN); if (it.jump) { this.vz = JUMP_V; this.mode = 'air'; this.fallTopZ = this.z; this.events.push('jump'); } }
+  }
+  private startSlide() {
+    this.mode = 'slide';
+    this.slideT = 0;
+    this.slideV = Math.min(SPRINT + 1.2, this.speed + 1.4);
+    this.crouch = false;
+    this.spend(0.06);
+    this.events.push('slide');
+  }
+  private sliding(dt: number, w: World, it: Intent, m: number, ix: number, iy: number) {
+    this.slideT += dt;
+    if (m >= 0.08) this.turn(bearingOf(ix, iy), 70 * dt);
+    const k = Math.min(1, this.slideT / SLIDE_SECS);
+    this.speed = this.slideV * (1 - k) + 1.2 * k;
+    const [fx, fy] = dirOf(this.facing);
+    const p = { x: this.x + fx * this.speed * dt, y: this.y + fy * this.speed * dt };
+    const hit = w.collide(p, this.z, R, 0.9, STEP);
+    if (hit && -(fx * hit.nx + fy * hit.ny) > 0.5) this.slideV *= 0.4;
+    this.x = p.x; this.y = p.y;
+    const g = w.ground(this.x, this.y, this.z, STEP + 0.1);
+    if (this.z - g > STEP + 0.06) { this.mode = 'air'; this.fallTopZ = this.z; this.vz = 0; this.vx = fx * this.speed; this.vy = fy * this.speed; return; }
+    this.z = g;
+    if (g < 0.3 && w.water(this.x, this.y)) { this.enterWater(); return; }
+    if (it.jump) { this.vz = JUMP_V * 1.05; this.mode = 'air'; this.fallTopZ = this.z; this.vx = fx * this.speed; this.vy = fy * this.speed; this.events.push('jump'); return; } // 미끄러지다 뛰면 멀리 뛴다
+    if (this.slideT >= SLIDE_SECS) { this.mode = 'ground'; this.crouch = !!it.crouch; }
+  }
+
+  // ───────── 앉기 · 제자리 동작 ─────────
+  private sitting(dt: number, it: Intent, m: number) {
+    this.speed = 0;
+    this.restT = 1; // 앉으면 바로 숨이 돌아온다
+    this.stamina = Math.min(this.maxStamina, this.stamina + dt * 0.9);
+    if (this.exhausted && this.stamina >= this.maxStamina - 1e-3) { this.exhausted = false; this.events.push('recovered'); }
+    if (this.act) { this.act.t += dt; if (this.act.kind === 'photo' && this.act.t - dt < 0.7 && this.act.t >= 0.7) this.events.push('shutter'); if (this.act.t >= this.act.dur) { this.act = null; this.events.push('actDone'); } }
+    if (m > 0.35 || it.jump) { this.mode = 'ground'; this.act = null; this.events.push('stand'); }
+  }
+  private acting(dt: number, w: World, it: Intent, m: number) {
+    const a = this.act;
+    this.speed = 0;
+    if (!a) { this.mode = 'ground'; return; }
+    a.t += dt;
+    if (a.kind === 'photo' && a.t - dt < 0.7 && a.t >= 0.7) this.events.push('shutter');
+    if (a.kind === 'lie') { this.restT = 1; this.stamina = Math.min(this.maxStamina, this.stamina + dt * 0.8); } else this.rest(dt);
+    this.phase += dt * (a.kind === 'dance' ? 7 : 3);
+    const cancel = (m > 0.35 && (a.dur === Infinity || a.t > 0.3)) || it.jump;
+    if (a.t >= a.dur || cancel) {
+      this.mode = 'ground';
+      this.act = null;
+      this.events.push('actDone');
+      if (it.jump && this.z - w.ground(this.x, this.y, this.z, 0.1) < 0.1) { this.vz = JUMP_V; this.mode = 'air'; this.fallTopZ = this.z; this.events.push('jump'); }
+    }
+  }
+  private staggering(dt: number, w: World) {
+    this.staggerT -= dt;
+    this.vx *= Math.exp(-dt * 5); this.vy *= Math.exp(-dt * 5);
+    const p = { x: this.x + this.vx * dt, y: this.y + this.vy * dt };
+    w.collide(p, this.z, R, H, STEP);
+    this.x = p.x; this.y = p.y;
+    this.phase += dt * 6;
+    if (this.staggerT <= 0) this.mode = 'ground';
+  }
+
+  /** 다른 몸(사람)에서 밀려난다 — 겹친 만큼 옮긴다. 벽 속으로 밀려 들어가지는 않는다. */
+  shove(dx: number, dy: number, w: World) {
+    const p = { x: this.x + dx, y: this.y + dy };
+    w.collide(p, this.z, R, H, STEP);
+    this.x = p.x; this.y = p.y;
   }
 
   // ───────── 공중 · 활공 ─────────
   private air(dt: number, w: World, it: Intent, m: number, ix: number, iy: number, gliding: boolean) {
     const floor = w.ground(this.x, this.y, this.z + 0.05, 0.05);
+    if (it.roll) this.rollBuf = 0.45; else if (this.rollBuf > 0) this.rollBuf -= dt;
     if (it.jump) {
       if (gliding) { this.mode = 'air'; this.fallTopZ = this.z; this.events.push('unglide'); gliding = false; }
       else if (this.z - floor > 1.3 && this.canExert) { this.mode = 'glide'; this.events.push('glide'); gliding = true; }
@@ -197,9 +375,13 @@ export class Body {
       this.z = floor;
       const fell = this.fallTopZ - floor;
       if (floor < 0.3 && w.water(this.x, this.y)) { this.enterWater(); return; }
+      this.vz = 0;
+      const buffered = this.rollBuf > 0;
+      this.rollBuf = 0;
+      // 착지 직전에 구르면 충격을 흘려 보낸다(낙법)
+      if (!gliding && buffered && fell < SAFE_ROLL) { this.startRoll(Math.hypot(this.vx, this.vy) > 0.5 ? bearingOf(this.vx, this.vy) : this.facing, true); return; }
       if (!gliding && fell > HURT_FALL) { this.mode = 'down'; this.downT = 1.1; this.speed = 0; this.events.push('hurt'); }
       else { this.mode = 'ground'; this.events.push('land'); this.speed *= gliding ? 0.5 : 0.8; }
-      this.vz = 0;
       return;
     }
     this.z = nz;
@@ -272,19 +454,23 @@ export class Body {
     this.climbJump.t = 0;
   }
 
+  vaulting = false;
   private startMantle(cx: number, cy: number, nx: number, ny: number, top: number) {
+    // 달리다 낮은 것(벤치·난간·볼라드)을 만나면 한 손 짚고 넘어간다
+    this.vaulting = this.mode === 'ground' && top - this.z < 1.05 && this.speed > 3.2;
     this.mode = 'mantle';
     this.wall = null;
-    this.mantle = { t: 0, x0: this.x, y0: this.y, z0: this.z, x1: cx - nx * 0.6, y1: cy - ny * 0.6, z1: top };
+    const reach = this.vaulting ? 1.0 : 0.6;
+    this.mantle = { t: 0, x0: this.x, y0: this.y, z0: this.z, x1: cx - nx * reach, y1: cy - ny * reach, z1: top };
     this.facing = bearingOf(-nx, -ny);
     this.vx = this.vy = this.vz = 0;
     this.speed = 0;
-    this.events.push('mantle');
+    this.events.push(this.vaulting ? 'vault' : 'mantle');
   }
 
   private doMantle(dt: number) {
     const mt = this.mantle;
-    const dur = Math.max(0.3, Math.min(0.7, (mt.z1 - mt.z0) * 0.35 + 0.25));
+    const dur = this.vaulting ? 0.3 : Math.max(0.3, Math.min(0.7, (mt.z1 - mt.z0) * 0.35 + 0.25));
     mt.t += dt / dur;
     const t = Math.min(1, mt.t);
     const up = Math.min(1, t / 0.65);
@@ -292,7 +478,7 @@ export class Body {
     this.z = mt.z0 + (mt.z1 - mt.z0) * (1 - (1 - up) ** 2);
     this.x = mt.x0 + (mt.x1 - mt.x0) * fwd;
     this.y = mt.y0 + (mt.y1 - mt.y0) * fwd;
-    if (t >= 1) { this.mode = 'ground'; this.z = mt.z1; }
+    if (t >= 1) { this.mode = 'ground'; this.z = mt.z1; if (this.vaulting) this.speed = RUN * 0.8; }
   }
 
   // ───────── 물 ─────────

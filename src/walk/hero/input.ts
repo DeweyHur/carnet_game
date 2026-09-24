@@ -1,18 +1,23 @@
 // 손. 키보드(WASD) · 마우스 끌기 · 게임패드 · 터치 조이스틱을 한 가지 의도로 모은다.
 // 게임패드는 스위치 배치: 아래=달리기(B) · 오른쪽=상호작용(A) · 위=점프(X) · 왼쪽=놓기(Y) · -=지도 · ZL=시점 정렬.
+// L=구르기 · R=두 번째 행동(살펴보기) · 오른쪽 스틱 누르기=웅크리기 · 십자 ←=인사 · 십자 →=춤 · ZR=사진 · +=앉기.
 
 export interface Frame {
   mx: number; my: number; // 카메라 기준: x 오른쪽, y 앞(크기 0..1)
   camYaw: number; camPitch: number; zoom: number; // 이번 프레임의 카메라 돌림(도)과 거리 배율
   sprint: boolean;
   jump: boolean; drop: boolean; interact: boolean; recenter: boolean; map: boolean;
+  crouch: boolean; roll: boolean; secondary: boolean;
+  emote: Emote | null; // 이번 프레임에 누른 몸짓
   pad: boolean; // 게임패드를 쓰는 중
 }
 
-type Edge = 'jump' | 'drop' | 'interact' | 'recenter' | 'map';
+export type Emote = 'wave' | 'dance' | 'photo' | 'sit';
+type Edge = 'jump' | 'drop' | 'interact' | 'recenter' | 'map' | 'crouch' | 'roll' | 'secondary' | Emote;
+const EMOTE_KEYS: Record<string, Emote> = { Digit1: 'wave', Digit2: 'dance', Digit3: 'photo', Digit4: 'sit' };
 
 const MOVE_KEYS: Record<string, [number, number]> = { KeyW: [0, 1], KeyS: [0, -1], KeyA: [-1, 0], KeyD: [1, 0] };
-const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'KeyE', 'KeyF', 'KeyX', 'KeyC', 'KeyQ', 'KeyM', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
+const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'KeyE', 'KeyF', 'KeyR', 'KeyX', 'KeyC', 'KeyV', 'KeyQ', 'KeyM', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
 
 export class Input {
   enabled = false;
@@ -48,7 +53,11 @@ export class Input {
       this.keys.add(e.code);
       if (e.code === 'Space') this.edges.add('jump');
       if (e.code === 'KeyE' || e.code === 'KeyF') this.edges.add('interact');
-      if (e.code === 'KeyX' || e.code === 'KeyC') this.edges.add('drop');
+      if (e.code === 'KeyX') this.edges.add('drop');
+      if (e.code === 'KeyC') this.edges.add('crouch');
+      if (e.code === 'KeyV') this.edges.add('roll');
+      if (e.code === 'KeyR') this.edges.add('secondary');
+      if (EMOTE_KEYS[e.code]) this.edges.add(EMOTE_KEYS[e.code]);
       if (e.code === 'KeyQ') this.edges.add('recenter');
       if (e.code === 'KeyM') this.edges.add('map');
       this.usingPad = false;
@@ -144,6 +153,13 @@ export class Input {
       if (edge(2)) this.edges.add('drop');
       if (edge(6) || edge(10)) this.edges.add('recenter');
       if (edge(8)) this.edges.add('map');
+      if (edge(4)) this.edges.add('roll');
+      if (edge(5)) this.edges.add('secondary');
+      if (edge(11)) this.edges.add('crouch');
+      if (edge(14)) this.edges.add('wave');
+      if (edge(15)) this.edges.add('dance');
+      if (edge(7)) this.edges.add('photo');
+      if (edge(9)) this.edges.add('sit');
       if (b[12]) zoom -= 400 * dt;
       if (b[13]) zoom += 400 * dt;
       if (b.some(Boolean)) this.usingPad = true;
@@ -152,10 +168,12 @@ export class Input {
     const f: Frame = {
       mx, my, camYaw, camPitch, zoom, sprint,
       jump: this.edges.has('jump'), drop: this.edges.has('drop'), interact: this.edges.has('interact'), recenter: this.edges.has('recenter'), map: this.edges.has('map'),
+      crouch: this.edges.has('crouch'), roll: this.edges.has('roll'), secondary: this.edges.has('secondary'),
+      emote: (['wave', 'dance', 'photo', 'sit'] as Emote[]).find((k) => this.edges.has(k)) ?? null,
       pad: this.usingPad,
     };
     this.edges.clear();
-    if (!this.enabled) { f.mx = f.my = 0; f.jump = f.drop = f.interact = f.recenter = false; f.sprint = false; f.camYaw = f.camPitch = f.zoom = 0; }
+    if (!this.enabled) { f.mx = f.my = 0; f.jump = f.drop = f.interact = f.recenter = f.crouch = f.roll = f.secondary = false; f.emote = null; f.sprint = false; f.camYaw = f.camPitch = f.zoom = 0; }
     return f;
   }
 

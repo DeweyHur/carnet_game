@@ -24,11 +24,12 @@ function outlineMat(width: number): THREE.MeshBasicMaterial {
 }
 
 type Pose = {
-  bob: number; pitch: number; lean: number; twist: number; headX: number;
+  bob: number; pitch: number; lean: number; twist: number; side: number; headX: number; headY: number;
   sLx: number; sLy: number; sRx: number; sRy: number; eL: number; eR: number;
   tL: number; tR: number; kL: number; kR: number; scarf: number;
 };
-const ZERO: Pose = { bob: 0, pitch: 0, lean: 0, twist: 0, headX: 0, sLx: 0, sLy: 0, sRx: 0, sRy: 0, eL: 0, eR: 0, tL: 0, tR: 0, kL: 0, kR: 0, scarf: 0 };
+const ZERO: Pose = { bob: 0, pitch: 0, lean: 0, twist: 0, side: 0, headX: 0, headY: 0, sLx: 0, sLy: 0, sRx: 0, sRy: 0, eL: 0, eR: 0, tL: 0, tR: 0, kL: 0, kR: 0, scarf: 0 };
+type Item = 'camera' | 'crepe' | 'coffee' | 'balloon' | 'flowers' | 'book' | 'coin';
 
 export class Figure {
   readonly scene = new THREE.Scene();
@@ -42,7 +43,11 @@ export class Figure {
   private readonly tL = new THREE.Group(); private readonly tR = new THREE.Group();
   private readonly kL = new THREE.Group(); private readonly kR = new THREE.Group();
   private readonly scarf = new THREE.Group();
+  private readonly handR = new THREE.Group();
+  private readonly items = new Map<Item, THREE.Object3D>();
+  private readonly baguette = new THREE.Group();
   private readonly glider = new THREE.Group();
+  private spinAcc = 0;
   private readonly shadow: THREE.Mesh;
   private readonly ripple: THREE.Mesh;
   private readonly surface: THREE.Mesh; // 헤엄칠 때 물속 몸을 가리는 수면(지도의 물은 평면이라 깊이를 쓰지 않는다)
@@ -152,6 +157,35 @@ export class Figure {
       this.part(this.limb(0.052, 0.18), COAT, el);
       this.part(new THREE.SphereGeometry(0.056, 10, 8), SKIN, el, 0, 0.005, -0.27);
     }
+    // 손에 드는 것들(오른손)
+    this.handR.position.z = -0.29;
+    this.eR.add(this.handR);
+    const item = (name: Item, g: THREE.Object3D) => { g.visible = false; this.handR.add(g); this.items.set(name, g); return g; };
+    const cam = item('camera', new THREE.Group());
+    this.part(new THREE.BoxGeometry(0.13, 0.07, 0.085), 0x26221e, cam, 0, 0.04, 0.02);
+    this.part(new THREE.CylinderGeometry(0.03, 0.034, 0.06, 12), 0x3d3a36, cam, 0, 0.09, 0.02, false);
+    this.part(new THREE.BoxGeometry(0.03, 0.02, 0.02), 0xd9d2c4, cam, 0.04, 0.035, 0.07, false);
+    const crepe = item('crepe', new THREE.Group());
+    this.part(new THREE.ConeGeometry(0.075, 0.22, 10).rotateX(Math.PI), 0xe7b867, crepe, 0, 0.03, 0.08);
+    this.part(new THREE.CylinderGeometry(0.08, 0.08, 0.04, 10), 0x5b3219, crepe, 0, 0.03, 0.2, false); // 누텔라
+    const coffee = item('coffee', new THREE.Group());
+    this.part(new THREE.CylinderGeometry(0.04, 0.032, 0.1, 12).rotateX(Math.PI / 2), 0xf6f1e7, coffee, 0, 0.03, 0.04);
+    this.part(new THREE.CylinderGeometry(0.042, 0.042, 0.02, 12).rotateX(Math.PI / 2), 0x7a4a2a, coffee, 0, 0.03, 0.1, false);
+    const balloon = item('balloon', new THREE.Group());
+    this.part(new THREE.SphereGeometry(0.2, 16, 12), 0xe63a3a, balloon, 0, 0, 1.05).scale.set(1, 1, 1.18);
+    balloon.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0.82)]), new THREE.LineBasicMaterial({ color: 0xfafafa })));
+    const flowers = item('flowers', new THREE.Group());
+    this.part(new THREE.ConeGeometry(0.07, 0.3, 8).rotateX(Math.PI), 0xefe6d0, flowers, 0, 0.02, 0.1);
+    for (const [fx, fy, c] of [[0.03, 0, 0xe0436c], [-0.03, 0.02, 0xf2c14e], [0, -0.03, 0xb04ad6], [0.01, 0.04, 0xf07f3c]] as const) this.part(new THREE.SphereGeometry(0.04, 8, 6), c, flowers, fx, 0.02 + fy, 0.27, false);
+    const book = item('book', new THREE.Group());
+    this.part(new THREE.BoxGeometry(0.15, 0.03, 0.2), 0x2f5d8a, book, 0, 0.03, 0.04);
+    const coin = item('coin', new THREE.Group());
+    this.part(new THREE.CylinderGeometry(0.025, 0.025, 0.006, 12), 0xd9b44a, coin, 0, 0.03, 0, false);
+    // 겨드랑이에 낀 바게트(왼쪽)
+    this.part(new THREE.CapsuleGeometry(0.035, 0.62, 4, 8).rotateX(Math.PI / 2 - 0.45), 0xd9a55a, this.baguette, 0, 0.02, 0);
+    this.baguette.position.set(-0.24, 0.02, 0.2);
+    this.baguette.visible = false;
+    this.spine.add(this.baguette);
     // 다리
     for (const [th, kn, sx] of [[this.tL, this.kL, -1], [this.tR, this.kR, 1]] as const) {
       th.position.set(sx * 0.09, 0, -0.04);
@@ -193,22 +227,73 @@ export class Figure {
     const run = Math.min(1, b.speed / 4.6);
     const sprint = Math.max(0, Math.min(1, (b.speed - 4.8) / 2.2));
     const breath = Math.sin(t * (b.exhausted ? 7 : 2.2)) * (b.exhausted ? 0.05 : 0.012);
+    const act = b.act?.kind;
+    const walkPose = (A: number, crouch: boolean) => {
+      const s = Math.sin(ph), c = Math.cos(ph);
+      if (crouch) return {
+        tL: 0.75 + A * 0.7 * s, tR: 0.75 - A * 0.7 * s, kL: -1.35 - 0.3 * Math.max(0, c), kR: -1.35 - 0.3 * Math.max(0, -c),
+        sLx: 0.45 - 0.3 * s, sRx: 0.45 + 0.3 * s, sLy: 0.15, sRy: -0.15, eL: 0.9, eR: 0.9,
+        lean: 0.55, bob: -0.3 + Math.abs(s) * 0.02, headX: 0.35, scarf: 0.3,
+      };
+      return {
+        tL: A * s, tR: -A * s,
+        kL: -(0.1 + (0.6 + run) * Math.max(0, c)), kR: -(0.1 + (0.6 + run) * Math.max(0, -c)),
+        sLx: -A * 0.9 * s, sRx: A * 0.9 * s, sLy: 0.08, sRy: -0.08,
+        eL: 0.2 + 1.1 * run, eR: 0.2 + 1.1 * run,
+        lean: 0.05 + 0.18 * run + 0.2 * sprint + (b.exhausted ? 0.3 : 0), twist: 0.12 * run * s,
+        bob: Math.abs(s) * 0.05 * run - 0.03 * run, headX: -0.1 * run, scarf: 0.4 + 0.9 * run,
+      };
+    };
+    const seated = () => b.seatZ >= 0
+      ? { bob: -0.8, tL: 1.5, tR: 1.42, kL: -1.5, kR: -1.4, lean: -0.04, sLx: 0.55, sRx: 0.55, sLy: 0.12, sRy: -0.12, eL: 0.7, eR: 0.7, headY: 0.35 * Math.sin(t * 0.5) }
+      : { bob: -0.8, tL: 1.42, tR: 1.3, kL: -0.25, kR: -0.6, lean: -0.12, sLx: -0.55, sRx: -0.55, sLy: 0.3, sRy: -0.3, eL: 0.05, eR: 0.05, headY: 0.35 * Math.sin(t * 0.5) };
     switch (b.mode) {
       case 'ground': {
         if (b.speed < 0.15) {
-          Object.assign(want, { bob: breath * 0.5, lean: breath + (b.exhausted ? 0.45 : 0), headX: b.exhausted ? 0.3 : 0, sLy: 0.1, sRy: -0.1, eL: 0.18, eR: 0.18 });
-          if (b.exhausted) Object.assign(want, { sLx: 0.55, sRx: 0.55, eL: 0.35, eR: 0.35, tL: 0.28, tR: 0.28, kL: -0.5, kR: -0.5, bob: -0.05 + breath });
-        } else {
-          const A = 0.22 + 0.5 * run + 0.22 * sprint;
-          const s = Math.sin(ph), c = Math.cos(ph);
-          Object.assign(want, {
-            tL: A * s, tR: -A * s,
-            kL: -(0.1 + (0.6 + run) * Math.max(0, c)), kR: -(0.1 + (0.6 + run) * Math.max(0, -c)),
-            sLx: -A * 0.9 * s, sRx: A * 0.9 * s, sLy: 0.08, sRy: -0.08,
-            eL: 0.2 + 1.1 * run, eR: 0.2 + 1.1 * run,
-            lean: 0.05 + 0.18 * run + 0.2 * sprint + (b.exhausted ? 0.3 : 0), twist: 0.12 * run * s,
-            bob: Math.abs(s) * 0.05 * run - 0.03 * run, headX: -0.1 * run, scarf: 0.4 + 0.9 * run,
-          });
+          if (b.crouch) Object.assign(want, { tL: 0.9, tR: 0.8, kL: -1.9, kR: -1.8, lean: 0.5, bob: -0.42 + breath * 0.5, sLx: 0.6, sRx: 0.6, eL: 0.8, eR: 0.8, headX: 0.4 });
+          else Object.assign(want, { bob: breath * 0.5, lean: breath + (b.exhausted ? 0.45 : 0), headX: b.exhausted ? 0.3 : 0, sLy: 0.1, sRy: -0.1, eL: 0.18, eR: 0.18 });
+          if (b.exhausted && !b.crouch) Object.assign(want, { sLx: 0.55, sRx: 0.55, eL: 0.35, eR: 0.35, tL: 0.28, tR: 0.28, kL: -0.5, kR: -0.5, bob: -0.05 + breath });
+          // 오래 서 있으면 두리번거린다
+          if (b.idleT > 5 && !b.exhausted) { want.headY = 0.75 * Math.sin(t * 0.55) * Math.min(1, (b.idleT - 5) / 2); want.headX += 0.12 * Math.sin(t * 0.31); }
+        } else Object.assign(want, walkPose(0.22 + 0.5 * run + 0.22 * sprint, b.crouch));
+        break;
+      }
+      case 'roll': {
+        this.spinAcc += dt * (Math.PI * 2) / 0.62;
+        Object.assign(want, { tL: 1.9, tR: 1.9, kL: -2.3, kR: -2.3, sLx: 1.3, sRx: 1.3, sLy: -0.1, sRy: 0.1, eL: 1.6, eR: 1.6, headX: 0.7, bob: -0.5, scarf: 1.2 });
+        break;
+      }
+      case 'slide':
+        Object.assign(want, { pitch: -0.42, bob: -0.58, tL: 1.5, kL: -0.12, tR: 0.55, kR: -1.95, sLx: -0.5, sLy: 0.9, eL: 0.2, sRx: 1.3, sRy: -0.3, eR: 0.3, lean: 0.1, headX: -0.1, scarf: 1.6, side: 0.12 });
+        break;
+      case 'stagger':
+        Object.assign(want, { lean: -0.35, sLx: 0.4 + 0.5 * Math.sin(t * 17), sRx: 0.4 - 0.5 * Math.sin(t * 17), sLy: 1.0, sRy: -1.0, eL: 0.4, eR: 0.4, tL: 0.4, kL: -0.6, tR: -0.2, headX: 0.25, side: 0.2 * Math.sin(t * 9) });
+        break;
+      case 'sit':
+        Object.assign(want, seated());
+        break;
+      case 'act': {
+        const at = b.act?.t ?? 0;
+        switch (act) {
+          case 'dance': {
+            const s = Math.sin(ph), c = Math.cos(ph * 0.5);
+            // 캉캉 — 다리를 번갈아 차올리고 팔을 흔든다
+            Object.assign(want, { bob: Math.abs(s) * 0.09 - 0.04, twist: 0.35 * c, side: 0.15 * s,
+              tL: Math.max(0, s) * 1.5, kL: -0.15 - Math.max(0, -s) * 0.5, tR: Math.max(0, -s) * 1.5, kR: -0.15 - Math.max(0, s) * 0.5,
+              sLx: 1.1 + 1.4 * s, sRx: 1.1 - 1.4 * s, sLy: 0.7, sRy: -0.7, eL: 0.6, eR: 0.6, headX: 0.15 * s, headY: 0.3 * c, scarf: 1.2 });
+            break;
+          }
+          case 'photo': Object.assign(want, { sLx: 1.05, sRx: 1.05, sLy: -0.45, sRy: 0.45, eL: 1.55, eR: 1.55, lean: 0.06, headX: -0.05, bob: at > 0.6 && at < 0.8 ? -0.02 : 0 }); break;
+          case 'drink': Object.assign(want, { lean: 0.95, headX: 0.55, sLx: 1.0, sRx: 1.0, sLy: -0.3, sRy: 0.3, eL: 1.3, eR: 1.3, tL: 0.3, tR: -0.1, kL: -0.3, kR: -0.1, bob: -0.08 }); break;
+          case 'eat': Object.assign(want, { sRx: 0.55, sRy: -0.1, eR: 2.05 + 0.25 * Math.sin(t * 9), sLx: 0.2, eL: 0.4, headX: -0.08 }); break;
+          case 'clap': Object.assign(want, { sLx: 1.15, sRx: 1.15, sLy: -0.3 + 0.2 * Math.sin(t * 16), sRy: 0.3 - 0.2 * Math.sin(t * 16), eL: 1.0, eR: 1.0, bob: 0.02 * Math.abs(Math.sin(t * 8)) }); break;
+          case 'lie': Object.assign(want, { pitch: -1.5, bob: -0.8, sLx: 2.8, sRx: 2.8, sLy: 0.35, sRy: -0.35, eL: 2.3, eR: 2.3, tL: 0.05, kL: -0.05, tR: 0.55, kR: -1.1, headX: 0.25 }); break;
+          case 'push': Object.assign(want, { sRx: 1.5, sRy: -0.05, eR: 0.15 + 0.2 * Math.max(0, 1 - at * 3), lean: 0.14, tL: 0.25, kL: -0.2, sLx: -0.2 }); break;
+          case 'tip': Object.assign(want, { sRx: 0.95, eR: 0.3, lean: 0.4, headX: -0.25, tL: 0.25, kL: -0.35 }); break;
+          case 'feed': Object.assign(want, { tL: 0.9, tR: 0.8, kL: -1.9, kR: -1.8, lean: 0.45, bob: -0.42, sRx: 0.5 + 0.7 * Math.max(0, Math.sin(t * 5)), eR: 0.3, sLx: 0.6, eL: 1.2, headX: -0.1 }); break;
+          case 'pet': Object.assign(want, { tL: 1.0, tR: 0.3, kL: -2.2, kR: -1.2, lean: 0.55, bob: -0.5, sRx: 0.95, eR: 0.35 + 0.25 * Math.sin(t * 6), sLx: 0.3, eL: 0.6, headX: -0.3 }); break;
+          case 'stretch': Object.assign(want, { sLx: 2.95, sRx: 2.95, sLy: 0.15, sRy: -0.15, eL: 0.1, eR: 0.1, lean: -0.18, bob: 0.03, headX: 0.35 }); break;
+          case 'think': Object.assign(want, { sRx: 0.55, eR: 2.35, sRy: 0.2, sLx: 0.55, sLy: -0.55, eL: 1.45, headX: 0.12, headY: 0.2 }); break;
         }
         break;
       }
@@ -227,7 +312,8 @@ export class Figure {
         break;
       }
       case 'mantle':
-        Object.assign(want, { tL: 1.3, tR: 0.9, kL: -1.9, kR: -1.5, sLx: 1.5, sRx: 1.5, eL: 0.7, eR: 0.7, lean: 0.55, bob: -0.2 });
+        if (b.vaulting) Object.assign(want, { tL: 1.1, tR: 0.7, kL: -0.6, kR: -1.2, sRx: 1.2, eR: 0.05, sRy: 0.2, sLx: -0.2, sLy: 1.1, lean: 0.35, side: 0.55, bob: 0.05, scarf: 1.2 });
+        else Object.assign(want, { tL: 1.3, tR: 0.9, kL: -1.9, kR: -1.5, sLx: 1.5, sRx: 1.5, eL: 0.7, eR: 0.7, lean: 0.55, bob: -0.2 });
         break;
       case 'down':
         Object.assign(want, { tL: 1.45, kL: -2.3, tR: 0.15, kR: -1.95, sLx: 0.7, sRx: 0.3, eL: 0.6, eR: 0.4, lean: 0.6, headX: 0.35, bob: -0.42 });
@@ -238,21 +324,38 @@ export class Figure {
         break;
       }
     }
+    // 앉아서 하는 동작(사진·먹기·박수)은 윗몸만 바꾼다
+    if (b.mode === 'sit' && act) {
+      if (act === 'photo') Object.assign(want, { sLx: 1.05, sRx: 1.05, sLy: -0.45, sRy: 0.45, eL: 1.55, eR: 1.55 });
+      else if (act === 'eat') Object.assign(want, { sRx: 0.55, eR: 2.05 + 0.25 * Math.sin(t * 9) });
+      else if (act === 'clap') Object.assign(want, { sLx: 1.15, sRx: 1.15, sLy: -0.3 + 0.2 * Math.sin(t * 16), sRy: 0.3 - 0.2 * Math.sin(t * 16), eL: 1.0, eR: 1.0 });
+    }
+    // 손에 든 것: 걷는 동안 오른팔은 그걸 들고 있다
+    const holding = b.carry && b.carry !== 'baguette' && (b.mode === 'ground' || b.mode === 'sit') && !act;
+    if (holding) Object.assign(want, b.carry === 'balloon' ? { sRx: 0.35, sRy: -0.25, eR: 0.35 } : { sRx: 0.45, sRy: -0.05, eR: 1.35 });
+    if (b.carry === 'baguette' && (b.mode === 'ground' || b.mode === 'sit')) Object.assign(want, { sLx: 0.08, sLy: 0.2, eL: 0.55 });
+    // 손 흔들기·가리키기는 걷거나 앉은 채로도 윗몸만
+    if (b.pointT > 0) Object.assign(want, { sRx: 1.55, sRy: -0.05, eR: 0.05, headX: 0.05 });
+    if (b.waveT > 0) Object.assign(want, { sRx: 0.25, sRy: -2.45 + 0.35 * Math.sin(t * 10), eR: 0.45 + 0.25 * Math.sin(t * 10 + 1), headX: 0.08, headY: 0.1 });
     // 부드럽게 옮겨 간다
     const k = 1 - Math.exp(-dt * (b.mode === 'ground' ? 16 : 11));
     const p = this.pose;
     for (const key of Object.keys(p) as (keyof Pose)[]) p[key] += (want[key] - p[key]) * k;
     this.root.position.set(0, 0, p.bob);
     this.root.rotation.z = (-b.facing * Math.PI) / 180;
-    this.tilt.rotation.x = -p.pitch;
-    this.spine.rotation.set(-p.lean, 0, p.twist);
-    this.head.rotation.x = p.headX - p.lean * 0.6;
+    if (b.mode !== 'roll') this.spinAcc = 0;
+    this.tilt.rotation.set(-p.pitch - (b.mode === 'roll' ? Math.min(Math.PI * 2, this.spinAcc) : 0), p.side, 0);
+    this.spine.rotation.set(-p.lean, p.side * 0.5, p.twist);
+    this.head.rotation.set(p.headX - p.lean * 0.6, 0, p.headY);
     this.sL.rotation.set(p.sLx, p.sLy, 0); this.sR.rotation.set(p.sRx, p.sRy, 0);
     this.eL.rotation.x = p.eL; this.eR.rotation.x = p.eR;
     this.tL.rotation.x = p.tL; this.tR.rotation.x = p.tR;
     this.kL.rotation.x = p.kL; this.kR.rotation.x = p.kR;
     this.scarf.rotation.x = -0.25 - p.scarf + Math.sin(t * 13) * 0.08 * p.scarf;
     for (const l of this.legs) l.visible = b.mode !== 'swim';
+    const showItem: Item | null = act === 'photo' ? 'camera' : act === 'tip' ? 'coin' : b.carry && b.carry !== 'baguette' && !(act && act !== 'eat') ? b.carry : null;
+    for (const [k, o] of this.items) o.visible = k === showItem && b.mode !== 'swim' && b.mode !== 'climb' && b.mode !== 'glide';
+    this.baguette.visible = b.carry === 'baguette' && b.mode !== 'swim';
     // 글라이더: 펼칠 때 부풀어 오른다
     const g = b.gliderOpen;
     this.glider.visible = g > 0.02;
