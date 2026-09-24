@@ -351,6 +351,7 @@ const COARSE = matchMedia('(pointer: coarse)').matches;
 const Q_DPR = [Math.min(2, window.devicePixelRatio || 1), Math.min(1.5, window.devicePixelRatio || 1), 1, 0.8];
 const Q_RADIUS = [300, 240, 190, 150];
 const Q_CROWD = [46, 34, 24, 14];
+const Q_GRASS = [30, 24, 16, 0]; // 풀이 나는 반경(m) — 가장 낮은 품질에선 풀 없이 결만
 let quality = COARSE ? 1 : 0;
 let slowT = 0, fastT = 0, frameEma = 16;
 function govern(dt: number) {
@@ -365,6 +366,7 @@ function applyQuality() {
   hero.town.radius = Q_RADIUS[quality];
   hero.crowd.target = Q_CROWD[quality];
   hero.crowd.outlines = quality < 2;
+  hero.town.grass.setRadius(Q_GRASS[quality]);
   if (import.meta.env.DEV) console.debug(`[quality] ${quality} (${Math.round(frameEma)} ms)`);
 }
 
@@ -534,6 +536,7 @@ function setMapMode(on: boolean) {
   if (on && (!S.started || S.finished || metroOpen || openPlace || document.body.classList.contains('metro-mode'))) return;
   if (mapMode === on) return;
   mapMode = on;
+  hero.town.mapView = on;
   document.body.classList.toggle('map-mode', on);
   paintEye();
   if (on) {
@@ -1169,7 +1172,7 @@ async function start() {
   hud();
   const touch = hero.input.touched || matchMedia('(pointer: coarse)').matches;
   if (touch) document.body.classList.add('touch-play');
-  hint(touch ? '🪂 파리 위다! 왼쪽을 끌어 방향, 달리기 버튼을 누르면 급강하. 어디든 내려앉아 걸어 보자.' : '🪂 파리 위다! WASD로 방향, Shift 급강하, Space 낙하산 접기. 어디든 내려앉아 걸어 보자.');
+  hint(touch ? '🪂 파리 위로 떨어지는 중! 왼쪽을 끌어 방향, 점프 버튼으로 낙하산을 편다(낮아지면 저절로). 어디든 내려앉아 걸어 보자.' : '🪂 파리 위로 떨어지는 중! WASD로 방향, Space로 낙하산 펴기(낮아지면 저절로). 펴고 나면 Shift 급강하, Space 접기.');
   setTimeout(() => hint(''), 9000);
 }
 

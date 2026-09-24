@@ -49,6 +49,10 @@ export class Figure {
   private readonly glider = new THREE.Group();
   private readonly wings: THREE.Mesh[] = [];
   private gilded = false;
+  private landT = 0;
+  private airT = 0;
+  private lastFacing = 0;
+  private turnRate = 0;
   private spinAcc = 0;
   private readonly shadow: THREE.Mesh;
   private readonly ripple: THREE.Mesh;
@@ -302,11 +306,35 @@ export class Figure {
       }
       case 'air': {
         const up = b.vz > -2;
+        const drop = b.fallTopZ - b.z; // 얼마나 떨어졌나
+        if (!up && (b.vz < -11 || drop > 9)) {
+          // 스카이다이빙: 배를 땅으로, 팔다리를 벌리고 바람에 떨린다. 빠를수록 더 납작하게
+          const w = Math.sin(t * 23) * 0.06, w2 = Math.sin(t * 17 + 1) * 0.08;
+          const flat = Math.min(1, (-b.vz - 8) / 20);
+          Object.assign(want, { pitch: 0.95 + 0.35 * flat, bob: 0.1, headX: -0.75 - 0.2 * flat,
+            sLx: 1.35 + w, sRx: 1.35 - w, sLy: 1.45 + w2, sRy: -1.45 - w2, eL: 0.55 + w, eR: 0.55 - w,
+            tL: -0.15 + w2, tR: -0.15 - w2, kL: -0.95 + w, kR: -0.95 - w, side: 0, twist: Math.sin(t * 1.3) * 0.08, scarf: 2.2 });
+          break;
+        }
+        if (!up && drop > 3.5) {
+          // 생각보다 높다: 팔을 휘젓는다
+          Object.assign(want, { sLx: 1.6 + 1.3 * Math.sin(t * 14), sRx: 1.6 + 1.3 * Math.sin(t * 14 + Math.PI), sLy: 0.9, sRy: -0.9, eL: 0.4, eR: 0.4,
+            tL: 0.5 + 0.35 * Math.sin(t * 12), tR: 0.5 - 0.35 * Math.sin(t * 12), kL: -0.9, kR: -0.9, lean: -0.2, headX: 0.25, scarf: 1.8 });
+          break;
+        }
         if (up) Object.assign(want, { tL: 0.8, kL: -1.3, tR: -0.25, kR: -0.35, sLx: -0.7, sRx: 0.9, sLy: 0.35, sRy: -0.35, eL: 0.5, eR: 0.6, lean: 0.12, scarf: 1.1 });
         else Object.assign(want, { tL: 0.35 + 0.15 * Math.sin(t * 9), tR: -0.1 - 0.15 * Math.sin(t * 9), kL: -0.5, kR: -0.3, sLx: 0.5, sRx: 0.5, sLy: 1.25 + 0.2 * Math.sin(t * 11), sRy: -1.25 - 0.2 * Math.sin(t * 11), eL: 0.3, eR: 0.3, lean: -0.1, scarf: 1.6 });
         break;
       }
       case 'glide':
+        if (b.parachute || b.golden) {
+          // 낙하산: 손잡이를 잡고 다리는 늘어져 흔들린다. 도는 쪽으로 몸이 기운다
+          const turn = Math.max(-1, Math.min(1, this.turnRate / 90));
+          const sw = Math.sin(t * 1.9) * 0.18;
+          Object.assign(want, { sLx: 2.85, sRx: 2.85, sLy: 0.32 - turn * 0.25, sRy: -0.32 - turn * 0.25, eL: 0.2 + Math.max(0, turn) * 0.5, eR: 0.2 + Math.max(0, -turn) * 0.5,
+            tL: 0.18 + sw, tR: 0.05 - sw, kL: -0.25 - Math.max(0, sw), kR: -0.35 - Math.max(0, -sw), side: turn * 0.35, lean: -0.05 + Math.min(0.3, b.speed / 100), pitch: 0.05, scarf: 1.8, headX: 0.15, headY: turn * 0.4 });
+          break;
+        }
         Object.assign(want, { sLx: 2.95, sRx: 2.95, sLy: 0.22, sRy: -0.22, eL: 0.12, eR: 0.12, tL: 0.25 + 0.12 * Math.sin(t * 2.2), tR: 0.1 - 0.12 * Math.sin(t * 2.2), kL: -0.35, kR: -0.5, lean: -0.08, pitch: 0.12, scarf: 1.4, headX: -0.1 });
         break;
       case 'climb': {
@@ -340,6 +368,17 @@ export class Figure {
     // 손 흔들기·가리키기는 걷거나 앉은 채로도 윗몸만
     if (b.pointT > 0) Object.assign(want, { sRx: 1.55, sRy: -0.05, eR: 0.05, headX: 0.05 });
     if (b.waveT > 0) Object.assign(want, { sRx: 0.25, sRy: -2.45 + 0.35 * Math.sin(t * 10), eR: 0.45 + 0.25 * Math.sin(t * 10 + 1), headX: 0.08, headY: 0.1 });
+    // 높은 데서 내려앉으면 무릎으로 받는다
+    if (b.events.includes('land') && this.airT > 0.7) this.landT = 0.38;
+    this.airT = b.mode === 'air' || b.mode === 'glide' ? this.airT + dt : 0;
+    if (this.landT > 0) {
+      this.landT -= dt;
+      if (b.mode === 'ground') { const k2 = Math.min(1, this.landT / 0.2); Object.assign(want, { tL: 1.0 * k2, tR: 0.9 * k2, kL: -1.7 * k2, kR: -1.6 * k2, lean: 0.4 * k2, bob: -0.38 * k2, sLx: 0.5 * k2, sRx: 0.5 * k2, sLy: 0.5 * k2, sRy: -0.5 * k2 }); }
+    }
+    // 얼마나 빨리 도나(낙하산 기울기)
+    const df = ((b.facing - this.lastFacing + 540) % 360) - 180;
+    this.lastFacing = b.facing;
+    if (dt > 0) this.turnRate += (df / dt - this.turnRate) * Math.min(1, dt * 4);
     // 부드럽게 옮겨 간다
     const k = 1 - Math.exp(-dt * (b.mode === 'ground' ? 16 : 11));
     const p = this.pose;

@@ -555,7 +555,7 @@ export class Crowd {
       const a = n.anchor;
       n.x += (a.x - n.x) * Math.min(1, dt * 3);
       n.y += (a.y - n.y) * Math.min(1, dt * 3);
-      n.z = n.state === 'sit' ? a.z : 0;
+      n.z = n.state === 'sit' ? a.z : this.world && !this.followGround ? this.world.terrain(a.x, a.y) : a.z;
       n.facing = turnTo(n.facing, a.facing, 120 * dt);
       n.speed = 0;
       n.phase += dt * (n.state === 'play' ? 6 : n.state === 'dance' ? 7 : 2);
@@ -655,6 +655,7 @@ export class Crowd {
     if (this.world && this.world.buildingTopAt(nx, ny) > 3 && !this.world.onLane(nx, ny, 1.4)) { n.facing = (n.facing + 25) % 360; return; }
     n.x = nx; n.y = ny;
     if (this.followGround && this.world) n.z = this.world.ground(nx, ny, n.z + 0.5, 0.5);
+    else if (this.world) n.z = this.world.terrain(nx, ny); // 잔디 둔덕 위로
   }
 
   private stepDog(n: Npc, dt: number) {
@@ -696,7 +697,7 @@ export class Crowd {
           const step = (Math.sin(b.phase * 4) > 0.7 ? 0.25 : 0) * dt;
           b.x += ux * step; b.y += uy * step;
           if (Math.hypot(b.x - f.x, b.y - f.y) > 3) b.facing = bearingOf(f.x - b.x, f.y - b.y);
-          b.z = 0;
+          b.z = this.world ? this.world.terrain(b.x, b.y) : 0;
         } else if (b.state === 'fly') {
           b.t += dt;
           b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;

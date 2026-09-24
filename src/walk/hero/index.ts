@@ -189,6 +189,7 @@ export class Hero {
     this.hud.update(b, dt);
     this.lastF = f;
     if (this.sceneWorld) { this.bumped = null; return { user, f, arrivedWaypoint }; }
+    this.town.heroZ = b.z;
     this.town.update(b.x, b.y);
     this.crowd.seats = this.town.seats;
     this.crowd.spots = this.town.spots;

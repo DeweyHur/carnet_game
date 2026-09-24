@@ -4,6 +4,7 @@ import { VectorTile } from '@mapbox/vector-tile';
 import type { VectorTileFeature } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import type { Frame } from './geo';
+import { BED_Z, Relief, WATER_Z } from './terrain';
 
 export interface Solid {
   rings: Float64Array[]; // [x0,y0,x1,y1,…] 닫힌 고리(첫 점 반복 없음). 짝홀 규칙으로 안/밖을 가린다(안뜰 = 구멍).
@@ -30,6 +31,10 @@ export class World {
   frame: Frame;
   private grid = new Map<number, Solid[]>();
   private bridges: Bridge[] = [];
+  /** 공원·잔디 고리(타일에서 읽은 것 + 손으로 그린 에펠탑 둘레) */
+  readonly greens: Float64Array[] = [];
+  /** 물(강) 고리 */
+  readonly waters: Float64Array[] = [];
   private tiles = new Set<string>();
   private lanes = new Map<number, Float64Array[]>(); // 걸어 다니는 길(OSM) — 건물 밑 통로·아케이드는 1층이 뚫려 있다
   private stamp = 1;
@@ -39,7 +44,11 @@ export class World {
   /** 새 건물이 읽혔다(타일 하나 분량) */
   onBuildings?: (list: Solid[]) => void;
 
-  constructor(frame: Frame) { this.frame = frame; }
+  /** 땅의 높낮이(공원 둔덕·강바닥) */
+  readonly relief: Relief;
+  constructor(frame: Frame) { this.frame = frame; this.relief = new Relief(this); }
+  /** 이 자리 땅 높이 */
+  terrain(x: number, y: number) { return this.relief.height(x, y); }
 
   /** (lng,lat) 둘레 z14 타일 3×3 중 아직 없는 것을 받아 온다. template은 {z}/{x}/{y} 주소. */
   ensure(lng: number, lat: number, template: string) {
@@ -76,7 +85,13 @@ export class World {
       this.insert(s);
     });
     if (fresh.length) this.onBuildings?.(fresh);
-    each('water', (f) => { const s = this.solidOf(f, x, y, 0, -3); if (s) { s.water = true; s.kind = 'water'; this.insert(s); } });
+    let wet = false;
+    each('water', (f) => { const s = this.solidOf(f, x, y, WATER_Z, BED_Z); if (s) { s.water = true; s.kind = 'water'; this.insert(s); this.waters.push(...s.rings); wet = true; } });
+    // 공원·잔디(둔덕을 만들고 풀을 심을 곳)
+    const greens: Float64Array[] = [];
+    each('park', (f) => { const s = this.solidOf(f, x, y, 0, 0); if (s) greens.push(...s.rings); });
+    each('landcover', (f) => { const c = String(f.properties.class ?? ''); if (c !== 'grass' && c !== 'wood' && c !== 'farmland') return; const s = this.solidOf(f, x, y, 0, 0); if (s) greens.push(...s.rings); });
+    if (greens.length) { this.greens.push(...greens); this.relief.addParks(greens); } else if (wet) this.relief.clear();
     each('transportation', (f) => {
       if (f.properties.brunnel !== 'bridge') return;
       const half = /motorway|trunk|primary|secondary/.test(String(f.properties.class)) ? 13 : 8;
@@ -233,6 +248,7 @@ export class World {
   /** 걷는 길을 등록한다. 건물을 가로지르는 구간은 1층 통로(아케이드·파사주)로 본다. */
   setLanes(segs: [number, number, number, number][]) {
     this.lanes.clear();
+    this.relief.clear();
     for (const [ax, ay, bx, by] of segs) {
       const seg = new Float64Array([ax, ay, bx, by]);
       for (let ix = Math.floor(Math.min(ax, bx) / CELL); ix <= Math.floor(Math.max(ax, bx) / CELL); ix++)
@@ -257,6 +273,31 @@ export class World {
     }
     return false;
   }
+
+  /** 가장 가까운 길 한가운데까지(최대 max m) */
+  laneDist(x: number, y: number, max: number): number {
+    let d2 = max * max;
+    for (let ix = Math.floor((x - max) / CELL); ix <= Math.floor((x + max) / CELL); ix++)
+      for (let iy = Math.floor((y - max) / CELL); iy <= Math.floor((y + max) / CELL); iy++) {
+        const arr = this.lanes.get(cellKey(ix, iy));
+        if (!arr) continue;
+        for (const s of arr) {
+          const dx = s[2] - s[0], dy = s[3] - s[1];
+          const L = dx * dx + dy * dy;
+          const t = L ? Math.max(0, Math.min(1, ((x - s[0]) * dx + (y - s[1]) * dy) / L)) : 0;
+          const e = (x - s[0] - dx * t) ** 2 + (y - s[1] - dy * t) ** 2;
+          if (e < d2) d2 = e;
+        }
+      }
+    return Math.sqrt(d2);
+  }
+
+  /** 다리(이 위는 물이 아니다) — 타일이 없을 때 손으로 넣는다 */
+  addBridge(ax: number, ay: number, bx: number, by: number, half: number) { this.bridges.push({ ax, ay, bx, by, half }); this.relief.clear(); }
+  /** 물(강)을 손으로 넣는다 */
+  addWater(ring: Float64Array) { const s = this.addSolid([ring], BED_Z, WATER_Z, 'water'); s.water = true; this.waters.push(ring); this.relief.clear(); }
+  /** 공원을 손으로 넣는다 */
+  addGreens(rings: Float64Array[]) { this.greens.push(...rings); this.relief.addParks(rings); }
 
   /** (x,y) 주변 r m 안에 걸치는 것들 */
   near(x: number, y: number, r: number): Solid[] {
@@ -318,7 +359,7 @@ export class World {
 
   /** 발 밑의 높이: 서 있을 수 있는 가장 높은 지붕(없으면 길바닥 0) */
   ground(x: number, y: number, z: number, reach = 0.6): number {
-    let g = 0;
+    let g = this.relief.height(x, y);
     for (const s of this.near(x, y, 0.5)) {
       if (s.water || s.top <= g || s.top > z + reach) continue;
       if (World.contains(s, x, y)) g = s.top;

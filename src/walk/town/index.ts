@@ -12,12 +12,15 @@ import type { Frame } from '../hero/geo';
 import { T } from './atlas';
 import { addBuilding } from './buildings';
 import type { Theme } from './buildings';
-import { GeoBuilder, hash, lin } from './geom';
+import { GeoBuilder, hash } from './geom';
 import { poolMaterial, townMaterial, townUniforms } from './material';
 import { awning, circleRing, rectRing, rotFacing, stamp, template } from './props';
 import { procedural } from './procedural';
 import { LANDMARKS, LB } from './landmarks';
 import { EIFFEL_ZONES } from '../eiffel';
+import { G_SIZE, Ground } from './ground';
+import { Grass } from './grass';
+import { inRing as inRingT, ringOf } from '../hero/terrain';
 import { sharedRenderer } from './renderer';
 
 export type { Theme };
@@ -96,8 +99,19 @@ export class Town {
   private job: Generator<void, void, void> | null = null;
   private jobCell: Cell | null = null;
 
+  /** 땅(높낮이·결·강)과 풀밭 */
+  readonly ground: Ground;
+  /** 하늘에서 내려다볼 때 보이는 먼 땅(4 km) */
+  readonly farGround: Ground;
+  readonly grass: Grass;
+  /** 지도 보기(위에서 내려다봄) 중에는 땅을 숨긴다 — 지도의 길·경로 선이 보이게 */
+  mapView = false;
   constructor() {
     this.scene.matrixAutoUpdate = false;
+    this.ground = new Ground(this.uniforms, { size: G_SIZE, spacing: 2.5, px: 1024 });
+    this.farGround = new Ground(this.uniforms, { size: 4096, spacing: 16, px: 2048, far: true });
+    this.grass = new Grass(this.uniforms, this.ground);
+    this.scene.add(this.farGround.group, this.ground.group, this.grass.group);
   }
 
   /** 새 동네(또는 새 원점) */
@@ -111,6 +125,8 @@ export class Town {
     this.spots = [];
     this.world = world;
     this.frame = frame;
+    this.ground.origin.set(NaN, NaN); // 새 세계 — 땅을 다시 깐다
+    this.farGround.origin.set(NaN, NaN);
     this.theme = theme;
     this.procedural = false;
     this.builtOnce = false;
@@ -184,6 +200,18 @@ export class Town {
     this.procedural = true;
     this.ways = ways;
     const t0 = performance.now();
+    // 타일이 없으면 강·공원·다리도 손으로 그린 것을 쓴다(에펠탑 둘레)
+    const open = EIFFEL_ZONES.map((z, i) => ({ z, r: this.open[i] }));
+    for (const { z, r } of open) {
+      const flat = r.subarray(0, r.length - 2); // 닫는 점(첫 점 반복) 빼고
+      if (z.kind === 'water') this.world.addWater(flat);
+      if (z.kind === 'park') this.world.addGreens([flat]);
+    }
+    const water = open.filter((o) => o.z.kind === 'water').map((o) => ringOf(o.r));
+    for (const [ax, ay, bx, by] of this.lanes) {
+      const mx = (ax + bx) / 2, my = (ay + by) / 2;
+      if (water.some((w) => inRingT(w, mx, my))) this.world.addBridge(ax, ay, bx, by, 5.5);
+    }
     const list = procedural(this.world, ways, this.theme).filter((b) => { const r = b.rings[0]; return !this.cleared((r[0] + r[4]) / 2, (r[1] + r[5]) / 2); });
     this.world.addBuildings(list);
     if (import.meta.env.DEV) console.debug(`[town] procedural ${list.length} buildings in ${Math.round(performance.now() - t0)} ms`);
@@ -223,12 +251,24 @@ export class Town {
   }
 
   /** 매 프레임: 가까운 칸을 짓고 먼 칸을 허문다(한 프레임에 조금씩) */
+  /** 사람 높이(풀이 발밑에서 눕는지 볼 때) */
+  heroZ = 0;
   update(x: number, y: number) {
     this.heroX = x; this.heroY = y;
-    this.uniforms.uEye.value.set(x, y, 0);
+    this.uniforms.uEye.value.set(x, y, this.heroZ);
     const now = performance.now();
     const dt = Math.min(0.1, (now - this.lastT) / 1000);
     this.lastT = now;
+    this.ground.time.value += dt;
+    if (this.world) {
+      this.ground.update(this.world, this.lanes, x, y);
+      this.farGround.update(this.world, this.lanes, x, y);
+      // 먼 땅은 가까운 땅이 덮는 사각형을 비운다(겹쳐 깜빡이지 않게) — 가장자리 1 m는 겹친다
+      const o = this.ground.origin;
+      this.farGround.hole.set(o.x + 1, o.y + 1, o.x + G_SIZE - 1, o.y + G_SIZE - 1);
+      this.ground.group.visible = this.farGround.group.visible = this.grass.group.visible = !this.mapView;
+      this.grass.update(dt, x, y, this.heroZ);
+    }
     for (const m of this.movers) { const k = m.children[0]; if (!k) continue; if (m.userData.spin === 'z') k.rotation.z += dt * 0.7; else k.rotation.y += dt * 0.5; }
     if (!this.enabled || !this.world) return;
     const R = Math.min(this.procedural ? 250 : 300, this.radius), DROP = R + 120;
@@ -320,12 +360,11 @@ export class Town {
     if (!c.props) { this.layoutProps(c); c.props = true; yield; }
     yield* this.shopFronts(c, g); // 테라스 가구를 placed에 더하므로 stamp보다 먼저
     for (const p of c.placed) {
-      stamp(g, template(p.t, p.k), p.x, p.y, p.z, p.rot, p.s);
+      stamp(g, template(p.t, p.k), p.x, p.y, p.z + this.world.terrain(p.x, p.y), p.rot, p.s);
       if (p.lamp) pools.quad([p.x - 5, p.y - 5, 0.04], [p.x + 5, p.y - 5, 0.04], [p.x + 5, p.y + 5, 0.04], [p.x - 5, p.y + 5, 0.04], [0, 0, 1], [0, 0, 1, 1], -1, [1, 1, 1]);
       if (++n % 12 === 0) yield;
     }
     yield;
-    if (this.procedural) { this.paveCell(c, g); yield; }
     const geo = g.build();
     const pg = pools.build();
     this.disposeParts(old.mesh, old.pools, old.signs);
@@ -337,25 +376,6 @@ export class Town {
 
 
   /** 타일이 없을 때는 길바닥도 그린다(아스팔트 + 포석 보도) */
-  private paveCell(c: Cell, g: GeoBuilder) {
-    for (const i of c.lanes) {
-      const [ax, ay, bx, by] = this.lanes[i];
-      const len = Math.hypot(bx - ax, by - ay);
-      if (len < 0.5) continue;
-      const dx = (bx - ax) / len, dy = (by - ay) / len, nx = -dy, ny = dx;
-      const road = 3.2, walk = 5.2;
-      const ext = 1.2; // 이음매가 벌어지지 않게 조금 길게
-      const x0 = ax - dx * ext, y0 = ay - dy * ext, x1 = bx + dx * ext, y1 = by + dy * ext;
-      const u = (len + ext * 2) / 4;
-      g.quad([x0 - nx * road, y0 - ny * road, 0.02], [x1 - nx * road, y1 - ny * road, 0.02], [x1 + nx * road, y1 + ny * road, 0.02], [x0 + nx * road, y0 + ny * road, 0.02], [0, 0, 1], [0, 0, u, road * 2 / 4], T.paves, lin('#ffffff'));
-      for (const s of [-1, 1]) {
-        const a = road * s, b = walk * s;
-        const [p, q] = s > 0 ? [a, b] : [b, a];
-        g.quad([x0 + nx * p, y0 + ny * p, 0.025], [x1 + nx * p, y1 + ny * p, 0.025], [x1 + nx * q, y1 + ny * q, 0.025], [x0 + nx * q, y0 + ny * q, 0.025], [0, 0, 1], [0, 0, u, 0.5], T.sidewalk, lin('#ffffff'));
-      }
-    }
-  }
-
   /** 길 한쪽에서 건물 벽까지 몇 m인가(없으면 Infinity) */
   private faceDist(x: number, y: number, nx: number, ny: number, max = 22): number {
     for (let d = 1.2; d <= max; d += 0.8) if (this.world.buildingTopAt(x + nx * d, y + ny * d) > 0) return d;

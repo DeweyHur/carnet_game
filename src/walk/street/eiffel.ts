@@ -136,7 +136,7 @@ export class EiffelQuests {
       const d = Math.hypot(x - b.x, y - b.y);
       if (g.npc && !h.crowd.npcs.includes(g.npc)) g.npc = null;
       if (!g.npc && d < 110) { // 사람들은 125 m 밖에서 사라진다 — 그보다 안쪽에서 세운다
-        const z = g.sit ? 0.12 : 0;
+        const z = (g.sit ? 0.12 : 0) + h.world.terrain(x, y); // 잔디 둔덕 위
         g.npc = h.crowd.spawn(g.role, x, y, g.facing, { state: g.sit ? 'sit' : 'stand', anchor: { x, y, z, facing: g.facing }, home: null, speed: 0, tag: `eiffel:${g.id}` });
         g.npc.z = z;
         if (g.id === 'picnic') this.setPicnic(x, y);
@@ -168,7 +168,7 @@ export class EiffelQuests {
       const bread = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.55, 3, 8).rotateZ(Math.PI / 2).translate(0, 0, 0.07), new THREE.MeshToonMaterial({ color: 0xd6a25a }));
       bread.position.set(0.1, -0.4, 0);
       g.add(cloth, check, check2, basket, bottle, bread);
-      g.position.set(x + 1.2, y, 0.03);
+      g.position.set(x + 1.2, y, h.world.terrain(x + 1.2, y) + 0.06);
       this.blanket = g;
       this.h.items.add(g);
     }
@@ -176,8 +176,9 @@ export class EiffelQuests {
     this.friends = this.friends.filter((n) => h.crowd.npcs.includes(n));
     if (!this.friends.length) {
       for (const [dx, dy, f] of [[2.4, 0.8, 250], [2.2, -0.9, 300]] as const) {
-        const n = h.crowd.spawn('sitter', x + dx, y + dy, f, { state: 'sit', anchor: { x: x + dx, y: y + dy, z: 0.12, facing: f }, home: null, speed: 0, tag: 'eiffel:friend' });
-        n.z = 0.12;
+        const fz = 0.12 + h.world.terrain(x + dx, y + dy);
+        const n = h.crowd.spawn('sitter', x + dx, y + dy, f, { state: 'sit', anchor: { x: x + dx, y: y + dy, z: fz, facing: f }, home: null, speed: 0, tag: 'eiffel:friend' });
+        n.z = fz;
         this.friends.push(n);
       }
     }
@@ -232,7 +233,7 @@ export class EiffelQuests {
         // 잔디밭 어딘가(길은 피해서)
         const u = 540 + Math.random() * 180, v = (Math.random() < 0.5 ? -1 : 1) * (20 + Math.random() * 55);
         const [x, y] = this.loc(u, v);
-        this.item = { kind: 'cork', x, y, z: 0, mesh: corkMesh(), held: false };
+        this.item = { kind: 'cork', x, y, z: h.world.terrain(x, y), mesh: corkMesh(), held: false };
         this.h.items.add(this.item.mesh);
         h.crowd.gesture(n, 'point', 3);
         n.facing = bearingOf(x - n.x, y - n.y);
@@ -323,7 +324,7 @@ export class EiffelQuests {
     const b = this.hero.body, c = this.h.c;
     if (!this.blanket) return;
     const p = this.blanket.position;
-    if (!b.sit({ x: p.x - 0.4, y: p.y + 0.2, z: 0.12, facing: bearingOf(n.x - p.x, n.y - p.y) })) return;
+    if (!b.sit({ x: p.x - 0.4, y: p.y + 0.2, z: p.z + 0.06, facing: bearingOf(n.x - p.x, n.y - p.y) })) return;
     sfx.sit();
     await wait(800);
     this.h.ui.say(this.at(n), 'Un peu de fromage ? Du pain ?', 2.5, '', n.id);

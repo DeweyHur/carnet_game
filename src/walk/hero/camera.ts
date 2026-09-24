@@ -43,10 +43,13 @@ export class OrbitCam {
         this.yaw = (this.yaw + Math.sin((d * Math.PI) / 180) * rate * moving * dt + 360) % 360;
       }
       // 떨어지거나 활공할 때는 조금 내려다본다
-      const wantPitch = b.parachute ? 36 : b.mode === 'glide' ? 22 : b.mode === 'climb' ? 8 : null;
+      // 헤엄칠 때는 둑(2 m) 너머로 보이게 높이서 내려다본다
+      const wantPitch = b.parachute || b.golden && b.mode === 'glide' ? 36 : b.freefall ? 40 : b.mode === 'glide' ? 22 : b.mode === 'climb' ? 8 : b.mode === 'swim' ? 42 : null;
       if (wantPitch !== null) this.pitch += (wantPitch - this.pitch) * Math.min(1, dt * 1.2);
     }
 
+    // 헤엄칠 땐(움직이는 중에도) 둑 너머로 보이게 높이서
+    if (b.mode === 'swim' && this.pitch < 42) this.pitch += (42 - this.pitch) * Math.min(1, dt * 3);
     const kh = 1 - Math.exp(-dt * 11), kv = 1 - Math.exp(-dt * (b.mode === 'ground' || b.mode === 'swim' ? 7 : 4.5));
     const focusZ = b.z + (b.mode === 'swim' ? 0.55 : b.mode === 'glide' ? 1.9 : 1.45);
     this.fx += (b.x - this.fx) * kh;
