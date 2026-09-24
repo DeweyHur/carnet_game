@@ -338,3 +338,5 @@ body.touch-play.hero-on #hint { top:170px; }
 /* 터치로 조이스틱을 끄는 동안 브라우저가 화면 끌기로 가로채지(pointercancel) 않게 */
 .maplibregl-canvas-container, .maplibregl-canvas { touch-action:none; }
 .hprompt .v { white-space:nowrap; }
+/* 하루의 빛: 지도 위에 시간대 색을 곱한다(한낮은 흰색이라 그대로) */
+#map::after { content:''; position:absolute; inset:0; background:var(--daylight, #fff); mix-blend-mode:multiply; pointer-events:none; transition:background 2s; }

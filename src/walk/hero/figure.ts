@@ -51,14 +51,24 @@ export class Figure {
   private readonly ramp = toonRamp();
   private readonly outline = outlineMat(0.012);
   private pose: Pose = { ...ZERO };
+  private sun!: THREE.DirectionalLight;
+  private sky!: THREE.HemisphereLight;
+
+  /** 하루의 빛: 햇빛 색·세기와 하늘빛 */
+  light(sunColor: string, sunI: number, skyColor: string, skyI: number) {
+    this.sun.color.set(sunColor);
+    this.sun.intensity = sunI;
+    this.sky.color.set(skyColor);
+    this.sky.intensity = skyI;
+  }
   private t = 0;
 
   constructor() {
     this.scene.add(this.flip);
     this.flip.add(this.root);
-    const sun = new THREE.DirectionalLight(0xfff4e0, 2.3);
+    const sun = (this.sun = new THREE.DirectionalLight(0xfff4e0, 2.3));
     sun.position.set(-0.6, 0.9, 1.4);
-    const sky = new THREE.HemisphereLight(0xcfe3ff, 0x8a7a66, 1.35);
+    const sky = (this.sky = new THREE.HemisphereLight(0xcfe3ff, 0x8a7a66, 1.35));
     sky.position.set(0, 0, 1);
     this.flip.add(sun, sun.target, sky);
     this.build();

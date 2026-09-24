@@ -2,7 +2,7 @@
 // 질문하지 않는다. 어디로 걸었고, 어디서 멈췄고, 무엇을 지나쳤는지만 기록한다.
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource, Map as MlMap, Marker, StyleSpecification } from 'maplibre-gl';
-import type { Feature } from 'geojson';
+import type { Feature, MultiPolygon, Polygon } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import './walk.css';
@@ -221,9 +221,24 @@ function findBuilding(p: Place): Feature | null {
   }
   if (!f || (f.geometry.type !== 'Polygon' && f.geometry.type !== 'MultiPolygon')) { buildingOf.set(p.id, null); return null; }
   const h = Number(f.properties?.render_height ?? f.properties?.height ?? 12) || 12;
-  const feat: Feature = { type: 'Feature', geometry: f.geometry, properties: { pid: p.id, color: CAT_COLOR[p.cat] ?? '#e4572e', h: h + 0.6 } };
+  const feat: Feature = { type: 'Feature', geometry: inflate(f.geometry as Polygon | MultiPolygon, 0.25), properties: { pid: p.id, color: CAT_COLOR[p.cat] ?? '#e4572e', h: h + 0.6 } };
   buildingOf.set(p.id, feat);
   return feat;
+}
+
+/** 폴리곤을 중심에서 m미터쯤 부풀린다 — 원래 건물 벽과 겹쳐 줄무늬(z-fighting)가 생기지 않게 */
+function inflate(g: Polygon | MultiPolygon, m: number): Polygon | MultiPolygon {
+  const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+  const out = polys.map((rings) => {
+    const outer = rings[0];
+    let cx = 0, cy = 0;
+    for (const p of outer) { cx += p[0]; cy += p[1]; }
+    cx /= outer.length; cy /= outer.length;
+    const r = Math.max(...outer.map((p) => dist([cx, cy], [p[0], p[1]]))) || 1;
+    const k = 1 + m / r;
+    return rings.map((ring) => ring.map((p) => [cx + (p[0] - cx) * k, cy + (p[1] - cy) * k]));
+  });
+  return g.type === 'Polygon' ? { type: 'Polygon', coordinates: out[0] } : { type: 'MultiPolygon', coordinates: out };
 }
 
 function paintBuildings() {
@@ -807,7 +822,40 @@ async function enterDistrict(d: District, at: LngLat) {
   hud();
 }
 
+// ───────── 하루의 빛: 아침 → 한낮 → 해질녘 → 밤 ─────────
+type Sky = { t: number; sky: string; horizon: string; fog: string; sun: string; sunI: number; amb: string; ambI: number; tint: string };
+const SKIES: Sky[] = [
+  { t: 6 * 60, sky: '#8fa9d6', horizon: '#f2cfb0', fog: '#efd9c4', sun: '#ffd9b0', sunI: 1.6, amb: '#c9d6f0', ambI: 1.1, tint: '#f3d8c4' },
+  { t: 9 * 60, sky: '#a9c9ec', horizon: '#efe3d2', fog: '#efe3d2', sun: '#fff4e0', sunI: 2.3, amb: '#cfe3ff', ambI: 1.35, tint: '#ffffff' },
+  { t: 16 * 60, sky: '#9cc3ef', horizon: '#f1e6d4', fog: '#efe3d2', sun: '#fff0d8', sunI: 2.3, amb: '#d3e2fb', ambI: 1.3, tint: '#ffffff' },
+  { t: 19 * 60, sky: '#e7a77a', horizon: '#f6c98f', fog: '#f0c49a', sun: '#ffb070', sunI: 2.0, amb: '#e8c3a8', ambI: 1.05, tint: '#f6c49a' },
+  { t: 20.5 * 60, sky: '#4c4f86', horizon: '#d98a6a', fog: '#8b7189', sun: '#ff9a6a', sunI: 1.1, amb: '#8c8fc0', ambI: 0.8, tint: '#a8849c' },
+  { t: 22 * 60, sky: '#141b38', horizon: '#2e3560', fog: '#2a2f4d', sun: '#9fb4ff', sunI: 0.45, amb: '#5a6aa8', ambI: 0.7, tint: '#4a5286' },
+];
+const mixHex = (a: string, b: string, k: number) => {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ch = (sh: number) => Math.round(((pa >> sh) & 255) + ((((pb >> sh) & 255) - ((pa >> sh) & 255)) * k));
+  return `#${((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, '0')}`;
+};
+let lastSkyMin = -99;
+function paintSky() {
+  if (!map || Math.abs(S.clock - lastSkyMin) < 3) return;
+  lastSkyMin = S.clock;
+  const m = S.clock % (24 * 60);
+  const i = SKIES.findIndex((x) => x.t > m); // 처음보다 이르면 0, 마지막보다 늦으면 -1
+  const a = i === -1 ? SKIES[SKIES.length - 1] : SKIES[Math.max(0, i - 1)];
+  const b = i === -1 ? a : SKIES[i];
+  const k = b.t > a.t ? Math.max(0, (m - a.t) / (b.t - a.t)) : 0;
+  map.setSky({ 'sky-color': mixHex(a.sky, b.sky, k), 'horizon-color': mixHex(a.horizon, b.horizon, k), 'fog-color': mixHex(a.fog, b.fog, k), 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.9 });
+  hero?.figure.light(mixHex(a.sun, b.sun, k), Math.max(1.7, a.sunI + (b.sunI - a.sunI) * k), mixHex(a.amb, b.amb, k), Math.max(1.2, a.ambI + (b.ambI - a.ambI) * k)); // 어둡게 하는 건 위의 색 곱하기가 맡는다
+  // 지도 전체(땅·건물·사람)에 같은 빛깔을 곱해 한 장면으로 보이게 한다
+  const tint = mixHex(a.tint, b.tint, k);
+  document.documentElement.style.setProperty('--daylight', tint);
+  map.setLight({ anchor: 'map', color: mixHex('#ffffff', tint, 0.6), intensity: 0.45, position: [1.15, 210, 30] });
+}
+
 function hud() {
+  paintSky();
   $('#clock').textContent = fmtClock(S.clock);
   paintBody();
   $('#money').textContent = `€${Number.isInteger(S.money) ? S.money : S.money.toFixed(2)}`;
