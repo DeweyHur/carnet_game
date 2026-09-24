@@ -130,7 +130,7 @@ export class Transit {
   private resize() {
     const w = window.innerWidth, h = window.innerHeight;
     const r = this.renderer!;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = Math.min(matchMedia('(pointer: coarse)').matches ? 1.25 : 1.6, window.devicePixelRatio || 1);
     if (this.canvas.width !== Math.round(w * dpr) || this.canvas.height !== Math.round(h * dpr)) { r.setPixelRatio(dpr); r.setSize(w, h, false); }
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
@@ -208,7 +208,7 @@ export class Transit {
     h.hud.show(true);
     const r = h.tick(dt, { waypoint: null, frozen: !h.input.enabled, pace: 1, maxStamina: 1, beacon: null });
     for (const e of h.events) {
-      if (e === 'stepL' || e === 'stepR') sfx.step(e === 'stepL');
+      if (e === 'stepL' || e === 'stepR') sfx.step(e === 'stepL', this.bus ? 'stone' : 'tile');
       else if (e === 'jump') sfx.jump();
       else if (e === 'land') sfx.land();
       else if (e === 'sit') sfx.sit();

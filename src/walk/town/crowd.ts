@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { World } from '../hero/world';
 import { hash } from './geom';
 import type { SeatSpot, Spot } from './index';
+import * as sfx from '../sound';
 
 export type Role = 'passer' | 'tourist' | 'jogger' | 'dogwalker' | 'kid' | 'waiter' | 'sitter' | 'reader' | 'musician' | 'vendor' | 'painter' | 'mime' | 'cyclist' | 'quest';
 type State = 'walk' | 'stand' | 'sit' | 'chat' | 'photo' | 'play' | 'clap' | 'wave' | 'dance' | 'serve' | 'paint' | 'ride' | 'follow' | 'flee' | 'point' | 'think';
@@ -126,6 +127,11 @@ export class Crowd {
   private anchorsUsed = new Set<string>();
   private laneOff = new Map<string, number>();
   private t = 0;
+  private anchorAcc = 0;
+  private colorAcc = 0;
+  private lastCount = -1;
+  /** 외곽선(느린 기기에선 끈다) */
+  set outlines(on: boolean) { for (const o of this.lines) o.visible = on; }
   theme = 'marais';
   /** 사람 수(보행자). 밤이 되면 준다. */
   density = 1;
@@ -348,9 +354,14 @@ export class Crowd {
 
   /** 제자리 역할들(테라스 손님·웨이터·벤치·악사·장수·화가·마임)과 비둘기를 가까워지면 채운다 */
   private fillAnchors(hx: number, hy: number) {
+    // 앉은 사람은 걷는 사람 목표치의 0.8배까지만 — 품질이 낮으면 함께 줄어든다
+    let seated = 0;
+    for (const n of this.npcs) if (n.anchor && n.state === 'sit') seated++;
+    const cap = Math.round(this.target * this.density * 0.8);
     for (const s of this.seats) {
+      if (seated >= cap) break; // 자리를 '썼다'고 표시하지 않는다 — 나중에 빈 틈이 나면 채운다
       const d = Math.hypot(s.x - hx, s.y - hy);
-      if (d > 85) continue;
+      if (d > 70) continue;
       const key = `seat:${s.x.toFixed(1)}:${s.y.toFixed(1)}`;
       if (this.anchorsUsed.has(key)) continue;
       this.anchorsUsed.add(key);
@@ -358,6 +369,7 @@ export class Crowd {
       const role: Role = s.kind === 'chair' ? 'sitter' : hash(s.x, s.y, 201) < 0.5 ? 'reader' : 'sitter';
       const n = this.spawn(role, s.x, s.y, s.facing, { state: 'sit', anchor: { x: s.x, y: s.y, z: s.z, facing: s.facing }, home: key, speed: 0 });
       n.z = s.z;
+      seated++;
     }
     for (const sp of this.spots) {
       const d = Math.hypot(sp.x - hx, sp.y - hy);
@@ -377,7 +389,7 @@ export class Crowd {
         const m = this.spawn(role, sp.x + fx * 2.4, sp.y + fy * 2.4, bearingOf(fx, fy), { state: role === 'mime' ? 'stand' : 'play', anchor: { x: sp.x + fx * 2.4, y: sp.y + fy * 2.4, z: 0, facing: bearingOf(fx, fy) }, home: key, speed: 0 });
         m.tag = role;
         // 구경꾼 몇
-        for (let k = 0; k < 2 + Math.floor(h * 6); k++) {
+        for (let k = 0; k < 2 + Math.floor(h * (this.target > 30 ? 4 : 2)); k++) {
           const a = rad(bearingOf(fx, fy)) + (k - 2) * 0.35;
           const r = 3.2 + hash(sp.x, k, 3) * 1.4;
           const px = m.x + Math.sin(a) * r, py = m.y + Math.cos(a) * r;
@@ -484,9 +496,25 @@ export class Crowd {
       }
     }
     for (const f of [...this.flocks]) if (Math.hypot(f.x - hx, f.y - hy) > 100) this.flocks.splice(this.flocks.indexOf(f), 1);
-    this.fillAnchors(hx, hy);
-    const walkers = this.npcs.filter((n) => !n.anchor && n.role !== 'quest').length;
+    this.anchorAcc -= dt;
+    if (this.anchorAcc < 0) { this.anchorAcc = 0.5; this.fillAnchors(hx, hy); }
+    let walkers = 0, seated = 0;
+    for (const n of this.npcs) { if (n.role === 'quest') continue; if (!n.anchor) walkers++; else if (n.state === 'sit') seated++; }
     const target = Math.round(this.target * this.density);
+    // 품질이 내려가 목표가 줄면, 멀리 있는(눈에 덜 띄는) 사람부터 한 명씩 보낸다
+    if (walkers > target * 1.2 || seated > target) {
+      for (let i = this.npcs.length - 1; i >= 0; i--) {
+        const n = this.npcs[i];
+        if (n.role === 'quest' || n.tag || Math.hypot(n.x - hx, n.y - hy) < 45) continue;
+        const sit = !!n.anchor && n.state === 'sit';
+        if ((!n.anchor && walkers > target * 1.2) || (sit && seated > target)) {
+          if (n.home) this.anchorsUsed.delete(n.home);
+          this.npcs.splice(i, 1);
+          if (sit) seated--; else walkers--;
+          break;
+        }
+      }
+    }
     // 처음(또는 동네에 막 도착했을 때)은 가까이에도 채운다 — 텅 빈 거리로 시작하지 않게
     const sparse = walkers < target * 0.5;
     for (let k = 0; k < (sparse ? 12 : 3) && walkers + k < target; k++) this.spawnWalker(hx, hy, sparse);
@@ -653,6 +681,7 @@ export class Crowd {
           b.state = 'fly'; b.t = 0;
           const a = Math.atan2(b.y - hero.y, b.x - hero.x) + (Math.random() - 0.5);
           b.vx = Math.cos(a) * 4; b.vy = Math.sin(a) * 4; b.vz = 4 + Math.random() * 2;
+          if (f.scared <= 0) sfx.flutter();
           f.scared = 1;
         }
         if (b.state === 'peck') {
@@ -724,9 +753,11 @@ export class Crowd {
     return out.compose(this.v.set(x, y, z), this.q, this.s1.set(sx, sy, sz));
   }
 
+  private paintColors = true;
   private set(name: PartName, i: number, m: THREE.Matrix4, color: number) {
     const mesh = this.parts.get(name)!;
     mesh.setMatrixAt(i, m);
+    if (!this.paintColors) return;
     this.col.setHex(color);
     mesh.setColorAt(i, this.col);
   }
@@ -734,6 +765,10 @@ export class Crowd {
   private render(camYaw: number) {
     void camYaw;
     this.pi = 0;
+    // 색은 사람이 바뀔 때(또는 가끔)만 다시 칠한다 — 매 프레임 할 필요가 없다
+    this.colorAcc++;
+    this.paintColors = this.npcs.length !== this.lastCount || this.colorAcc > 20;
+    if (this.paintColors) { this.colorAcc = 0; this.lastCount = this.npcs.length; }
     let i = 0;
     let dogI = 0, bikeI = 0;
     for (const n of this.npcs) {
@@ -839,7 +874,7 @@ export class Crowd {
       void name;
       mesh.count = i;
       mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      if (mesh.instanceColor && this.paintColors) mesh.instanceColor.needsUpdate = true;
       const o = (mesh.userData as { outline?: THREE.InstancedMesh }).outline;
       if (o) o.count = i;
     }

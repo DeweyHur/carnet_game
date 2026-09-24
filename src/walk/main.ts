@@ -14,10 +14,8 @@ import { DISTRICTS, otherDistricts, planJourney, planOptions, stopPos, LINES } f
 import type { District, Gate, Journey } from './districts';
 import { ALL_RICH } from './rich';
 import { openDestination } from './destination';
-import { openArrival, openMorning } from './arrival';
-import type { StayMap } from './arrival';
 import type { Stay } from './stays';
-import { bodyLine, drain, eat, level, paceFactor, rest, sightFactor, LIBERTE_CARD } from './trip';
+import { bodyLine, drain, eat, level, paceFactor, rest, sightFactor } from './trip';
 import type { Pass } from './trip';
 import type { Dest } from './destination';
 import type { MetroMap } from './metro';
@@ -135,7 +133,7 @@ async function boot() {
     S.trail = [S.pos];
     S.origin = S.pos;
 
-    map = new maplibregl.Map({ container: 'map', style: st.style, center: S.pos, zoom: 18.4, pitch: 25, bearing: -20, attributionControl: { compact: true }, maxPitch: 85, maxZoom: 24, clickTolerance: 10 }); // 살짝 끌린 손가락은 클릭으로 치지 않는다
+    map = new maplibregl.Map({ container: 'map', style: st.style, center: S.pos, zoom: 18.4, pitch: 25, bearing: -20, attributionControl: { compact: true }, maxPitch: 85, maxZoom: 24, clickTolerance: 10, pixelRatio: Q_DPR[quality] }); // 살짝 끌린 손가락은 클릭으로 치지 않는다
     map.on('load', () => {
       dressMap(st.fallback, ways);
       hero = new Hero(map, () => setMapMode(!mapMode));
@@ -146,6 +144,7 @@ async function boot() {
       hero.setLanes(laneSegments(graph));
       hero.reset(S.pos);
       hero.town.setFar(st.fallback ? 300 : 1e6);
+      applyQuality();
       dressTown();
       hero.hud.onPrompt = () => hero.input.press('interact');
       hero.hud.onPrompt2 = () => hero.input.press('secondary');
@@ -153,7 +152,7 @@ async function boot() {
       transit = new Transit({ hero, toast, hint: (s2) => hint(s2), fine: (eur, why) => toast(`🎫 검표원(contrôleur)! ${why} 벌금 €${eur}`) });
       status.textContent = '';
       $('#go').removeAttribute('disabled');
-      $('#go').textContent = '파리에 도착했다';
+      $('#go').textContent = '🪂 뛰어내리기';
     });
   } catch (e) {
     status.textContent = e instanceof Error ? e.message : String(e);
@@ -303,14 +302,27 @@ function mapHandlers(on: boolean) {
   for (const h of HANDLERS) { const x = map[h] as { enable(): void; disable(): void }; if (on) x.enable(); else x.disable(); }
 }
 
+const cpu: { frame: number; n: number; render?: number } = { frame: 0, n: 0 }; // 디버그: 한 프레임 JS 시간(ms, 평균)
 function frame(t: number) {
-  const dt = Math.min(0.1, (t - lastT) / 1000 || 0);
+  const c0 = performance.now();
+  frameBody(t);
+  cpu.frame += (performance.now() - c0 - cpu.frame) * 0.05;
+  cpu.n++;
+  requestAnimationFrame(frame);
+}
+function frameBody(t: number) {
+  const raw = Math.min(1, (t - lastT) / 1000 || 0);
+  const dt = Math.min(0.1, raw);
   lastT = t;
-  if (transit?.active) { transit.frame(dt); requestAnimationFrame(frame); return; }
+  govern(raw); // 느린 기기는 실제 흐른 시간으로 재야 빨리 품질을 낮춘다
+  soundAcc += dt;
+  if (soundAcc > 0.25 && S.started) { soundAcc = 0; soundscape(); }
+  if (transit?.active) { transit.frame(dt); return; }
   if (hero) heroFrame(dt);
+  districtAcc += dt;
+  if (districtAcc > 1.5) { districtAcc = 0; autoDistrict(); }
   lookAcc += dt;
   if (lookAcc > 0.12 && S.started && !metroOpen) { lookAcc = 0; look(); hud(); }
-  requestAnimationFrame(frame);
 }
 
 /** 거리(Town)에 이 동네의 장소·지하철 입구·버스 정류장을 알려 준다 */
@@ -329,6 +341,61 @@ function dressTown() {
     }
   }
   hero.town.setGates(allGates(district).map(({ st, g }) => { const [x, y] = f.toLocal(g.pos); return { x, y, station: st.name, label: g.label }; }), bus);
+}
+
+// ───────── 품질 자동 조절: 느리면 해상도·짓는 반경·사람 수를 줄이고, 여유가 생기면 되돌린다 ─────────
+const COARSE = matchMedia('(pointer: coarse)').matches;
+const Q_DPR = [Math.min(2, window.devicePixelRatio || 1), Math.min(1.5, window.devicePixelRatio || 1), 1, 0.8];
+const Q_RADIUS = [300, 240, 190, 150];
+const Q_CROWD = [46, 34, 24, 14];
+let quality = COARSE ? 1 : 0;
+let slowT = 0, fastT = 0, frameEma = 16;
+function govern(dt: number) {
+  if (!hero || !S.started || dt <= 0) return;
+  frameEma += (Math.min(dt, 0.25) * 1000 - frameEma) * 0.05;
+  if (frameEma > 24) { slowT += dt; fastT = 0; } else if (frameEma < 15) { fastT += dt; slowT = 0; } else { slowT = Math.max(0, slowT - dt); fastT = Math.max(0, fastT - dt); }
+  if (slowT > 2.5 && quality < 3) { quality++; slowT = 0; applyQuality(); }
+  else if (fastT > 12 && quality > (COARSE ? 1 : 0)) { quality--; fastT = 0; applyQuality(); }
+}
+function applyQuality() {
+  if (Math.abs(map.getPixelRatio() - Q_DPR[quality]) > 0.01) map.setPixelRatio(Q_DPR[quality]); // 캔버스 크기 바꾸기는 비싸다 — 같으면 건너뛴다
+  hero.town.radius = Q_RADIUS[quality];
+  hero.crowd.target = Q_CROWD[quality];
+  hero.crowd.outlines = quality < 2;
+  if (import.meta.env.DEV) console.debug(`[quality] ${quality} (${Math.round(frameEma)} ms)`);
+}
+
+// ───────── 소리: 음악 분위기·거리 공기·바람 ─────────
+let soundAcc = 0;
+function soundscape() {
+  if (!hero) return;
+  const b = hero.body;
+  const hour = (S.clock / 60) % 24;
+  const under = !!transit?.active;
+  sfx.musicMood(hour, under, !!street?.holding);
+  const near = (kind: string, r: number) => { let k = 0; for (const sp of hero.town.spots) if (sp.kind === kind) { const d = Math.hypot(sp.x - b.x, sp.y - b.y); if (d < r) k = Math.max(k, 1 - d / r); } return k; };
+  let flock = 0;
+  for (const f of hero.crowd.flocks) { const d = Math.hypot(f.x - b.x, f.y - b.y); if (d < 20) flock = Math.max(flock, 1 - d / 20); }
+  let park = 0;
+  for (const p of places) if (p.cat === 'park') { const d = dist(S.pos, p.pos); if (d < 80) park = Math.max(park, 1 - d / 80); }
+  const night = S.clock >= 19.5 * 60 ? Math.min(1, (S.clock - 19.5 * 60) / 120) : 0;
+  sfx.ambient({ night, hour, z: b.z, underground: under, terrace: near('terrace', 16), fountain: near('fountain', 12), flock, park, crowd: Math.min(1, hero.crowd.npcs.length / 40) });
+  const g = b.mode === 'glide' ? 0.55 + (b.parachute ? 0.2 : 0) : 0;
+  sfx.wind(under ? 0 : Math.max(g, Math.min(0.8, (b.z - 12) / 70), b.mode === 'air' && b.vz < -8 ? 0.6 : 0));
+}
+
+// ───────── 어디든: 다른 동네로 걸어·날아 들어가면 그 동네를 읽는다 ─────────
+let districtAcc = 0;
+let switching = false;
+function autoDistrict() {
+  if (switching || !S.started || S.finished || metroOpen || transit?.active || mapMode || openPlace) return;
+  const [lng, lat] = S.pos;
+  const inside = (d: District, pad: number) => lat > d.bbox[0] - pad && lat < d.bbox[2] + pad && lng > d.bbox[1] - pad && lng < d.bbox[3] + pad;
+  if (inside(district, 0.004)) return;
+  const d = Object.values(DISTRICTS).find((x) => x.id !== district.id && inside(x, 0.002));
+  if (!d) return;
+  switching = true;
+  void enterDistrict(d, S.pos, true).catch(() => null).finally(() => { switching = false; });
 }
 
 /** 거리 그래프를 선분으로 — 건물을 가로지르는 길은 1층이 뚫린 통로다 */
@@ -418,7 +485,7 @@ function heroFrame(dt: number) {
 
 function onBodyEvent(e: BodyEvent) {
   switch (e) {
-    case 'stepL': case 'stepR': sfx.step(e === 'stepL'); break;
+    case 'stepL': case 'stepR': sfx.step(e === 'stepL', hero.body.z > 2.5 ? 'roof' : 'stone'); break;
     case 'jump': sfx.jump(); break;
     case 'land': sfx.land(); break;
     case 'hurt':
@@ -426,7 +493,7 @@ function onBodyEvent(e: BodyEvent) {
       S.tired = Math.min(100, S.tired + 6);
       toast('쿵! 높은 데서 그냥 뛰어내렸다 (지침 +6) — 착지 직전에 V를 누르면 굴러서 안 다친다');
       break;
-    case 'glide': sfx.glide(); break;
+    case 'glide': if (hero.body.parachute) sfx.chute(); else sfx.glide(); break;
     case 'unglide': sfx.unglide(); break;
     case 'grab': sfx.grab(); break;
     case 'climbjump': sfx.climbJump(); break;
@@ -700,70 +767,6 @@ function showStationMarker() {
 
 const bottomPad = () => Math.round(Math.min(window.innerHeight * 0.52, 460));
 
-// ───────── 숙소를 고르는 동안의 지도 ─────────
-const pickMarkers: Marker[] = [];
-const clearPicks = () => { for (const m of pickMarkers) m.remove(); pickMarkers.length = 0; };
-const fitAll = (pts: LngLat[], maxZoom: number) => {
-  if (!pts.length) return;
-  const b = pts.reduce((bb, p) => bb.extend(p), new maplibregl.LngLatBounds(pts[0], pts[0]));
-  map.easeTo({ pitch: 0, bearing: 0, duration: 400 });
-  setTimeout(() => map.fitBounds(b, { padding: { top: 80, bottom: bottomPad(), left: 50, right: 50 }, maxZoom, duration: 1100 }), 420);
-};
-const pin = (cls: string, html: string, pos: LngLat, onClick?: () => void) => {
-  const el = document.createElement('div');
-  el.className = cls;
-  el.innerHTML = html;
-  if (onClick) el.addEventListener('click', (ev) => { ev.stopPropagation(); onClick(); });
-  pickMarkers.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(pos).addTo(map));
-  return el;
-};
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-
-const stayMap: StayMap = {
-  overview(items, pick) {
-    clearPicks();
-    quietMap(true);
-    for (const { d, pos } of items) pin('areapin', `<b>${esc(d.name)}</b>`, pos, () => pick(d.id));
-    fitAll(items.map((x) => x.pos), 13.4);
-  },
-  district(_d, stays, sights, pick) {
-    clearPicks();
-    quietMap(true);
-    for (const c of sights) pin('sightpin', `<span>${c.emoji}</span><b>${esc(c.name)}</b>`, c.pos);
-    for (const s of stays) pin('staypin', `<b>${esc(s.name)}</b><em>€${s.night}</em>`, s.pos, () => pick(s.id));
-    fitAll([...stays.map((s) => s.pos), ...sights.map((c) => c.pos)], 16.2);
-  },
-  focus(stay, links) {
-    for (const m of pickMarkers) m.getElement().classList.toggle('picked', m.getLngLat().lng === stay.pos[0] && m.getLngLat().lat === stay.pos[1]);
-    (map.getSource('metro') as GeoJSONSource).setData({
-      type: 'FeatureCollection',
-      features: links.map((l) => ({ type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: [stay.pos, l.to] } })),
-    });
-    map.setPaintProperty('metro', 'line-color', '#e4b23a');
-    map.setPaintProperty('metro', 'line-width', 3);
-    map.setLayoutProperty('metro', 'visibility', 'visible');
-    fitAll([stay.pos, ...links.map((l) => l.to)], 16.6);
-  },
-  airport(from, to) {
-    clearPicks();
-    quietMap(true);
-    pin('areapin', '<b>CDG 공항</b>', from);
-    pin('staypin', '<b>숙소</b>', to);
-    (map.getSource('metro') as GeoJSONSource).setData(line([from, to]));
-    map.setPaintProperty('metro', 'line-color', '#e4572e');
-    map.setPaintProperty('metro', 'line-width', 3);
-    map.setLayoutProperty('metro', 'visibility', 'visible');
-    fitAll([from, to], 11);
-  },
-  clear() {
-    clearPicks();
-    map.setLayoutProperty('metro', 'visibility', 'none');
-    (map.getSource('metro') as GeoJSONSource).setData(line([]));
-    map.setPaintProperty('metro', 'line-width', 7);
-    quietMap(false);
-  },
-};
-
 /** 지하철을 보여 주는 동안은 걷기용 표시(가게 핀·자취·시야·HUD 버튼)를 치운다 */
 function quietMap(on: boolean) {
   document.body.classList.toggle('metro-mode', on);
@@ -880,8 +883,9 @@ async function ride(target: Dest, gate: Gate) {
 }
 
 /** 새 지구의 길·장소로 통째로 갈아 끼운다. */
-async function enterDistrict(d: District, at: LngLat) {
-  const data = await loadDistrict(d, (s) => toast(s));
+/** keep: 몸은 그대로 두고(날거나 걸어서 들어왔다) 동네 데이터만 갈아 끼운다 */
+async function enterDistrict(d: District, at: LngLat, keep = false) {
+  const data = await loadDistrict(d, (s) => (keep ? undefined : toast(s)));
   district = d;
   graph = buildGraph(data.ways);
   places = parsePlaces(data.places, d.curated, ALL_RICH);
@@ -889,21 +893,22 @@ async function enterDistrict(d: District, at: LngLat) {
   for (const m of markers.values()) m.remove();
   markers.clear();
   S.node = nearestNode(graph, at);
-  S.pos = graph.nodes[S.node];
+  if (!keep) S.pos = graph.nodes[S.node];
   S.path = [];
   S.seg = 0;
   S.target = null;
-  S.trail = [S.pos];
-  lastTrail = S.pos;
+  if (!keep) { S.trail = [S.pos]; lastTrail = S.pos; }
   const next = graph.adj[S.node]?.[0];
   hero.theme = d.id;
   hero.setWays(data.ways);
   hero.setGraph(graph.nodes, graph.adj.map((es) => es.map((e) => e.to)));
   hero.setLanes(laneSegments(graph));
-  hero.reset(S.pos, next ? bearing(S.pos, graph.nodes[next.to]) : 0);
+  if (keep) hero.rebase();
+  else hero.reset(S.pos, next ? bearing(S.pos, graph.nodes[next.to]) : 0);
   dressTown();
   street?.reset(d.id);
   guideTarget = null;
+  if (keep) { toast(`📍 ${d.full}`); showStationMarker(); showStayMarker(); paintMetroBtn(); for (const p of places) if (p.known) showMarker(p, false); hud(); return; }
   wasCamOn = false; // 다음 프레임에 위에서 내려오며 사람 뒤로 붙는다
   avatar.setLngLat(S.pos);
   (map.getSource('trail') as GeoJSONSource).setData(line(S.trail));
@@ -1079,44 +1084,39 @@ function closeCard(_why: 'enter' | 'pass') {
   hud();
 }
 
+const EIFFEL: LngLat = [2.29448, 48.85826];
 async function start() {
   sfx.unlock();
-  const intro = $('#intro');
-  $('#go').setAttribute('disabled', '');
-  intro.classList.add('gone');
-
-  // ① 숙소 ② 공항에서 오는 법 ③ 표
-  const a = await openArrival(stayMap);
-  S.stay = a.stay;
-  S.pass = a.pass;
-  S.money = Math.round((S.money - a.ride.cost - (a.pass === 'liberte' ? LIBERTE_CARD : 0)) * 100) / 100;
-  S.fares = a.ride.cost;
-  S.clock += a.ride.mins;
-  S.tired = Math.min(100, S.tired + a.ride.tired);
-  S.hunger = Math.min(100, S.hunger + a.ride.mins * 0.14);
-
-  for (let i = 0; i < 6; i++) sfx.stair(i);
-  sfx.surface();
+  sfx.startMusic();
+  $('#intro').classList.add('gone');
   S.started = true;
   $('#hud').classList.add('on');
   try {
-    await enterDistrict(DISTRICTS[a.stay.district], a.stay.pos);
+    // 에펠탑에서 가장 가까운 동네를 읽어 두고, 몸은 탑 꼭대기 한참 위에 둔다
+    await enterDistrict(DISTRICTS['champs-elysees'], DISTRICTS['champs-elysees'].start);
   } catch (e) {
     toast(e instanceof Error ? e.message : '지도를 펴지 못했어요');
     return;
   }
+  // 탑 꼭대기 바로 옆 위에서, 파리 시내(동북동) 쪽을 보며 — 탑이 눈앞에, 도시가 그 너머에
+  const [x, y] = hero.frame.toLocal(EIFFEL);
+  // 탑에서 150 m 뒤, 430 m 높이(탑 꼭대기보다 100 m 위) — 내려다보면 탑 전체와 그 너머 시내가 보인다
+  const B = (44 * Math.PI) / 180; // 바라보는 방향(58°)과 조금 어긋나게 — 탑이 주인공 몸에 가리지 않고 오른쪽 아래에
+  hero.body.skydive(x - Math.sin(B) * 150, y - Math.cos(B) * 150, 430, 58);
+  hero.cam.snap(hero.body);
+  hero.cam.yaw = 58;
+  hero.cam.pitch = 36;
+  hero.cam.wantDist = 13;
+  S.pos = hero.lnglat;
   S.origin = S.pos;
   S.trail = [S.pos];
-
-  // ④ 체크인·아침
-  const m = await openMorning(a.stay, S.clock);
-  S.clock += m.mins;
-  S.money = Math.round((S.money - m.cost) * 100) / 100;
-  if (m.fed) eat(S, m.fed, 10); else rest(S, 6);
+  lastTrail = S.pos;
+  sfx.wind(1);
   hud();
-  toast(`${a.stay.name} · ${fmtClock(S.clock)}`);
-  hint(`${m.line} ${hero.input.touched || matchMedia('(pointer: coarse)').matches ? '왼쪽 아래를 끌어 걷고, 오른쪽을 끌어 둘러봅니다.' : 'WASD로 걷고, 마우스를 끌어 둘러봅니다. Shift 달리기 · Space 점프.'}`);
-  setTimeout(() => hint(''), 8000);
+  const touch = hero.input.touched || matchMedia('(pointer: coarse)').matches;
+  if (touch) document.body.classList.add('touch-play');
+  hint(touch ? '🪂 파리 위다! 왼쪽을 끌어 방향, 달리기 버튼을 누르면 급강하. 어디든 내려앉아 걸어 보자.' : '🪂 파리 위다! WASD로 방향, Shift 급강하, Space 낙하산 접기. 어디든 내려앉아 걸어 보자.');
+  setTimeout(() => hint(''), 9000);
 }
 
 const mode = (xs: string[]) => [...xs.reduce((m, x) => m.set(x, (m.get(x) ?? 0) + 1), new Map<string, number>())].sort((a, b) => b[1] - a[1])[0][0];
@@ -1211,7 +1211,7 @@ function finish() {
 const metroBtn = $<HTMLButtonElement>('#metro-go');
 const stayBtn = $<HTMLButtonElement>('#stay-go');
 function paintMetroBtn() {
-  metroBtn.textContent = '🚇 어디 갈까';
+  metroBtn.innerHTML = '🚇<span class="lbl"> 어디 갈까</span>';
   metroBtn.title = '다른 동네, 또는 가고 싶은 곳을 고른다';
   metroBtn.onclick = chooseDestination;
   const st = S.stay;
@@ -1225,16 +1225,20 @@ function paintMetroBtn() {
 }
 $('#go').addEventListener('click', start);
 const eyeBtn = $<HTMLButtonElement>('#eye');
-function paintEye() { eyeBtn.textContent = mapMode ? '🚶 걷기' : '🗺 지도'; eyeBtn.title = mapMode ? '다시 직접 걷는다 (M)' : '위에서 내려다보고 갈 곳을 찍는다 (M)'; }
+function paintEye() { eyeBtn.innerHTML = mapMode ? '🚶<span class="lbl"> 걷기</span>' : '🗺<span class="lbl"> 지도</span>'; eyeBtn.title = mapMode ? '다시 직접 걷는다 (M)' : '위에서 내려다보고 갈 곳을 찍는다 (M)'; }
 paintEye();
 eyeBtn.addEventListener('click', () => { eyeBtn.blur(); setMapMode(!mapMode); });
 $('#end').addEventListener('click', finish);
+const muteBtn = $<HTMLButtonElement>('#mute');
+const paintMute = () => { muteBtn.textContent = sfx.isMuted() ? '🔇' : '🔊'; };
+paintMute();
+muteBtn.addEventListener('click', () => { muteBtn.blur(); sfx.unlock(); sfx.setMuted(!sfx.isMuted()); paintMute(); });
 $('#again').addEventListener('click', () => location.reload());
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (openPlace) closeCard('pass'); else if (mapMode) setMapMode(false); } });
 // 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
 // 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
 window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
-if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map };
+if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();

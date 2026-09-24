@@ -44,25 +44,29 @@ export class HeroHud {
 
     this.pad = document.createElement('div');
     this.pad.className = 'hpad';
-    this.pad.innerHTML = `<div class="emotes"><button class="emo" data-e="wave" type="button">👋</button><button class="emo" data-e="dance" type="button">💃</button><button class="emo" data-e="photo" type="button">📷</button><button class="emo" data-e="sit" type="button">🪑</button></div>`
-      + `<button class="map" type="button">🗺</button><button class="face" type="button">😊</button><button class="drop" type="button">놓기</button><button class="crouch" type="button">웅크</button><button class="roll" type="button">구르기</button><button class="run" type="button">달리기</button><button class="jump" type="button">점프</button>`;
+    // 원신처럼: 오른쪽 아래 큰 점프 하나 + 달리기(누르고 있기)/구르기(톡) 하나. 놓기는 벽에 붙었을 때만.
+    // 몸짓·웅크리기는 😊 안에. 지도는 위쪽 HUD에.
+    this.pad.innerHTML = `<div class="emotes"><button class="emo" data-e="wave" type="button">👋<small>인사</small></button><button class="emo" data-e="photo" type="button">📷<small>사진</small></button><button class="emo" data-e="sit" type="button">🪑<small>앉기</small></button><button class="emo" data-e="dance" type="button">💃<small>춤</small></button><button class="emo" data-e="crouch" type="button">🐾<small>살금</small></button></div>`
+      + `<button class="face" type="button">😊</button><button class="drop" type="button">놓기</button><button class="run" type="button"><b>달리기</b><small>톡 = 구르기</small></button><button class="jump" type="button">점프</button>`;
     const btn = (c: string) => this.pad.querySelector(`.${c}`) as HTMLButtonElement;
     const tap = (b: HTMLButtonElement, f: () => void) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); f(); });
     tap(btn('jump'), () => input.press('jump'));
-    tap(btn('roll'), () => input.press('roll'));
-    tap(btn('crouch'), () => input.press('crouch'));
-    this.crouchBtn = btn('crouch');
     const emotes = this.pad.querySelector('.emotes') as HTMLElement;
     tap(btn('face'), () => emotes.classList.toggle('on'));
-    for (const b of this.pad.querySelectorAll<HTMLButtonElement>('.emo')) tap(b, () => { input.press(b.dataset.e as Emote); emotes.classList.remove('on'); });
-    tap(btn('map'), onMap);
+    for (const b of this.pad.querySelectorAll<HTMLButtonElement>('.emo')) tap(b, () => { const e = b.dataset.e!; if (e === 'crouch') input.press('crouch'); else input.press(e as Emote); emotes.classList.remove('on'); });
+    this.crouchBtn = this.pad.querySelector('.emo[data-e="crouch"]') as HTMLButtonElement;
+    void onMap;
     this.dropBtn = btn('drop');
     tap(this.dropBtn, () => input.press('drop'));
     const run = btn('run');
-    run.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); run.setPointerCapture(e.pointerId); input.hold(true); run.classList.add('held'); });
-    const release = () => { input.hold(false); run.classList.remove('held'); };
+    let downAt = 0;
+    run.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); run.setPointerCapture(e.pointerId); downAt = performance.now(); input.hold(true); run.classList.add('held'); });
+    const release = () => {
+      input.hold(false); run.classList.remove('held');
+      if (performance.now() - downAt < 230) input.press('roll'); // 톡 치면 구르기(피하기)
+    };
     run.addEventListener('pointerup', release);
-    run.addEventListener('pointercancel', release);
+    run.addEventListener('pointercancel', () => { input.hold(false); run.classList.remove('held'); });
     document.body.appendChild(this.pad);
     input.onTouchMode = () => document.body.classList.add('touch-play');
 
@@ -93,7 +97,7 @@ export class HeroHud {
     this.dropBtn.hidden = b.mode !== 'climb';
     this.pad.querySelector('.jump')!.textContent = b.mode === 'air' ? '글라이더' : b.mode === 'glide' ? '접기' : b.mode === 'climb' ? '도약' : b.mode === 'sit' ? '일어서기' : '점프';
     this.crouchBtn.classList.toggle('held', b.crouch);
-    this.crouchBtn.textContent = b.speed > 3.7 && b.mode === 'ground' ? '슬라이딩' : '웅크리기';
+    this.pad.classList.toggle('crouched', b.crouch);
   }
 
   private lastPrompt2 = '';

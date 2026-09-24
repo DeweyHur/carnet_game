@@ -1,6 +1,8 @@
 // 거리 위에 뜨는 것들(DOM): 사람 머리 위 말풍선, 지금 바라보는 것의 이름표, 대화 상자, 가게 앞 안내판, 사진 플래시.
 // 자리는 매 프레임 거리(Town)의 투영으로 3D 좌표 → 화면 좌표를 구해 옮긴다.
 
+import * as sfx from '../sound';
+
 export interface Anchor { x: number; y: number; z: number }
 export type Project = (x: number, y: number, z: number, out: { x: number; y: number }) => boolean;
 
@@ -37,7 +39,8 @@ export class StreetUi {
   }
 
   /** 머리 위 말풍선 */
-  say(at: () => Anchor | null, text: string, secs = 2.6, kind = '') {
+  say(at: () => Anchor | null, text: string, secs = 2.6, kind = '', voice?: number) {
+    if (voice !== undefined) sfx.say(text, voice, false);
     // 같은 자리(사람)에 이미 떠 있으면 바꿔 쓴다
     const old = this.bubbles.find((b) => b.at === at);
     const node = old?.node ?? el('div', `bubble ${kind}`);
@@ -50,7 +53,7 @@ export class StreetUi {
   /** 바라보는 것의 이름표(없으면 null) */
   focus(at: (() => Anchor | null) | null, icon = '', name = '', sub = '') {
     this.tagAt = at;
-    if (!at) { this.tag.classList.remove('on'); return; }
+    if (!at) { this.tag.classList.remove('on'); this.tag.style.opacity = '0'; return; }
     const sig = `${icon}|${name}|${sub}`;
     if (this.tag.dataset.sig !== sig) {
       this.tag.dataset.sig = sig;
@@ -66,11 +69,13 @@ export class StreetUi {
     build(this.card);
     this.card.classList.add('on');
   }
-  hideCard() { this.cardAt = null; this.card.classList.remove('on'); }
+  hideCard() { this.cardAt = null; this.card.classList.remove('on'); this.card.style.opacity = '0'; }
   get cardOpen() { return !!this.cardAt; }
 
   /** 대화: 말하는 사람·프랑스어·한국어·선택지. 고른 번호를 돌려준다(닫으면 -1). */
   talk(who: string, fr: string, ko: string, choices: string[]): Promise<number> {
+    if (fr) sfx.say(fr, who.length * 97 + who.charCodeAt(0));
+    sfx.pop();
     return new Promise((resolve) => {
       const box = this.talkBox;
       box.replaceChildren();
@@ -82,7 +87,7 @@ export class StreetUi {
       choices.forEach((c, i) => {
         const b = el('button', i === 0 ? 'primary' : '', '');
         b.append(el('kbd', '', String(i + 1)), document.createTextNode(c));
-        b.addEventListener('click', (e) => { e.stopPropagation(); done(i); });
+        b.addEventListener('click', (e) => { e.stopPropagation(); sfx.select(); done(i); });
         row.appendChild(b);
       });
       box.appendChild(row);

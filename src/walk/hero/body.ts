@@ -86,6 +86,18 @@ export class Body {
     this.safe = { x, y, z };
   }
 
+  /** 낙하산(시작할 때): 기력을 쓰지 않고, 땅에 닿을 때까지 펼쳐 둔다. Shift = 급강하 */
+  parachute = false;
+  skydive(x: number, y: number, z: number, facing: number) {
+    this.place(x, y, z);
+    this.facing = facing;
+    this.mode = 'glide';
+    this.gliderOpen = 1;
+    this.parachute = true;
+    this.fallTopZ = z;
+    this.vz = -2;
+  }
+
   // ───────── 밖(게임)에서 시키는 동작 ─────────
   /** 제자리 동작을 시작한다. 땅 위(또는 앉아 있을 때 사진)만 된다. */
   doAct(kind: Act): boolean {
@@ -332,19 +344,20 @@ export class Body {
     const floor = w.ground(this.x, this.y, this.z + 0.05, 0.05);
     if (it.roll) this.rollBuf = 0.45; else if (this.rollBuf > 0) this.rollBuf -= dt;
     if (it.jump) {
-      if (gliding) { this.mode = 'air'; this.fallTopZ = this.z; this.events.push('unglide'); gliding = false; }
+      if (gliding) { this.mode = 'air'; this.fallTopZ = this.z; this.events.push('unglide'); gliding = false; this.parachute = false; }
       else if (this.z - floor > 1.3 && this.canExert) { this.mode = 'glide'; this.events.push('glide'); gliding = true; }
     }
     if (gliding) {
-      this.vz += (-GLIDE_SINK - this.vz) * Math.min(1, dt * 3.5);
+      const sink = this.parachute ? (it.sprint ? 9 : 3.2) : GLIDE_SINK;
+      this.vz += (-sink - this.vz) * Math.min(1, dt * 3.5);
       if (m >= 0.08) this.turn(bearingOf(ix, iy), 150 * dt);
-      const want = (m >= 0.08 ? GLIDE_FWD * m : 2.2) * Math.max(0.7, it.pace);
+      const want = (m >= 0.08 ? GLIDE_FWD * m * (this.parachute ? 1.5 : 1) : 2.2) * Math.max(0.7, it.pace);
       const [fx, fy] = dirOf(this.facing);
       const s = Math.hypot(this.vx, this.vy);
       const ns = approach(s, want, dt * 5);
       this.vx = fx * ns; this.vy = fy * ns;
-      this.spend(dt * 0.06);
-      if (this.exhausted) { this.mode = 'air'; this.fallTopZ = this.z; this.events.push('unglide'); }
+      if (!this.parachute) this.spend(dt * 0.06);
+      if (this.exhausted && !this.parachute) { this.mode = 'air'; this.fallTopZ = this.z; this.events.push('unglide'); }
       this.fallTopZ = this.z;
     } else {
       this.vz = Math.max(-45, this.vz - G * dt);
@@ -376,6 +389,7 @@ export class Body {
       const fell = this.fallTopZ - floor;
       if (floor < 0.3 && w.water(this.x, this.y)) { this.enterWater(); return; }
       this.vz = 0;
+      this.parachute = false;
       const buffered = this.rollBuf > 0;
       this.rollBuf = 0;
       // 착지 직전에 구르면 충격을 흘려 보낸다(낙법)
@@ -390,6 +404,7 @@ export class Body {
 
   // ───────── 벽타기 ─────────
   private grab(hit: { nx: number; ny: number; solid: Solid; cx: number; cy: number }) {
+    this.parachute = false;
     this.mode = 'climb';
     this.wall = { nx: hit.nx, ny: hit.ny, solid: hit.solid };
     this.x = hit.cx + hit.nx * R; this.y = hit.cy + hit.ny * R;
@@ -458,6 +473,7 @@ export class Body {
   private startMantle(cx: number, cy: number, nx: number, ny: number, top: number) {
     // 달리다 낮은 것(벤치·난간·볼라드)을 만나면 한 손 짚고 넘어간다
     this.vaulting = this.mode === 'ground' && top - this.z < 1.05 && this.speed > 3.2;
+    this.parachute = false;
     this.mode = 'mantle';
     this.wall = null;
     const reach = this.vaulting ? 1.0 : 0.6;
@@ -483,6 +499,7 @@ export class Body {
 
   // ───────── 물 ─────────
   private enterWater() {
+    this.parachute = false;
     this.mode = 'swim';
     this.z = 0;
     this.vz = 0;

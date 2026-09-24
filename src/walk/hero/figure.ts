@@ -359,7 +359,8 @@ export class Figure {
     // 글라이더: 펼칠 때 부풀어 오른다
     const g = b.gliderOpen;
     this.glider.visible = g > 0.02;
-    this.glider.scale.set(0.3 + 0.7 * g, 0.3 + 0.7 * g, g);
+    const pk = b.parachute ? 2 : 1; // 낙하산은 크게
+    this.glider.scale.set((0.3 + 0.7 * g) * pk, (0.3 + 0.7 * g) * pk, g * pk);
     this.glider.rotation.x = 0.1 + Math.sin(t * 1.7) * 0.03;
     // 그림자: 높이 올라갈수록 옅고 작아진다
     const hgt = Math.max(0, b.z - groundZ);

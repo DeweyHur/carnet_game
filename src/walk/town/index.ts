@@ -74,6 +74,8 @@ export class Town {
   private matrix = new THREE.Matrix4();
   private matrixOk = false;
   enabled = true;
+  /** 짓는 반경(m) — 느린 기기에선 줄인다 */
+  radius = 300;
   private heroX = 0; private heroY = 0;
   private procedural = false;
   private builtOnce = false;
@@ -85,6 +87,8 @@ export class Town {
   private readonly farUniforms = { ...this.uniforms, uFar: { value: 30000 } };
   private readonly farMat = townMaterial(this.farUniforms);
   private lastT = performance.now();
+  private job: Generator<void, void, void> | null = null;
+  private jobCell: Cell | null = null;
 
   constructor() {
     this.scene.matrixAutoUpdate = false;
@@ -217,7 +221,7 @@ export class Town {
     this.lastT = now;
     for (const m of this.movers) { const sails = m.children[0]; if (sails) sails.rotation.y += dt * 0.5; }
     if (!this.enabled || !this.world) return;
-    const R = this.procedural ? 250 : 300, DROP = R + 120;
+    const R = Math.min(this.procedural ? 250 : 300, this.radius), DROP = R + 120;
     const t0 = performance.now();
     const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
     const span = Math.ceil(R / CELL);
@@ -232,12 +236,19 @@ export class Town {
       want.push({ c, d });
     }
     want.sort((a, b) => a.d - b.d);
-    const budget = this.builtOnce ? 6 : 60; // 처음엔 한꺼번에(화면이 비지 않게)
-    for (const { c } of want) {
-      this.buildCell(c);
-      if (performance.now() - t0 > budget) break;
+    const budget = this.builtOnce ? 5 : 60; // 처음엔 한꺼번에(화면이 비지 않게), 그다음은 조금씩(끊기지 않게)
+    // 한 칸도 여러 프레임에 나눠 짓는다 — 칸 하나가 수십 ms라 통째로 지으면 뚝 끊긴다
+    let wi = 0;
+    while (performance.now() - t0 < budget) {
+      if (!this.job) {
+        while (wi < want.length && want[wi].c === this.jobCell) wi++;
+        if (wi >= want.length) break;
+        this.jobCell = want[wi++].c;
+        this.job = this.buildSteps(this.jobCell);
+      }
+      if (this.job.next().done) { this.job = null; this.jobCell = null; }
     }
-    this.builtOnce = this.builtOnce || want.length === 0 || performance.now() - t0 < 60;
+    this.builtOnce = this.builtOnce || want.length === 0 || !!this.jobCell || performance.now() - t0 < 60;
     for (const c of this.cells.values()) {
       if (!c.built) continue;
       if (Math.hypot((c.ix + 0.5) * CELL - x, (c.iy + 0.5) * CELL - y) > DROP) this.dropCell(c);
@@ -245,12 +256,17 @@ export class Town {
   }
 
   private dropCell(c: Cell) {
-    if (c.mesh) { this.scene.remove(c.mesh); c.mesh.geometry.dispose(); c.mesh = null; }
-    if (c.pools) { this.scene.remove(c.pools); c.pools.geometry.dispose(); c.pools = null; }
-    for (const s of c.signs) { this.scene.remove(s); s.traverse((o) => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); const m = o.material as THREE.MeshBasicMaterial; m.map?.dispose(); m.dispose(); } }); }
-    c.signs = [];
+    if (this.jobCell === c) { this.job = null; this.jobCell = null; }
+    this.disposeParts(c.mesh, c.pools, c.signs);
+    c.mesh = null; c.pools = null; c.signs = [];
     c.built = false;
     c.dirty = false;
+  }
+
+  private disposeParts(mesh: THREE.Mesh | null, pools: THREE.Mesh | null, signs: THREE.Object3D[]) {
+    if (mesh) { this.scene.remove(mesh); mesh.geometry.dispose(); }
+    if (pools) { this.scene.remove(pools); pools.geometry.dispose(); }
+    for (const s of signs) { this.scene.remove(s); s.traverse((o) => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); const m = o.material as THREE.MeshBasicMaterial; m.map?.dispose(); m.dispose(); } }); }
   }
 
   private street = (x: number, y: number) => this.world.onLane(x, y, 3.5);
@@ -275,26 +291,36 @@ export class Town {
     return null;
   };
 
-  private buildCell(c: Cell) {
-    this.dropCell(c);
+  /** 칸 하나 짓기 — 건물·가구 몇 개마다 쉬어 가는 생성기. 다 지을 때까지 옛 메시는 그대로 둔다(깜빡이지 않게). */
+  private *buildSteps(c: Cell): Generator<void, void, void> {
+    const old = { mesh: c.mesh, pools: c.pools, signs: c.signs };
+    c.signs = [];
+    c.dirty = false; // 짓는 동안 새 건물이 들어오면 다시 dirty가 되어 한 번 더 짓는다
     const g = new GeoBuilder();
     const pools = new GeoBuilder();
     const env = { world: this.world, theme: this.theme, street: this.street, shopAt: this.shopAt, zone: this.zone };
-    for (const s of c.solids) if (!this.cleared(s.render!.cx, s.render!.cy)) addBuilding(g, s, env);
-    if (!c.props) { this.layoutProps(c); c.props = true; }
+    let n = 0;
+    for (const s of c.solids) {
+      if (!this.cleared(s.render!.cx, s.render!.cy)) { addBuilding(g, s, env); if (++n % 3 === 0) yield; }
+    }
+    if (!c.props) { this.layoutProps(c); c.props = true; yield; }
+    yield* this.shopFronts(c, g); // 테라스 가구를 placed에 더하므로 stamp보다 먼저
     for (const p of c.placed) {
       stamp(g, template(p.t, p.k), p.x, p.y, p.z, p.rot, p.s);
       if (p.lamp) pools.quad([p.x - 5, p.y - 5, 0.04], [p.x + 5, p.y - 5, 0.04], [p.x + 5, p.y + 5, 0.04], [p.x - 5, p.y + 5, 0.04], [0, 0, 1], [0, 0, 1, 1], -1, [1, 1, 1]);
+      if (++n % 12 === 0) yield;
     }
-    this.shopFronts(c, g);
-    if (this.procedural) this.paveCell(c, g);
+    yield;
+    if (this.procedural) { this.paveCell(c, g); yield; }
     const geo = g.build();
-    if (geo) { c.mesh = new THREE.Mesh(geo, this.mat); c.mesh.matrixAutoUpdate = false; this.scene.add(c.mesh); }
     const pg = pools.build();
+    this.disposeParts(old.mesh, old.pools, old.signs);
+    c.mesh = null; c.pools = null;
+    if (geo) { c.mesh = new THREE.Mesh(geo, this.mat); c.mesh.matrixAutoUpdate = false; this.scene.add(c.mesh); }
     if (pg) { c.pools = new THREE.Mesh(pg, this.poolMat); c.pools.matrixAutoUpdate = false; c.pools.renderOrder = 2; this.scene.add(c.pools); }
     c.built = true;
-    c.dirty = false;
   }
+
 
   /** 타일이 없을 때는 길바닥도 그린다(아스팔트 + 포석 보도) */
   private paveCell(c: Cell, g: GeoBuilder) {
@@ -520,7 +546,7 @@ export class Town {
   }
 
   /** 이 칸에 있는 장소들: 1층 차양·테라스·간판 */
-  private shopFronts(c: Cell, g: GeoBuilder) {
+  private *shopFronts(c: Cell, g: GeoBuilder): Generator<void, void, void> {
     const list = this.placeCell.get(cellKey(c.ix, c.iy)) ?? [];
     for (const p of list) {
       if (p.minor || p.cat === 'park') continue;
@@ -550,9 +576,8 @@ export class Town {
       }
       // 간판: 차양 위 이름판 + 벽에서 튀어나온 깃발 간판(그림)
       c.signs.push(this.nameBoard(p, f, tx, ty));
+      yield; // 간판 그림(캔버스)이 무겁다 — 하나마다 쉰다
     }
-    // 다시 짓는 칸이면 테라스 가구가 이미 placed에 있다 — 위에서 stamp는 buildCell이 한다
-    for (const p of c.placed) if (p.t === 'terrace' && !c.mesh) void p;
   }
 
   /** 기마르 입구 간판: 크림색 바탕에 초록 글씨 METROPOLITAIN (양면) */
@@ -584,8 +609,10 @@ export class Town {
   private nameBoard(p: TownPlace, f: Front, tx: number, ty: number): THREE.Object3D {
     const grp = new THREE.Group();
     const cv = document.createElement('canvas');
-    cv.width = 512; cv.height = 96;
+    // 작게 그린다(칸을 지을 때마다 만드니 크면 끊긴다)
+    cv.width = 384; cv.height = 72;
     const g2 = cv.getContext('2d')!;
+    g2.setTransform(0.75, 0, 0, 0.75, 0, 0);
     const bg = CAT_COLOR[p.cat];
     g2.fillStyle = p.cat === 'museum' || p.cat === 'sight' ? '#2a2724' : bg;
     g2.fillRect(0, 0, 512, 96);
@@ -610,8 +637,9 @@ export class Town {
     grp.add(board);
     // 깃발 간판: 벽에서 수직으로 튀어나온 동그란 판(양면)
     const cv2 = document.createElement('canvas');
-    cv2.width = cv2.height = 128;
+    cv2.width = cv2.height = 64;
     const g3 = cv2.getContext('2d')!;
+    g3.scale(0.5, 0.5);
     g3.fillStyle = '#1d1a17'; g3.beginPath(); g3.arc(64, 64, 62, 0, 7); g3.fill();
     g3.fillStyle = bg; g3.beginPath(); g3.arc(64, 64, 54, 0, 7); g3.fill();
     g3.font = '64px "Apple Color Emoji","Noto Color Emoji","Segoe UI Emoji",sans-serif'; g3.textAlign = 'center'; g3.textBaseline = 'middle';
@@ -624,10 +652,6 @@ export class Town {
     blade.up.set(0, 0, 1);
     blade.lookAt(bx + tx, by + ty, 4.55);
     grp.add(blade);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.9), new THREE.MeshBasicMaterial({ color: 0x1f2b25 }));
-    arm.position.set(f.x + f.nx * 0.45 + tx * 2.3, f.y + f.ny * 0.45 + ty * 2.3, 5.0);
-    arm.lookAt(f.x + f.nx * 5 + tx * 2.3, f.y + f.ny * 5 + ty * 2.3, 5.0);
-    grp.add(arm);
     grp.traverse((o) => { o.matrixAutoUpdate = true; });
     this.scene.add(grp);
     return grp;

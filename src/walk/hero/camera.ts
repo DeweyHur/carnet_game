@@ -3,7 +3,7 @@ import type { Body } from './body';
 import type { World } from './world';
 import { angleDiff, dirOf } from './geo';
 
-export interface Shot { x: number; y: number; z: number; bearing: number; pitch: number }
+export interface Shot { x: number; y: number; z: number; bearing: number; pitch: number; fx: number; fy: number; fz: number }
 
 export class OrbitCam {
   yaw = 0; // 카메라가 바라보는 방위
@@ -21,6 +21,8 @@ export class OrbitCam {
   }
 
   recenter() { this.recenterT = 0.35; }
+  /** 좌표 원점이 옮겨졌다 */
+  shift(dx: number, dy: number) { this.fx += dx; this.fy += dy; }
 
   update(dt: number, b: Body, w: World, dYaw: number, dPitch: number, zoom: number): Shot {
     if (dYaw || dPitch) this.idle = 0; else this.idle += dt;
@@ -41,7 +43,7 @@ export class OrbitCam {
         this.yaw = (this.yaw + Math.sin((d * Math.PI) / 180) * rate * moving * dt + 360) % 360;
       }
       // 떨어지거나 활공할 때는 조금 내려다본다
-      const wantPitch = b.mode === 'glide' ? 22 : b.mode === 'climb' ? 8 : null;
+      const wantPitch = b.parachute ? 36 : b.mode === 'glide' ? 22 : b.mode === 'climb' ? 8 : null;
       if (wantPitch !== null) this.pitch += (wantPitch - this.pitch) * Math.min(1, dt * 1.2);
     }
 
@@ -67,6 +69,6 @@ export class OrbitCam {
     // 카메라 높이가 바닥에 걸려 올라갔으면 초점을 보도록 각도를 다시 잰다
     const horiz = Math.hypot(this.fx - x, this.fy - y);
     const lookDown = (Math.atan2(z - this.fz, horiz) * 180) / Math.PI;
-    return { x, y, z, bearing: this.yaw, pitch: Math.min(85, 90 - lookDown) };
+    return { x, y, z, bearing: this.yaw, pitch: Math.min(85, 90 - lookDown), fx: this.fx, fy: this.fy, fz: this.fz };
   }
 }

@@ -19,6 +19,14 @@ export function lin(c: string | number): V3 {
   return v;
 }
 
+/** 단위 공 꼭짓점 — 매번 도형을 새로 만들지 않게 detail마다 한 번만 */
+const balls = new Map<number, Float32Array>();
+function unitBall(detail: number): Float32Array {
+  let a = balls.get(detail);
+  if (!a) { const g = new THREE.IcosahedronGeometry(1, detail); a = (g.attributes.position.array as Float32Array).slice(); g.dispose(); balls.set(detail, a); }
+  return a;
+}
+
 export class GeoBuilder {
   pos: number[] = [];
   nor: number[] = [];
@@ -104,15 +112,13 @@ export class GeoBuilder {
 
   /** 뭉툭한 공(나뭇잎 덩어리 등) — 팔면체를 한 번 쪼갠 것 */
   blob(cx: number, cy: number, cz: number, rx: number, ry: number, rz: number, tint: V3, detail = 1, glow = 0) {
-    const g = new THREE.IcosahedronGeometry(1, detail);
-    const p = g.attributes.position;
-    const base = this.count;
-    for (let i = 0; i < p.count; i++) {
-      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const p = unitBall(detail);
+    const base = this.count, n = p.length / 3;
+    for (let i = 0; i < n; i++) {
+      const x = p[i * 3], y = p[i * 3 + 1], z = p[i * 3 + 2];
       this.vert([cx + x * rx, cy + y * ry, cz + z * rz], [x, y, z], 0, 0, -1, tint, glow);
     }
-    for (let i = 0; i < p.count; i++) this.idx.push(base + i);
-    g.dispose();
+    for (let i = 0; i < n; i++) this.idx.push(base + i);
   }
 
   /** 기울어진 판(차양 등): 네 점을 직접 */

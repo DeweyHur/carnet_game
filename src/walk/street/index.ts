@@ -80,6 +80,7 @@ export class Street {
   private amazeT = 0;
   private cardPlace: Place | null = null;
   private landmarkT = 0;
+  private focusTick = 0;
   readonly landmarksSeen = new Set<string>();
   private readonly c: StreetCtx;
   district = '';
@@ -134,7 +135,9 @@ export class Street {
     // 몸짓
     if (f.emote && !this.busy) this.emote(f.emote);
     // 무엇을 보고 있나
-    this.focusT = b.mode === 'ground' || b.mode === 'sit' ? this.pickFocus() : null;
+    // 바라보는 것은 세 프레임에 한 번만 다시 고른다(가게 수백 곳을 매 프레임 훑지 않게)
+    this.focusTick = (this.focusTick + 1) % 3;
+    if (this.focusTick === 0 || f.interact || f.secondary) this.focusT = b.mode === 'ground' || b.mode === 'sit' ? this.pickFocus() : null;
     this.paintFocus();
     if (this.busy) return;
     if (f.interact) this.primary();
@@ -289,7 +292,7 @@ export class Street {
     if (t.kind === 'spot' && t.spot.kind === 'bench') { this.feed(); return; }
     if (t.kind === 'npc') {
       if (t.npc.role === 'musician') { this.emote('dance'); return; }
-      if (this.quest?.npc === t.npc && this.quest.kind === 'way' && this.quest.place) { this.ui.say(this.npcAt(t.npc), T.ASK_WAY(this.quest.place.name).fr, 3); this.c.hint(`"${this.quest.place.name}"이 있는 쪽을 보고 E. (방향만 맞으면 된다)`); return; }
+      if (this.quest?.npc === t.npc && this.quest.kind === 'way' && this.quest.place) { this.ui.say(this.npcAt(t.npc), T.ASK_WAY(this.quest.place.name).fr, 3, '', t.npc.id); this.c.hint(`"${this.quest.place.name}"이 있는 쪽을 보고 E. (방향만 맞으면 된다)`); return; }
       this.emote('wave');
     }
   }
@@ -346,11 +349,12 @@ export class Street {
       case 'wave': {
         if (!b.wave()) return;
         sfx.bonjour();
+        sfx.say('Bonjour !', 4242);
         // 가까이서 이쪽을 볼 수 있는 사람이 인사를 받는다
         const n = h.crowd.nearest(b.x, b.y, b.facing, 9, (q) => !q.bike && q.role !== 'jogger');
         if (n) {
           if (!n.greeted) { n.greeted = true; this.stats.bonjour++; n.mood = Math.min(1, n.mood + 0.4); }
-          setTimeout(() => { h.crowd.gesture(n, 'wave', 1.4); this.ui.say(this.npcAt(n), n.mood < -0.3 ? 'Mouais…' : T.pick(T.WAVE_BACK), 2.2); }, 350);
+          setTimeout(() => { h.crowd.gesture(n, 'wave', 1.4); this.ui.say(this.npcAt(n), n.mood < -0.3 ? 'Mouais…' : T.pick(T.WAVE_BACK), 2.2, '', n.id); }, 350);
         }
         return;
       }
@@ -389,7 +393,7 @@ export class Street {
       const high = b.z > 12 && d < 1500;
       if (d > l.clear + 90 && !high) continue;
       this.landmarksSeen.add(l.id);
-      sfx.spotBig();
+      sfx.fanfare();
       this.ui.say(() => ({ x: l.x, y: l.y, z: 30 }), `✨ ${l.emoji} ${l.name}`, 4, 'found big');
       this.c.toast(`${l.emoji} ${l.name}${high ? ' — 지붕 위에서 보인다' : ''}`);
     }
@@ -508,7 +512,7 @@ export class Street {
     if (!this.c.pay(cost, what)) return;
     sfx.served();
     b.carry = i === 2 ? null : 'coffee';
-    if (w) this.ui.say(this.npcAt(w), 'Et voilà !', 2);
+    if (w) this.ui.say(this.npcAt(w), 'Et voilà !', 2, '', w.id);
     this.c.terrace(p, what, cost, mins);
     this.c.toast(`☕ ${what} · ${mins}분 · €${cost} — 사람 구경하며 쉬었다 (지침 −12)`);
     setTimeout(() => { if (b.carry === 'coffee') b.carry = null; }, 14000);
@@ -547,6 +551,7 @@ export class Street {
         if (i !== 0) return;
         b.wave();
         sfx.bonjour();
+        sfx.say('Bonjour !', 4242);
         n.greeted = true;
         this.stats.bonjour++;
         this.ui.say(at, 'Bonjour.', 1.6);
@@ -597,7 +602,7 @@ export class Street {
     b.doAct('tip');
     sfx.coin();
     setTimeout(() => {
-      this.ui.say(this.npcAt(n), n.role === 'mime' ? '🙇' : T.MUSICIAN_MERCI.fr, 2.6);
+      this.ui.say(this.npcAt(n), n.role === 'mime' ? '🙇' : T.MUSICIAN_MERCI.fr, 2.6, '', n.id);
       h.crowd.gesture(n, n.role === 'mime' ? 'wave' : 'play', 3);
       this.c.rest(2);
     }, 700);
@@ -612,7 +617,7 @@ export class Street {
     if (i < 0 || i > 2) return;
     const [what, cost, fill] = menu[i];
     if (!this.c.pay(cost, what)) return;
-    this.ui.say(this.npcAt(n), 'Et voilà, bon appétit !', 2);
+    this.ui.say(this.npcAt(n), 'Et voilà, bon appétit !', 2, '', n.id);
     sfx.served();
     b.carry = 'crepe';
     b.doAct('eat');
@@ -641,7 +646,7 @@ export class Street {
     await wait(600);
     this.stats.portraits++;
     this.c.shot('몽마르트르 초상화');
-    this.ui.say(this.npcAt(n), 'Voilà ! Très joli.', 2.5);
+    this.ui.say(this.npcAt(n), 'Voilà ! Très joli.', 2.5, '', n.id);
     this.busy = false;
     h.cam.wantDist = 6.5;
   }
@@ -674,10 +679,11 @@ export class Street {
     if (approach) {
       n.state = 'follow';
       n.followTarget = { x: b.x, y: b.y };
-      this.ui.say(this.npcAt(n), 'Excusez-moi !', 2.5);
+      this.ui.say(this.npcAt(n), 'Excusez-moi !', 2.5, '', n.id);
       sfx.spot();
     }
     this.ui.questLine(`❗ ${this.quest.line}`);
+    sfx.questStart();
     if (!approach) await this.questTalk(this.quest);
   }
 
@@ -725,11 +731,11 @@ export class Street {
     const q = this.quest;
     if (!q) return;
     const n = q.npc;
-    this.ui.say(this.npcAt(n), l.fr, 3);
+    this.ui.say(this.npcAt(n), l.fr, 3, '', n.id);
     this.c.hero.crowd.gesture(n, 'wave', 2);
     this.stats.helped++;
     this.stats.quests.push(what);
-    sfx.spotBig();
+    sfx.questDone();
     this.c.rest(4);
     // 보답: 현지인만 아는 곳 하나
     const p = this.unseenNear(600);
@@ -741,7 +747,7 @@ export class Street {
   private endQuest(l: T.Line | null) {
     const q = this.quest;
     if (q) {
-      if (l) this.ui.say(this.npcAt(q.npc), l.fr, 3);
+      if (l) this.ui.say(this.npcAt(q.npc), l.fr, 3, '', q.npc.id);
       q.npc.tag = undefined;
       q.npc.state = q.npc.bike ? 'ride' : 'walk'; q.npc.timer = 10;
       q.npc.followTarget = null;
@@ -790,7 +796,7 @@ export class Street {
       if (k < 1 && this.quest?.item === it) requestAnimationFrame(fly);
     };
     requestAnimationFrame(fly);
-    this.ui.say(this.npcAt(kid), 'Mon ballon !! 😭', 4);
+    this.ui.say(this.npcAt(kid), 'Mon ballon !! 😭', 4, '', kid.id);
     sfx.spotBig();
     this.ui.questLine(`🎈 ${this.quest.line}`);
     this.c.toast('🎈 아이의 풍선이 지붕 위로 날아갔다! 말을 걸어 보자');
@@ -829,7 +835,7 @@ export class Street {
     const it: Item = { kind: 'dog', x: dx, y: dy, z: 0, mesh, t: 0, follow: false, flee: 0 };
     this.items.add(mesh);
     this.quest = { kind: 'dog', npc: owner, item: it, line: '길 잃은 강아지 비스코트를 찾아 주자 (웅크리고 다가가기)', t: 0 };
-    this.ui.say(this.npcAt(owner), 'Biscotte ! Biscotte !', 4);
+    this.ui.say(this.npcAt(owner), 'Biscotte ! Biscotte !', 4, '', owner.id);
     sfx.bark();
     this.ui.questLine(`🐶 ${this.quest.line}`);
     this.c.toast('🐶 누가 강아지를 부르며 찾고 있다. 말을 걸어 보자');
@@ -909,7 +915,7 @@ export class Street {
     const h = this.c.hero, b = h.body;
     if (h.bumped) {
       this.stats.bumps++;
-      this.ui.say(this.npcAt(h.bumped), T.pick(T.BUMP), 2);
+      this.ui.say(this.npcAt(h.bumped), T.pick(T.BUMP), 2, '', h.bumped.id);
       sfx.bump();
       if (this.stats.bumps === 1) this.c.toast('사람과 부딪혔다. 붐비는 보도에선 걷거나, 구르기(V)로 비켜 가자');
     }
@@ -922,7 +928,7 @@ export class Street {
         for (const n of h.crowd.npcs) {
           const d = Math.hypot(n.x - b.x, n.y - b.y);
           if (d > (musician ? 12 : 7) || n.bike || Math.random() > (musician ? 0.5 : 0.25)) continue;
-          if (n.anchor || n.state !== 'walk') { h.crowd.gesture(n, musician && Math.random() < 0.3 ? 'dance' : 'clap', 2.5); if (Math.random() < 0.3) this.ui.say(this.npcAt(n), T.pick(T.CHEER), 1.6); }
+          if (n.anchor || n.state !== 'walk') { h.crowd.gesture(n, musician && Math.random() < 0.3 ? 'dance' : 'clap', 2.5); if (Math.random() < 0.2) sfx.applause(6); if (Math.random() < 0.3) this.ui.say(this.npcAt(n), T.pick(T.CHEER), 1.6, '', n.id); }
         }
         if (musician && Math.random() < 0.18) { this.c.S.money = Math.round((this.c.S.money + 0.5) * 100) / 100; this.c.toast('🪙 구경꾼이 동전을 던져 줬다 (+€0.5)'); sfx.coin(); }
       }
@@ -932,7 +938,7 @@ export class Street {
     if ((b.mode === 'climb' || b.mode === 'glide') && this.amazeT < 0) {
       this.amazeT = 3.5;
       const n = h.crowd.nearest(b.x, b.y, b.facing + 180, 18, (q) => !q.bike);
-      if (n) { this.ui.say(this.npcAt(n), T.pick(T.AMAZED), 2); h.crowd.gesture(n, 'point', 2); n.facing = bearingOf(b.x - n.x, b.y - n.y); }
+      if (n) { this.ui.say(this.npcAt(n), T.pick(T.AMAZED), 2, '', n.id); h.crowd.gesture(n, 'point', 2); n.facing = bearingOf(b.x - n.x, b.y - n.y); }
     }
   }
 

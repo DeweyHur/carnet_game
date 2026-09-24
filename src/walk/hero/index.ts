@@ -1,5 +1,6 @@
 // 직접 걷는 사람: 몸(물리) + 세계(건물 충돌) + 모습(3D) + 카메라 + 손(입력) + 화면 안내를 묶는다.
 import type { CameraOptions, Map as MlMap } from 'maplibre-gl';
+import { LngLat as LngLatM } from 'maplibre-gl';
 import type { LngLat } from '../graph';
 import { Body } from './body';
 import type { BodyEvent, Intent } from './body';
@@ -111,6 +112,25 @@ export class Hero {
     this.absorb();
   }
 
+  /** 몸은 그대로 두고 좌표의 원점만 지금 자리로 옮긴다(다른 동네로 걸어·날아 들어갈 때). 세계·거리·사람을 새로 읽는다. */
+  rebase() {
+    const at = this.lnglat;
+    const b = this.body;
+    this.frame = new Frame(at);
+    this.world = new World(this.frame);
+    this.town.reset(this.world, this.frame, this.theme);
+    this.setLanes(this.lanes);
+    this.crowd.reset(this.world, this.graphNodes.map((p) => this.frame.toLocal(p)), this.graphAdj, this.theme);
+    this.crowd.seats = this.town.seats;
+    this.crowd.spots = this.town.spots;
+    const cx = this.cam;
+    const dx = b.x, dy = b.y;
+    b.x = 0; b.y = 0;
+    b.safe = { x: 0, y: 0, z: b.z };
+    cx.shift(-dx, -dy);
+    this.absorb();
+  }
+
   /** 가까운 곳으로 자리만 옮긴다(같은 동네) */
   moveTo(at: LngLat) {
     const [x, y] = this.frame.toLocal(at);
@@ -207,7 +227,8 @@ export class Hero {
   drive(dt: number) {
     const f = this.lastF;
     const s = this.cam.update(dt, this.body, this.world, f?.camYaw ?? 0, f?.camPitch ?? 0, f?.zoom ?? 0);
-    const target = this.map.calculateCameraOptionsFromCameraLngLatAltRotation(this.frame.toLngLat(s.x, s.y), s.z, s.bearing, s.pitch, 0);
+    // 지도 중심을 사람 머리(그 높이)에 둔다. 땅에 두면 높이 날 때 중심이 1 km 앞 땅에 찍혀 가까운 절단면에 사람이 잘린다.
+    const target = this.map.calculateCameraOptionsFromTo(LngLatM.convert(this.frame.toLngLat(s.x, s.y)), s.z, LngLatM.convert(this.frame.toLngLat(s.fx, s.fy)), s.fz);
     if (!this.blend) { this.map.jumpTo({ ...target, roll: 0 }); return; }
     const bl = this.blend;
     const t = Math.min(1, (performance.now() - bl.t0) / 1000 / bl.secs);
