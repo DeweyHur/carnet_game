@@ -296,3 +296,42 @@ body.metro-mode #stay-go { opacity:0; pointer-events:none; }
 .metro-photo.on:has(.photo-cap)::after { background:linear-gradient(#0000 35%, #000c); }
 .metro-photo.on:has(.photo-cap) > .metro-credit { left:10px; right:auto; bottom:5px; max-width:calc(100% - 20px); }
 .metro-credit { pointer-events:none; }
+
+/* ───────── 직접 걷기: 기력 바퀴 · 행동 안내 · 터치 조작 ───────── */
+.hwheel { position:fixed; left:0; top:0; width:44px; height:44px; pointer-events:none; z-index:4; opacity:0; transition:opacity .35s; }
+.hwheel.on { opacity:1; }
+.hwheel svg { width:100%; height:100%; transform:rotate(-90deg); filter:drop-shadow(0 1px 2px #0008); }
+.hwheel circle { fill:none; stroke-width:6; stroke-linecap:round; }
+.hwheel .bg { stroke:#0006; }
+.hwheel .cap { stroke:#ffffff26; stroke-dashoffset:0; stroke-linecap:butt; transform:scale(-1,1); transform-origin:center; }
+.hwheel .fg { stroke:#7ee06a; transition:stroke .2s; }
+.hwheel.low .fg { stroke:#ffd166; animation:wlow .5s infinite alternate; }
+.hwheel.ex .fg { stroke:#ff5a3c; animation:wlow .35s infinite alternate; }
+@keyframes wlow { to { opacity:.45; } }
+
+.hprompt { position:fixed; left:50%; bottom:86px; translate:-50% 8px; display:flex; align-items:center; gap:10px; padding:8px 16px 8px 8px; border-radius:999px; background:#1f1b16e6; color:#fff; font-size:15px; opacity:0; pointer-events:none; transition:.2s; z-index:4; box-shadow:0 2px 10px #0006; max-width:92vw; }
+.hprompt.on { opacity:1; translate:-50% 0; pointer-events:auto; }
+.hprompt kbd { display:grid; place-items:center; min-width:28px; height:28px; border-radius:50%; background:#fff; color:#1f1b16; font:700 14px/1 inherit; }
+.hprompt .v { font-weight:700; } .hprompt .w { color:#e9dfcc; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+body:not(.hero-on) .hprompt, body:not(.hero-on) .hwheel { display:none; }
+
+.hhelp { position:fixed; left:12px; bottom:14px; max-width:min(560px, 70vw); padding:8px 12px; border-radius:12px; background:#1f1b16cc; color:#f3ead9; font-size:12.5px; line-height:1.7; z-index:3; pointer-events:none; transition:opacity 1.2s; }
+.hhelp b { color:#ffd166; font-weight:700; }
+.hhelp.seen { opacity:0; }
+body:not(.hero-on) .hhelp, body.touch-play .hhelp { display:none; }
+
+.hstick { position:fixed; width:104px; height:104px; margin:-52px 0 0 -52px; border-radius:50%; background:#ffffff22; border:2px solid #ffffff88; display:none; z-index:4; pointer-events:none; backdrop-filter:blur(2px); }
+.hstick.on { display:block; }
+.hstick i { position:absolute; left:50%; top:50%; width:46px; height:46px; margin:-23px 0 0 -23px; border-radius:50%; background:#fffe; box-shadow:0 2px 8px #0006; }
+
+.hpad { position:fixed; right:14px; bottom:calc(18px + env(safe-area-inset-bottom)); display:none; grid-template-columns:auto auto; gap:10px; align-items:end; z-index:4; }
+body.touch-play.hero-on .hpad { display:grid; }
+.hpad button { width:62px; height:62px; padding:0; border-radius:50%; font-size:14px; font-weight:700; background:#fffe; touch-action:none; user-select:none; -webkit-user-select:none; }
+.hpad .jump { width:78px; height:78px; background:#2d6cdf; color:#fff; }
+.hpad .run.held { background:#ffd166; }
+.hpad .map { grid-column:1 / 3; justify-self:end; width:48px; height:48px; font-size:20px; }
+.hpad .drop { background:#e4572e; color:#fff; }
+.hpad .drop[hidden] { display:none; }
+body.touch-play .hprompt { bottom:auto; top:118px; }
+body.hero-on #hint { bottom:auto; top:110px; }
+body.touch-play.hero-on #hint { top:170px; }

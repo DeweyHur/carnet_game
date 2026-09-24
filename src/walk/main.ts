@@ -29,6 +29,9 @@ import { describe } from './generic';
 import type { Dish } from './content';
 import { openMenu, openVisit } from './inside';
 import type { Shot } from './inside';
+import { Hero } from './hero';
+import type { BodyEvent } from './hero';
+import { angleDiff } from './hero/geo';
 
 maplibregl.setWorkerUrl(workerUrl);
 
@@ -38,21 +41,10 @@ const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 const VISION = 45; // m — 이 안에 들어와야 가게가 "눈에 띈다"
 const NEAR = 70; // m — 이 안에 있어야 들어갈 수 있다
 const WALK_MPS = 1.35; // 실제 보행 속도
-const TIME_SCALE = 9; // 화면에서는 9배속으로 걷는다
-// 카메라: 걸을 때는 바짝 당겨 골목이 보이게, 멈추면 물러나 어디로 갈지 고르게
-const CAM_WALK = { zoom: 18.6, pitch: 64 };
-const CAM_LOOK = { zoom: 17.0, pitch: 48 };
-// 시선 모드: 카메라를 눈높이(1.7m)에 두고 거의 수평으로 본다. 걷기 시작하면 위에서 내려와 눈높이로 붙는다.
-// 3인칭 시점: 카메라를 내 뒤(back m)·위(alt m)에 두고 진행 방향을 내려다본다. 플레이어 모델은 없다.
-// pitch는 84까지만 안정적(그 이상은 MapLibre가 지평선 너머로 중심을 잡아 깨진다)
-const EYE = { alt: 5.5, back: 9, pitch: 76, blendSecs: 3.2 }; // 걷기 시작하면 지금 카메라에서 이 시점까지 blendSecs 동안 부드럽게
-// 시야: 걷는 동안은 진행 방향 ±FOV° 안, SIGHT m 이내, 지금 걷는 길에서 STREET m 이내의 가게만 보인다.
+// 시야: 달리는 동안은 카메라가 보는 쪽 ±FOV° 안, SIGHT m 이내만 보인다. 자동으로 걸을 때는 지금 걷는 길에서 STREET m 이내만.
 const FOV = 70;
 const SIGHT = 60;
 const STREET = 24;
-let eyeMode = (() => { try { return localStorage.getItem('carnet-walk-eye') !== '0'; } catch { return true; } })();
-let walkStartedAt = 0;
-let camFrom: { center: LngLat; zoom: number; pitch: number; bearing: number } | null = null; // 걷기 시작 순간의 카메라
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
 interface Visit { place: Place; at: number; mins: number; cost: number; dishes?: Dish[]; seen?: number; total?: number }
@@ -95,6 +87,8 @@ let map: MlMap;
 let graph: Graph;
 let places: Place[] = [];
 let avatar: Marker;
+let hero: Hero;
+let mapMode = false; // 🗺 지도 보기(위에서 내려다보며 목적지를 찍는다)
 const markers = new Map<string, Marker>();
 let openPlace: Place | null = null;
 
@@ -137,6 +131,10 @@ async function boot() {
     map = new maplibregl.Map({ container: 'map', style: st.style, center: S.pos, zoom: 18.4, pitch: 25, bearing: -20, attributionControl: { compact: true }, maxPitch: 85, maxZoom: 24, clickTolerance: 10 }); // 살짝 끌린 손가락은 클릭으로 치지 않는다
     map.on('load', () => {
       dressMap(st.fallback, ways);
+      hero = new Hero(map, () => setMapMode(!mapMode));
+      hero.attach();
+      hero.reset(S.pos);
+      hero.hud.onPrompt = () => prompt?.act();
       status.textContent = '';
       $('#go').removeAttribute('disabled');
       $('#go').textContent = '파리에 도착했다';
@@ -152,6 +150,14 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
   map.setSky({ 'sky-color': '#a9c9ec', 'horizon-color': '#efe3d2', 'fog-color': '#efe3d2', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.9 });
   // 기본 지도의 가게·명소 라벨을 끈다. 걸어가서 봐야 보인다.
   for (const l of layers) if ('source-layer' in l && l['source-layer'] === 'poi') map.setLayoutProperty(l.id, 'visibility', 'none');
+  // 직접 걸을 때는 건물이 비쳐 보이면 벽인지 알 수 없다. 불투명하게, 파리의 크림색 석회암 톤으로.
+  for (const l of layers) if (l.type === 'fill-extrusion') {
+    map.setPaintProperty(l.id, 'fill-extrusion-opacity', 1);
+    map.setPaintProperty(l.id, 'fill-extrusion-color', ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 10], 4, '#e3d6bd', 14, '#ece2cc', 30, '#f3ecdc']);
+  }
+  // 도로 선·글자가 건물 벽을 뚫고 보이지 않게, 입체 건물을 평면 층들 위로 올린다
+  for (const l of layers) if (l.type === 'fill-extrusion') map.moveLayer(l.id);
+  map.setVerticalFieldOfView(52); // 게임처럼 넓게
   if (!fallback && !layers.some((l) => l.type === 'fill-extrusion')) {
     const src = Object.entries(map.getStyle().sources).find(([, s]) => s.type === 'vector')?.[0];
     if (src) map.addLayer({ id: 'walk-3d', type: 'fill-extrusion', source: src, 'source-layer': 'building', minzoom: 14,
@@ -184,11 +190,14 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
   map.on('click', (e) => {
     if (!S.started || S.finished || metroOpen) return;
     if (openPlace) { closeCard('pass'); return; }
-    // 색칠된 건물을 눌렀나? 걷는 중이면 멈춰서 바라본다.
+    // 색칠된 건물을 눌렀나? 가까우면 들여다보고, 멀면 카드에서 걸어갈지 고른다.
     const hit = map.queryRenderedFeatures(e.point, { layers: ['hl'] })[0];
     const pl = hit && places.find((p) => p.id === hit.properties?.pid);
-    if (pl && dist(S.pos, pl.pos) <= NEAR) { openCard(pl); return; }
+    if (pl) { openCard(pl); return; }
+    // 땅을 찍어 걸어가는 건 지도 보기에서만. 평소에는 직접 걷는다.
+    if (!mapMode) return;
     walkTo([e.lngLat.lng, e.lngLat.lat], null);
+    setMapMode(false);
   });
 }
 
@@ -270,52 +279,6 @@ function walkTo(dest: LngLat, target: Place | null) {
   S.legs.push(target ? 'place' : 'wander');
   (map.getSource('route') as GeoJSONSource).setData(line(S.path));
   hint('');
-  camera('walk');
-}
-
-let camMode: 'walk' | 'look' | '' = '';
-function camera(mode: 'walk' | 'look') {
-  if (camMode === mode) return;
-  camMode = mode;
-  const c = mode === 'walk' ? CAM_WALK : CAM_LOOK;
-  // 걷는 동안은 frame()이 매 프레임 카메라를 잡고 있으므로 거기서 서서히 당긴다. 멈춰 있을 때만 easeTo.
-  if (mode === 'walk') {
-    walkStartedAt = performance.now();
-    const c0 = map.getCenter();
-    camFrom = { center: [c0.lng, c0.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() };
-    if (eyeMode) { map.stop(); map.setCenterClampedToGround(false); avatar.getElement().classList.add('hidden'); }
-  }
-  if (mode === 'look') {
-    map.setCenterClampedToGround(true);
-    avatar.getElement().classList.remove('hidden');
-    map.easeTo({ center: S.pos, zoom: c.zoom, pitch: c.pitch, elevation: 0, duration: 1300, easing: (t) => 1 - Math.pow(1 - t, 3) });
-  }
-}
-
-const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + 540) % 360) - 180) * t;
-
-/** 3인칭 시점의 한 프레임: 카메라를 내 뒤·위에 놓고 진행 방향을 본다. 걷기 시작 후 blendSecs 동안은 원래 카메라에서 서서히 넘어온다. */
-function eyeFrame(bearing: number) {
-  if (!Number.isFinite(bearing)) bearing = S.heading || 0;
-  const target = map.calculateCameraOptionsFromCameraLngLatAltRotation(offset(S.pos, bearing + 180, EYE.back), EYE.alt, bearing, EYE.pitch, 0); // roll을 빼면 NaN이 들어가 행렬이 깨진다
-  const t = Math.min(1, (performance.now() - walkStartedAt) / 1000 / EYE.blendSecs);
-  if (t >= 1 || !camFrom) { map.jumpTo(target); return; }
-  const w = t * t * (3 - 2 * t); // smoothstep
-  const tc = target.center as maplibregl.LngLat;
-  map.jumpTo({
-    center: [camFrom.center[0] + (tc.lng - camFrom.center[0]) * w, camFrom.center[1] + (tc.lat - camFrom.center[1]) * w],
-    zoom: camFrom.zoom + ((target.zoom ?? camFrom.zoom) - camFrom.zoom) * w,
-    pitch: camFrom.pitch + ((target.pitch ?? camFrom.pitch) - camFrom.pitch) * w,
-    bearing: lerpAngle(camFrom.bearing, target.bearing ?? camFrom.bearing, w),
-    elevation: (target.elevation ?? 0) * w,
-    roll: 0,
-  });
-}
-
-/** p에서 방위 brg 쪽으로 m미터 이동한 점 */
-function offset(p: LngLat, brg: number, m: number): LngLat {
-  const r = (brg * Math.PI) / 180;
-  return [p[0] + (Math.sin(r) * m) / (111320 * Math.cos((p[1] * Math.PI) / 180)), p[1] + (Math.cos(r) * m) / 111320];
 }
 
 /** 점 q가 선분 a–b에서 얼마나 떨어져 있나(m) */
@@ -334,11 +297,14 @@ function distToSeg(q: LngLat, a: LngLat, b: LngLat): number {
 function inSight(p: Place): boolean {
   const d = dist(S.pos, p.pos);
   const f = sightFactor(S); // 배고프면 주변이 덜 눈에 들어온다
-  if (d > (S.path.length > 1 ? SIGHT : VISION) * f) return false;
-  if (S.path.length > 1) {
-    const rel = ((bearing(S.pos, p.pos) - S.heading + 540) % 360) - 180;
+  const moving = hero ? hero.body.speed > 0.6 || S.path.length > 1 : S.path.length > 1;
+  if (d > (moving ? SIGHT : VISION) * f) return false;
+  if (moving) {
+    // 직접 걸을 때는 카메라가 보는 쪽(화면에 보이는 것), 자동으로 걸을 때는 걷는 방향
+    const rel = angleDiff(S.path.length > 1 || !hero ? S.heading : hero.cam.yaw, bearing(S.pos, p.pos));
     if (Math.abs(rel) > FOV && d > 12) return false;
     // 지금 걷는 길가에 있는 것만 — 앞으로 갈 몇 구간을 기준으로 잰다
+    if (S.path.length < 2) return true;
     let near = false;
     for (let i = Math.max(0, S.seg - 1); i + 1 < S.path.length && i < S.seg + 8; i++) if (distToSeg(p.pos, S.path[i], S.path[i + 1]) <= STREET) { near = true; break; }
     if (!near) return false;
@@ -347,51 +313,163 @@ function inSight(p: Place): boolean {
 }
 
 let lastT = 0;
-let stepAcc = 0;
 let lookAcc = 0;
-let leftFoot = false;
+let wasCamOn = false;
+let lastTrail: LngLat = START;
+let splashed = false;
+let climbT = 0;
+let prompt: { verb: string; what: string; act: () => void } | null = null;
+const MODALS = ['inside', 'dest', 'trip', 'metro', 'summary'];
+const modalOpen = () => MODALS.some((id) => document.getElementById(id)?.classList.contains('on'));
+const HANDLERS = ['dragPan', 'dragRotate', 'scrollZoom', 'boxZoom', 'doubleClickZoom', 'keyboard', 'touchZoomRotate', 'touchPitch'] as const;
+/** 직접 걷는 동안에는 지도가 끌리거나 돌지 않게 한다(카메라는 사람이 잡는다) */
+function mapHandlers(on: boolean) {
+  for (const h of HANDLERS) { const x = map[h] as { enable(): void; disable(): void }; if (on) x.enable(); else x.disable(); }
+}
+
 function frame(t: number) {
   const dt = Math.min(0.1, (t - lastT) / 1000 || 0);
   lastT = t;
-  if (S.path.length > 1 && !openPlace && !S.finished) {
-    let move = WALK_MPS * TIME_SCALE * dt * paceFactor(S);
-    let guard = 0;
-    while (move > 0 && S.seg + 1 < S.path.length && guard++ < 200) {
-      const next = S.path[S.seg + 1];
-      const d = dist(S.pos, next);
-      if (d > 0.3) S.heading = bearing(S.pos, next);
-      if (d <= move) { S.pos = next; S.seg++; move -= d; S.walked += d; S.clock += d / WALK_MPS / 60; drain(S, d / WALK_MPS / 60, d); }
-      else { const k = move / d; S.pos = [S.pos[0] + (next[0] - S.pos[0]) * k, S.pos[1] + (next[1] - S.pos[1]) * k]; S.walked += move; S.clock += move / WALK_MPS / 60; drain(S, move / WALK_MPS / 60, move); move = 0; }
-    }
-    if (!Number.isFinite(S.pos[0]) || !Number.isFinite(S.pos[1])) { // 좌표가 깨지면 마지막 멀쩡한 노드로 되돌린다
-      S.pos = S.path[Math.min(S.seg, S.path.length - 1)] ?? graph.nodes[nearestNode(graph, district.start)];
-      S.path = []; toast('길을 잃었어요. 다시 골라 주세요.'); camera('look');
-    }
+  if (hero) heroFrame(dt);
+  lookAcc += dt;
+  if (lookAcc > 0.12 && S.started && !metroOpen) { lookAcc = 0; look(); hud(); findPrompt(); }
+  requestAnimationFrame(frame);
+}
+
+/** 자동으로 걷던 걸 멈춘다(사람이 직접 움직이면) */
+function cancelAuto() {
+  S.path = [];
+  S.target = null;
+  S.travelTo = null;
+  S.travelGate = null;
+  S.restAt = false;
+  (map.getSource('route') as GeoJSONSource).setData(line([]));
+  hint('');
+}
+
+function heroFrame(dt: number) {
+  const quiet = document.body.classList.contains('metro-mode');
+  const live = S.started && !S.finished && !metroOpen && !quiet;
+  const modal = modalOpen();
+  hero.visible = S.started && !quiet && !metroOpen;
+  hero.input.enabled = live && !modal && !mapMode;
+  hero.input.allowMapKey = live && !modal;
+  hero.hud.show(live && !mapMode);
+  const camOn = live && !mapMode;
+  if (camOn !== wasCamOn) {
+    wasCamOn = camOn;
+    if (camOn) { hero.resume(S.walked ? 1.3 : 2.6); mapHandlers(false); avatar.getElement().classList.add('hidden'); }
+    else { map.setCenterClampedToGround(true); mapHandlers(true); if (mapMode) avatar.getElement().classList.remove('hidden'); }
+    if (map.getLayer('vision')) map.setLayoutProperty('vision', 'visibility', camOn || quiet ? 'none' : 'visible');
+  }
+  if (!S.started) return;
+  const auto = S.path.length > 1 && S.seg + 1 < S.path.length ? S.path[S.seg + 1] : null;
+  const frozen = !live || !!openPlace || modal || mapMode;
+  const r = hero.tick(dt, {
+    waypoint: auto,
+    frozen,
+    pace: paceFactor(S),
+    maxStamina: 1 - 0.45 * (S.tired / 100), // 지칠수록 기력 바퀴가 작아진다
+    beacon: S.path.length > 1 ? S.path[S.path.length - 1] : null,
+  });
+  if (r.f.map && live && !modal) { setMapMode(!mapMode); return; } // 이번 프레임에 카메라를 잡으면 지도 보기 전환(easeTo)이 끊긴다
+  if (!live) { if (camOn) hero.drive(dt); map.triggerRepaint(); return; }
+  if (r.user && S.path.length > 1) cancelAuto();
+  if (r.f.interact && prompt && !frozen) prompt.act();
+
+  const b = hero.body;
+  S.pos = hero.lnglat;
+  S.heading = hero.heading;
+  if (b.moved > 0 || b.lift > 0) {
+    const mins = (b.moved + b.lift * 2) / WALK_MPS / 60;
+    S.walked += b.moved;
+    S.clock += mins;
+    drain(S, mins, b.moved + b.lift * 3); // 오르는 건 걷는 것보다 힘들다
+  }
+  if (dist(lastTrail, S.pos) > 3) {
+    lastTrail = S.pos;
     S.trail.push(S.pos);
-    avatar.setLngLat(S.pos);
     (map.getSource('trail') as GeoJSONSource).setData(line(S.trail));
-    (map.getSource('vision') as GeoJSONSource).setData(circle(S.pos, VISION));
+  }
+  avatar.setLngLat(S.pos);
+  if (mapMode) (map.getSource('vision') as GeoJSONSource).setData(circle(S.pos, VISION));
+  if (S.path.length > 1) {
+    if (r.arrivedWaypoint) S.seg++;
     (map.getSource('route') as GeoJSONSource).setData(line([S.pos, ...S.path.slice(S.seg + 1)]));
-    const cur = map.getBearing();
-    const diff = ((S.heading - cur + 540) % 360) - 180;
-    const k = Math.min(1, dt * 1.6);
-    const nb = cur + diff * Math.min(1, dt * (eyeMode ? 1.5 : 1.2));
-    if (eyeMode) eyeFrame(nb);
-    else map.jumpTo({ center: S.pos, bearing: nb, zoom: map.getZoom() + (CAM_WALK.zoom - map.getZoom()) * k, pitch: map.getPitch() + (CAM_WALK.pitch - map.getPitch()) * k });
-    stepAcc += dt;
-    if (stepAcc > 0.34) { stepAcc = 0; leftFoot = !leftFoot; sfx.step(leftFoot); }
     if (S.seg + 1 >= S.path.length) arrive();
   }
-  else if (S.path.length > 1 && openPlace && eyeMode && !S.finished) {
-    // 걷다가 건물을 눌러 멈춘 상태: 그 건물 쪽으로 천천히 고개를 돌린다
-    const want = bearing(S.pos, openPlace.pos);
-    const cur = map.getBearing();
-    const diff = ((want - cur + 540) % 360) - 180;
-    eyeFrame(cur + diff * Math.min(1, dt * 2));
+  for (const e of hero.events) onBodyEvent(e);
+  if (b.mode === 'climb' && b.climbMove > 0.1) { climbT += dt; if (climbT > 0.38) { climbT = 0; sfx.climbStep(); } }
+  if (camOn) hero.drive(dt);
+  map.triggerRepaint();
+}
+
+function onBodyEvent(e: BodyEvent) {
+  switch (e) {
+    case 'stepL': case 'stepR': sfx.step(e === 'stepL'); break;
+    case 'jump': sfx.jump(); break;
+    case 'land': sfx.land(); break;
+    case 'hurt':
+      sfx.hurt();
+      S.tired = Math.min(100, S.tired + 6);
+      toast('쿵! 높은 데서 그냥 뛰어내렸다. 다리가 저릿하다 (지침 +6)');
+      break;
+    case 'glide': sfx.glide(); break;
+    case 'unglide': sfx.unglide(); break;
+    case 'grab': sfx.grab(); break;
+    case 'climbjump': sfx.climbJump(); break;
+    case 'mantle': sfx.mantle(); break;
+    case 'splash':
+      sfx.splash();
+      if (!splashed) { splashed = true; toast('풍덩! 물에 뛰어들었다'); }
+      break;
+    case 'stroke': sfx.stroke(); break;
+    case 'drown':
+      S.tired = Math.min(100, S.tired + 10);
+      toast('힘이 빠져 물가로 끌려 나왔다 (지침 +10)');
+      break;
+    case 'exhausted': sfx.exhausted(); break;
+    case 'recovered': sfx.recovered(); break;
   }
-  lookAcc += dt;
-  if (lookAcc > 0.12 && S.started && !metroOpen) { lookAcc = 0; look(); hud(); }
-  requestAnimationFrame(frame);
+}
+
+/** 가까이 있는 것 중 하나를 골라 "E 살펴보기" 같은 안내를 띄운다 */
+function findPrompt() {
+  prompt = null;
+  if (hero && S.started && !S.finished && !metroOpen && !openPlace && !mapMode && hero.body.mode === 'ground' && !modalOpen()) {
+    let bd = Infinity;
+    for (const p of places) {
+      const d = dist(S.pos, p.pos);
+      if (d > 16) continue;
+      const score = d + (Math.abs(angleDiff(S.heading, bearing(S.pos, p.pos))) > 80 && d > 4 ? 12 : 0);
+      if (score < bd) { bd = score; prompt = { verb: S.visits.some((v) => v.place.id === p.id) ? '다시 보기' : '살펴보기', what: `${p.emoji} ${p.name}`, act: () => openCard(p) }; }
+    }
+    for (const { st, g } of allGates(district)) {
+      const d = dist(S.pos, g.pos);
+      if (d < 12 && d < bd) { bd = d; prompt = { verb: '지하철 타기', what: `Ⓜ ${st.name}`, act: chooseDestination }; }
+    }
+    const st = S.stay;
+    if (st && st.district === district.id) {
+      const d = dist(S.pos, st.pos);
+      if (d < 16 && d < bd) { bd = d; prompt = { verb: '들어가 쉬기', what: `🛏 ${st.name}`, act: goRest }; }
+    }
+  }
+  hero?.hud.setPrompt(prompt);
+}
+
+/** 🗺 지도 보기: 위에서 내려다보고, 찍은 곳까지 알아서 걸어간다. 여는 동안 시간은 멈춘다. */
+function setMapMode(on: boolean) {
+  if (on && (!S.started || S.finished || metroOpen || openPlace || document.body.classList.contains('metro-mode'))) return;
+  if (mapMode === on) return;
+  mapMode = on;
+  document.body.classList.toggle('map-mode', on);
+  paintEye();
+  if (on) {
+    map.stop();
+    map.setCenterClampedToGround(true);
+    map.easeTo({ center: S.pos, zoom: 16.4, pitch: 0, bearing: 0, elevation: 0, roll: 0, duration: 900 });
+    hint('가고 싶은 곳을 누르면 거기까지 알아서 걸어갑니다. M 또는 🗺으로 돌아가기.');
+  } else hint('');
 }
 
 function arrive() {
@@ -399,7 +477,6 @@ function arrive() {
   (map.getSource('route') as GeoJSONSource).setData(line([]));
   const t = S.target;
   S.target = null;
-  camera('look');
   if (S.restAt) { S.restAt = false; goRest(); return; }
   if (S.travelTo) { const d = S.travelTo; const g = S.travelGate ?? nearestGate(); S.travelTo = null; S.travelGate = null; void ride(d, g); return; }
   if (t) openCard(t);
@@ -664,7 +741,7 @@ async function ride(target: Dest, gate: Gate) {
   const r = await openMetro(district, dest, j, gate, target.place ?? null, () => { pre = loadDistrict(dest, () => {}).catch(() => null); }, metroMap);
   metroMap.clear();
   metroOpen = false;
-  if (!r) { camera('look'); map.easeTo({ center: S.pos, zoom: CAM_LOOK.zoom, pitch: CAM_LOOK.pitch, duration: 900 }); return; }
+  if (!r) return; // 타지 않고 돌아섰다 — 카메라는 사람 뒤로 돌아온다
   S.clock += r.mins;
   S.money = Math.round((S.money - r.cost) * 100) / 100;
   S.fares = Math.round((S.fares + r.cost) * 100) / 100;
@@ -707,15 +784,16 @@ async function enterDistrict(d: District, at: LngLat) {
   S.seg = 0;
   S.target = null;
   S.trail = [S.pos];
-  camMode = '';
-  camera('look');
+  lastTrail = S.pos;
+  const next = graph.adj[S.node]?.[0];
+  hero.reset(S.pos, next ? bearing(S.pos, graph.nodes[next.to]) : 0);
+  wasCamOn = false; // 다음 프레임에 위에서 내려오며 사람 뒤로 붙는다
   avatar.setLngLat(S.pos);
   (map.getSource('trail') as GeoJSONSource).setData(line(S.trail));
   (map.getSource('route') as GeoJSONSource).setData(line([]));
   (map.getSource('vision') as GeoJSONSource).setData(circle(S.pos, VISION));
   if (map.getSource('streets')) (map.getSource('streets') as GeoJSONSource).setData({ type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: data.ways } });
-  map.jumpTo({ center: S.pos, zoom: 18.6, pitch: 30, bearing: 20 });
-  map.easeTo({ center: S.pos, zoom: CAM_LOOK.zoom, pitch: CAM_LOOK.pitch, duration: 2400 });
+  map.jumpTo({ center: S.pos, zoom: 17.4, pitch: 40, bearing: hero.heading - 30, elevation: 0 });
   for (const p of places) if (p.known) showMarker(p, false);
   showStationMarker();
   showStayMarker();
@@ -874,7 +952,7 @@ async function start() {
   if (m.fed) eat(S, m.fed, 10); else rest(S, 6);
   hud();
   toast(`${a.stay.name} · ${fmtClock(S.clock)}`);
-  hint(`${m.line} 지도에서 아무 데나 누르면 그쪽으로 걸어갑니다.`);
+  hint(`${m.line} ${hero.input.touched || matchMedia('(pointer: coarse)').matches ? '왼쪽 아래를 끌어 걷고, 오른쪽을 끌어 둘러봅니다.' : 'WASD로 걷고, 마우스를 끌어 둘러봅니다. Shift 달리기 · Space 점프.'}`);
   setTimeout(() => hint(''), 8000);
 }
 
@@ -981,28 +1059,16 @@ function paintMetroBtn() {
 }
 $('#go').addEventListener('click', start);
 const eyeBtn = $<HTMLButtonElement>('#eye');
-const paintEye = () => { eyeBtn.textContent = eyeMode ? '👁 시선' : '🚁 위에서'; eyeBtn.title = eyeMode ? '걸을 때 눈높이에서 본다 (누르면 위에서 보기)' : '걸을 때 위에서 본다 (누르면 눈높이)'; };
+function paintEye() { eyeBtn.textContent = mapMode ? '🚶 걷기' : '🗺 지도'; eyeBtn.title = mapMode ? '다시 직접 걷는다 (M)' : '위에서 내려다보고 갈 곳을 찍는다 (M)'; }
 paintEye();
-eyeBtn.addEventListener('click', () => {
-  eyeMode = !eyeMode;
-  try { localStorage.setItem('carnet-walk-eye', eyeMode ? '1' : '0'); } catch { /* 무시 */ }
-  paintEye();
-  if (camMode === 'walk') {
-    const c0 = map.getCenter();
-    camFrom = { center: [c0.lng, c0.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() };
-    walkStartedAt = performance.now();
-    map.setCenterClampedToGround(!eyeMode);
-    avatar.getElement().classList.toggle('hidden', eyeMode);
-    if (!eyeMode) map.easeTo({ center: S.pos, elevation: 0, zoom: CAM_WALK.zoom, pitch: CAM_WALK.pitch, roll: 0, duration: 1500 });
-  }
-});
+eyeBtn.addEventListener('click', () => { eyeBtn.blur(); setMapMode(!mapMode); });
 $('#end').addEventListener('click', finish);
 $('#again').addEventListener('click', () => location.reload());
-window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openPlace) closeCard('pass'); });
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (openPlace) closeCard('pass'); else if (mapMode) setMapMode(false); } });
 // 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
 // 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
 window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
-if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, walkTo, openCard, finish, places: () => places, graph: () => graph, map: () => map };
+if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, quick: async () => { $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, places: () => places, graph: () => graph, map: () => map };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();

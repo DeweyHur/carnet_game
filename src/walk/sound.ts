@@ -63,3 +63,37 @@ export const pageTurn = () => tone(240, 0, 0.09, 0.05, 'triangle');
 export const tick = () => tone(1500, 0, 0.04, 0.04, 'square');
 export const shutter = () => { tone(2200, 0, 0.03, 0.09, 'square'); tone(900, 0.05, 0.05, 0.08, 'square'); };
 export const served = () => { tone(1568, 0, 0.5, 0.05); tone(2093, 0.12, 0.7, 0.04); };
+
+// ───────── 직접 걸을 때: 점프·착지·활공·벽타기·물 ─────────
+/** 걸러 낸 잡음 한 줌(바람·물·옷자락) */
+function hiss(dur: number, gain: number, from: number, to: number, type: BiquadFilterType = 'bandpass') {
+  if (!ctx) return;
+  const src = ctx.createBufferSource();
+  src.buffer = noise(Math.max(0.1, dur));
+  const f = ctx.createBiquadFilter();
+  f.type = type;
+  f.Q.value = 0.9;
+  f.frequency.setValueAtTime(from, ctx.currentTime);
+  f.frequency.exponentialRampToValueAtTime(to, ctx.currentTime + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, ctx.currentTime);
+  g.gain.linearRampToValueAtTime(gain, ctx.currentTime + Math.min(0.04, dur / 3));
+  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+  src.connect(f).connect(g).connect(ctx.destination);
+  src.start();
+  src.stop(ctx.currentTime + dur + 0.05);
+}
+export const jump = () => { hiss(0.18, 0.5, 700, 1800); tone(180, 0, 0.08, 0.05, 'triangle'); };
+export const land = () => { tone(70, 0, 0.12, 0.16, 'triangle'); hiss(0.12, 0.35, 900, 300); };
+export const hurt = () => { tone(55, 0, 0.3, 0.25, 'triangle'); tone(220, 0.05, 0.18, 0.06, 'sawtooth'); };
+export const glide = () => { hiss(0.35, 0.8, 300, 2400); tone(392, 0.05, 0.15, 0.04); tone(587, 0.12, 0.2, 0.04); };
+export const unglide = () => hiss(0.2, 0.5, 1800, 400);
+export const grab = () => { tone(140, 0, 0.06, 0.1, 'square'); hiss(0.08, 0.3, 2000, 900); };
+export const climbStep = () => hiss(0.07, 0.18, 1600, 700);
+export const climbJump = () => { hiss(0.22, 0.5, 600, 2000); tone(260, 0, 0.1, 0.05, 'triangle'); };
+export const mantle = () => { hiss(0.25, 0.3, 500, 1500); tone(120, 0.18, 0.08, 0.1, 'triangle'); };
+export const splash = () => hiss(0.6, 1.1, 2500, 300, 'lowpass');
+export const stroke = () => hiss(0.3, 0.35, 1200, 400, 'lowpass');
+export const exhausted = () => { for (let i = 0; i < 3; i++) setTimeout(() => hiss(0.28, 0.28, 900, 500), i * 420); };
+export const recovered = () => { tone(784, 0, 0.12, 0.04); tone(1046, 0.08, 0.2, 0.04); };
+export const staminaTick = () => tone(1760, 0, 0.05, 0.025, 'square');
