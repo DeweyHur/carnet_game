@@ -244,7 +244,8 @@ function look() {
       const [px, py] = hero.frame.toLocal(p.pos);
       const f = p.minor ? null : hero.town.front({ id: p.id, x: px, y: py });
       const ax = f ? f.x + f.nx * 0.8 : px, ay = f ? f.y + f.ny * 0.8 : py;
-      street.ui.say(() => ({ x: ax, y: ay, z: f ? 5.4 : 2.6 }), `✨ ${p.emoji} ${p.name}`, p.curated ? 3.2 : 2.2, p.curated ? 'found big' : 'found');
+      const gz = hero.world.terrain(ax, ay);
+      street.ui.say(() => ({ x: ax, y: ay, z: gz + (f ? 5.4 : 2.6) }), `✨ ${p.emoji} ${p.name}`, p.curated ? 3.2 : 2.2, p.curated ? 'found big' : 'found');
     }
     if (p.curated) { sfx.spotBig(); toast(`${p.emoji} ${p.name}`); } else sfx.spot();
   }
@@ -506,7 +507,7 @@ function heroFrame(dt: number) {
 
 function onBodyEvent(e: BodyEvent) {
   switch (e) {
-    case 'stepL': case 'stepR': sfx.step(e === 'stepL', hero.body.z > 2.5 ? 'roof' : 'stone'); break;
+    case 'stepL': case 'stepR': sfx.step(e === 'stepL', hero.body.z - hero.world.terrain(hero.body.x, hero.body.y) > 2.5 ? 'roof' : 'stone'); break;
     case 'jump': sfx.jump(); break;
     case 'land': sfx.land(); break;
     case 'hurt':

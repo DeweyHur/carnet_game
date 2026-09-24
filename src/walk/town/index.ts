@@ -9,7 +9,7 @@ import type { Frame } from '../hero/geo';
 import { T } from './atlas';
 import { addBuilding } from './buildings';
 import type { Theme } from './buildings';
-import { GeoBuilder, hash } from './geom';
+import { GeoBuilder, hash, lin } from './geom';
 import { poolMaterial, townMaterial, townUniforms } from './material';
 import { awning, circleRing, rectRing, rotFacing, stamp, template } from './props';
 import { procedural } from './procedural';
@@ -86,7 +86,7 @@ export class Town {
   backlog = 0;
   inView = 0;
   /** 이 동네 원점 기준 랜드마크(로컬 m) */
-  landmarks: { id: string; name: string; emoji: string; x: number; y: number; clear: number; zone?: { style: string; r: number } }[] = [];
+  landmarks: { id: string; name: string; emoji: string; x: number; y: number; z: number; clear: number; zone?: { style: string; r: number } }[] = [];
   private landmarkMesh: THREE.Mesh | null = null;
   private movers: THREE.Object3D[] = [];
   private extras: THREE.Object3D[] = [];
@@ -151,13 +151,16 @@ export class Town {
     for (const L of LANDMARKS) {
       const [x, y] = this.frame.toLocal(L.pos);
       if (Math.hypot(x, y) > 7000) continue;
-      this.landmarks.push({ id: L.id, name: L.name, emoji: L.emoji, x, y, clear: L.clear, zone: L.zone });
+      const oz = this.world.relief.hill(x, y); // 언덕 위 랜드마크(사크레쾨르 등)
+      this.landmarks.push({ id: L.id, name: L.name, emoji: L.emoji, x, y, z: oz, clear: L.clear, zone: L.zone });
       if (!L.build) continue;
       const rot = ((90 - L.bearing) * Math.PI) / 180;
-      const b = new LB(g, x, y, rot, (rings, base, top) => { this.world.addSolid(rings, base, top, 'building'); });
+      const b = new LB(g, x, y, rot, (rings, base, top) => { this.world.addSolid(rings, base + oz, top + oz, 'building', undefined, true); });
+      g.dz = oz;
       L.build(b);
-      for (const m of b.movers) { this.scene.add(m); this.movers.push(m); }
-      for (const m of b.extras) { this.scene.add(m); this.extras.push(m); }
+      g.dz = 0;
+      for (const m of b.movers) { m.position.z += oz; this.scene.add(m); this.movers.push(m); }
+      for (const m of b.extras) { m.position.z += oz; this.scene.add(m); this.extras.push(m); }
     }
     const geo = g.build();
     if (geo) { this.landmarkMesh = new THREE.Mesh(geo, this.farMat); this.landmarkMesh.frustumCulled = false; this.scene.add(this.landmarkMesh); }
@@ -348,6 +351,38 @@ export class Town {
     return null;
   };
 
+  /** 언덕 위 건물: 평지에 짓듯 만들고(상대 높이) 꼭짓점을 그 자리 땅만큼 올린다. 비탈 아래쪽은 돌 기단으로 메운다. */
+  private addLifted(g: GeoBuilder, s: Solid, env: Parameters<typeof addBuilding>[2]) {
+    const gz = s.gz ?? 0;
+    if (!gz) { addBuilding(g, s, env); return; }
+    const lifted = s.base <= gz - 0.05;
+    const rel: Solid = { ...s, top: s.top - gz, base: lifted ? 0 : s.base - gz };
+    const w = env.world;
+    const relWorld = {
+      buildingTopAt: (x: number, y: number, ex?: Solid) => { const t = w.buildingTopAt(x, y, ex === rel ? s : ex); return t > 0 ? Math.max(0.01, t - gz) : 0; },
+      addSolid: (rings: Float64Array[], b: number, t: number, k: Solid['kind']) => w.addSolid(rings, b + gz, t + gz, k, undefined, true),
+    } as unknown as World;
+    g.dz = gz;
+    addBuilding(g, rel, { ...env, world: relWorld });
+    // 기단: 가장 낮은 모서리(바닥)부터 0(상대)까지 돌벽
+    if (lifted && s.base < gz - 0.35) {
+      const r = s.render!.rings[0];
+      const n = r.length / 2;
+      let area = 0;
+      for (let i = 0; i < n; i++) { const j = (i + 1) % n; area += r[i * 2] * r[j * 2 + 1] - r[j * 2] * r[i * 2 + 1]; }
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        const ax = r[i * 2], ay = r[i * 2 + 1], bx = r[j * 2], by = r[j * 2 + 1];
+        const L = Math.hypot(bx - ax, by - ay);
+        if (L < 0.3) continue;
+        let nx = (by - ay) / L, ny = -(bx - ax) / L;
+        if (area < 0) { nx = -nx; ny = -ny; }
+        g.wall(ax, ay, bx, by, s.base - gz, 0.02, nx, ny, [0, L / 2.9], [0, (gz - s.base) / 3.05], T.blankStone, lin('#e8dcc3'), s.render!.seed);
+      }
+    }
+    g.dz = 0;
+  }
+
   /** 칸 하나 짓기 — 건물·가구 몇 개마다 쉬어 가는 생성기. 다 지을 때까지 옛 메시는 그대로 둔다(깜빡이지 않게). */
   private *buildSteps(c: Cell): Generator<void, void, void> {
     const old = { mesh: c.mesh, pools: c.pools, signs: c.signs };
@@ -358,13 +393,13 @@ export class Town {
     const env = { world: this.world, theme: this.theme, street: this.street, shopAt: this.shopAt, zone: this.zone };
     let n = 0;
     for (const s of c.solids) {
-      if (!this.cleared(s.render!.cx, s.render!.cy)) { addBuilding(g, s, env); if (++n % 3 === 0) yield; }
+      if (!this.cleared(s.render!.cx, s.render!.cy)) { this.addLifted(g, s, env); if (++n % 3 === 0) yield; }
     }
     if (!c.props) { this.layoutProps(c); c.props = true; yield; }
     yield* this.shopFronts(c, g); // 테라스 가구를 placed에 더하므로 stamp보다 먼저
     for (const p of c.placed) {
       stamp(g, template(p.t, p.k), p.x, p.y, p.z + this.world.terrain(p.x, p.y), p.rot, p.s);
-      if (p.lamp) pools.quad([p.x - 5, p.y - 5, 0.04], [p.x + 5, p.y - 5, 0.04], [p.x + 5, p.y + 5, 0.04], [p.x - 5, p.y + 5, 0.04], [0, 0, 1], [0, 0, 1, 1], -1, [1, 1, 1]);
+      if (p.lamp) { const lz = this.world.terrain(p.x, p.y) + 0.04; pools.quad([p.x - 5, p.y - 5, lz], [p.x + 5, p.y - 5, lz], [p.x + 5, p.y + 5, lz], [p.x - 5, p.y + 5, lz], [0, 0, 1], [0, 0, 1, 1], -1, [1, 1, 1]); }
       if (++n % 12 === 0) yield;
     }
     yield;
@@ -554,7 +589,7 @@ export class Town {
       add('bus', sx, sy, rot);
       W.addSolid([rectRing(sx - lane.nx * side * 0.6, sy - lane.ny * side * 0.6, 3.7, 0.12, rot)], 0, 2.3, 'prop');
       this.spots.push({ kind: 'bus', x: sx, y: sy, facing: Math.atan2(-lane.ny * side, -lane.nx * side), ref: b.name, label: b.name });
-      this.seats.push({ x: sx - lane.nx * side * 0.35, y: sy - lane.ny * side * 0.35, z: 0.52, facing: bearingOfVec(-lane.nx * side, -lane.ny * side), kind: 'bench' });
+      this.seats.push({ x: sx - lane.nx * side * 0.35, y: sy - lane.ny * side * 0.35, z: 0.52 + this.world.terrain(sx, sy), facing: bearingOfVec(-lane.nx * side, -lane.ny * side), kind: 'bench' });
     }
   }
 
@@ -564,7 +599,8 @@ export class Town {
     this.world.addSolid([rectRing(x, y, 1.8, 0.5, rot)], 0, 0.47, 'prop');
     const f = bearingOfVec(fx, fy);
     const rx = Math.cos(rot), ry = Math.sin(rot);
-    for (const s of [-0.45, 0.45]) this.seats.push({ x: x + rx * s + fx * 0.08, y: y + ry * s + fy * 0.08, z: 0.47, facing: f, kind: 'bench' });
+    const bz = this.world.terrain(x, y);
+    for (const s of [-0.45, 0.45]) this.seats.push({ x: x + rx * s + fx * 0.08, y: y + ry * s + fy * 0.08, z: 0.47 + bz, facing: f, kind: 'bench' });
     this.spots.push({ kind: 'bench', x, y, facing: f });
   }
 
@@ -591,6 +627,7 @@ export class Town {
       if (!f) continue;
       const tx = -f.ny, ty = f.nx; // 벽을 따라
       const w = p.cat === 'museum' || p.cat === 'sight' ? 0 : 3.4;
+      g.dz = this.world.terrain(f.x + f.nx * 1.5, f.y + f.ny * 1.5);
       if (w) awning(g, f.x - tx * w / 2 + f.nx * 0.02, f.y - ty * w / 2 + f.ny * 0.02, f.x + tx * w / 2 + f.nx * 0.02, f.y + ty * w / 2 + f.ny * 0.02, f.nx, f.ny, CAT_COLOR[p.cat], 3.35, p.cat === 'cafe' || p.cat === 'bar' || p.cat === 'eat' ? 2.4 : 1.4, 0.7);
       // 테라스: 카페·바·식당 앞 보도에 테이블 두세 개
       if ((p.cat === 'cafe' || p.cat === 'bar' || p.cat === 'eat') && !this.sat.has(p.id)) {
@@ -605,14 +642,17 @@ export class Town {
           // 의자 두 개: 탁자 양옆(벽을 따라)에서 탁자를 본다
           for (const sx of [-1, 1]) {
             const cxp = qx + Math.cos(rot) * sx * 0.58, cyp = qy + Math.sin(rot) * sx * 0.58;
-            this.seats.push({ x: cxp, y: cyp, z: 0.45, facing: bearingOfVec(-Math.cos(rot) * sx, -Math.sin(rot) * sx), kind: 'chair', place: p.id });
+            this.seats.push({ x: cxp, y: cyp, z: 0.45 + this.world.terrain(cxp, cyp), facing: bearingOfVec(-Math.cos(rot) * sx, -Math.sin(rot) * sx), kind: 'chair', place: p.id });
           }
           this.world.addSolid([circleRing(qx, qy, 0.36, 8)], 0, 0.75, 'prop');
         }
         this.spots.push({ kind: 'terrace', x: f.x + f.nx * 1.35, y: f.y + f.ny * 1.35, facing: bearingOfVec(f.nx, f.ny), ref: p.id, label: p.name });
       }
       // 간판: 차양 위 이름판 + 벽에서 튀어나온 깃발 간판(그림)
-      c.signs.push(this.nameBoard(p, f, tx, ty));
+      g.dz = 0;
+      const board = this.nameBoard(p, f, tx, ty);
+      board.position.z += this.world.terrain(f.x + f.nx * 1.5, f.y + f.ny * 1.5);
+      c.signs.push(board);
       yield; // 간판 그림(캔버스)이 무겁다 — 하나마다 쉰다
     }
   }
@@ -635,9 +675,10 @@ export class Town {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.31), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
     const c = Math.cos(rot), s = Math.sin(rot);
     // 틀의 (0, 2.06, 2.72) — 입구 쪽 간판 바로 앞
-    m.position.set(cx - 2.06 * s, cy + 2.06 * c, 2.72);
+    const mz = 2.72 + this.world.terrain(cx, cy);
+    m.position.set(cx - 2.06 * s, cy + 2.06 * c, mz);
     m.up.set(0, 0, 1);
-    m.lookAt(m.position.x - s, m.position.y + c, 2.72);
+    m.lookAt(m.position.x - s, m.position.y + c, mz);
     this.scene.add(m);
     return m;
   }

@@ -30,6 +30,8 @@ export class EiffelQuests {
   private readonly h: EiffelHost;
   private frameRef: unknown = null;
   private tower: [number, number] = [0, 0];
+  /** 탑이 선 땅 높이 */
+  private towerZ = 0;
   private givers: Giver[] = [
     { id: 'hat', name: '마고 (관광객)', role: 'tourist', at: [70, -118], facing: AXIS + 180, npc: null, called: false },
     { id: 'race', name: '야니스 (파쿠르)', role: 'jogger', at: [-88, 58], facing: AXIS, npc: null, called: false },
@@ -67,6 +69,7 @@ export class EiffelQuests {
     if (this.frameRef === this.hero.frame) return;
     this.frameRef = this.hero.frame;
     this.tower = this.hero.frame.toLocal(EIFFEL_POS);
+    this.towerZ = this.hero.world.relief.hill(this.tower[0], this.tower[1]);
     for (const g of this.givers) g.npc = null;
     this.friends = [];
     if (this.blanket) { this.h.items.remove(this.blanket); this.blanket = null; }
@@ -120,9 +123,9 @@ export class EiffelQuests {
     this.stepItem();
     if (this.active === 'race') {
       this.raceT -= dt;
-      if (b.z >= 113 && dTower < 30) this.finish('race', '2층까지 3분 안에 올라갔다', 20, 'Incroyable ! Tu grimpes comme un chat !');
+      if (b.z - this.towerZ >= 113 && dTower < 30) this.finish('race', '2층까지 3분 안에 올라갔다', 20, 'Incroyable ! Tu grimpes comme un chat !');
       else if (this.raceT <= 0) { this.active = null; this.line(''); this.h.c.toast('⏱ 시간 초과 — 야니스에게 다시 말을 걸면 또 도전할 수 있다'); sfx.exhausted(); }
-      else this.line(`🏃 2층(115 m)까지 ${Math.ceil(this.raceT)}초 — 다리를 타고 올라가자 (지금 ${Math.round(b.z)} m)`);
+      else this.line(`🏃 2층(115 m)까지 ${Math.ceil(this.raceT)}초 — 다리를 타고 올라가자 (지금 ${Math.round(b.z - this.towerZ)} m)`);
     }
   }
 
@@ -201,7 +204,7 @@ export class EiffelQuests {
         if (i !== 0) return;
         this.start('hat');
         const [x, y] = this.loc(20, -26);
-        this.item = { kind: 'hat', x, y, z: 58, mesh: hatMesh(), held: false };
+        this.item = { kind: 'hat', x, y, z: 58 + this.towerZ, mesh: hatMesh(), held: false };
         this.h.items.add(this.item.mesh);
         this.line('🎩 1층(58 m)에 걸린 모자를 가져오자 — 탑 다리를 타고 오르거나, 위에서 글라이더로 내려앉기');
         return;
@@ -380,9 +383,10 @@ export class EiffelQuests {
     const b = this.hero.body;
     if (b.golden) return;
     // 낙하산·글라이더로 탑 위를 날고 있었나(기어 올라온 게 아니라)
-    if ((b.mode === 'glide' || b.mode === 'air') && b.z > 278) this.highGlide = 3;
+    const rz = b.z - this.towerZ;
+    if ((b.mode === 'glide' || b.mode === 'air') && rz > 278) this.highGlide = 3;
     else this.highGlide = Math.max(0, this.highGlide - dt);
-    if ((b.mode === 'ground' || b.mode === 'roll') && this.highGlide > 0 && b.z > 270 && dTower < 12) { // 다치며 떨어진 건 '잘' 내려앉은 게 아니다
+    if ((b.mode === 'ground' || b.mode === 'roll') && this.highGlide > 0 && rz > 270 && dTower < 12) { // 다치며 떨어진 건 '잘' 내려앉은 게 아니다
       // 알림 없이: 반짝임 한 번, 작은 종소리, 그리고 천이 금빛으로
       b.golden = true;
       this.goldenFound = true;
@@ -434,7 +438,7 @@ export class EiffelQuests {
     const [tx, ty] = this.tower;
     const pts: number[] = [], ph: number[] = [];
     const rot = ((90 - 44) * Math.PI) / 180, c = Math.cos(rot), s = Math.sin(rot);
-    const put = (lx: number, ly: number, z: number) => { pts.push(tx + lx * c - ly * s, ty + lx * s + ly * c, z); ph.push(Math.random() * 100); };
+    const put = (lx: number, ly: number, z: number) => { pts.push(tx + lx * c - ly * s, ty + lx * s + ly * c, z + this.towerZ); ph.push(Math.random() * 100); };
     // 다리 넷(0~57 m), 1~2층 사이(57~115 m), 몸통(115~277 m) — 단면 둘레에 흩뿌린다
     for (let i = 0; i < 1400; i++) {
       const z = Math.pow(Math.random(), 0.8) * 300;

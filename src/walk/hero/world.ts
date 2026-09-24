@@ -13,6 +13,8 @@ export interface Solid {
   minX: number; minY: number; maxX: number; maxY: number;
   stamp: number;
   water?: boolean;
+  /** 언덕 위에 올려 앉힌 높이(그 자리 땅) — 그리기는 이만큼 올려서 한다 */
+  gz?: number;
   /** 무엇인가: 건물 · 물 · 거리 가구 · 지붕(망사르드) */
   kind?: 'building' | 'water' | 'prop' | 'roof';
   /** 그리기용(건물만): 타일 경계에서 잘라 낸 고리. cut[i][k] = 1이면 k번째 변은 타일 경계라 벽을 세우지 않는다. */
@@ -46,7 +48,24 @@ export class World {
 
   /** 땅의 높낮이(공원 둔덕·강바닥) */
   readonly relief: Relief;
-  constructor(frame: Frame) { this.frame = frame; this.relief = new Relief(this); }
+  constructor(frame: Frame, opts: { hills?: boolean } = {}) {
+    this.frame = frame;
+    this.relief = new Relief(this);
+    if (opts.hills) this.relief.enableHills((p) => frame.toLocal(p));
+  }
+
+  /** 언덕 위에 올려 앉힌다: 윗면은 가운데 땅만큼, 바닥(0이었으면)은 가장 낮은 모서리까지 내려 틈이 없게 */
+  private lift(s: Solid) {
+    if (!this.relief.hillsOn || s.kind === 'water') return;
+    const t = this.relief.hill((s.minX + s.maxX) / 2, (s.minY + s.maxY) / 2);
+    let mn = t;
+    const r = s.rings[0];
+    const step = Math.max(2, Math.floor(r.length / 60) * 2);
+    for (let i = 0; i < r.length; i += step) mn = Math.min(mn, this.relief.hill(r[i], r[i + 1]));
+    s.gz = t;
+    s.top += t;
+    s.base = s.base <= 0.01 ? mn - 0.3 : s.base + t;
+  }
   /** 둘레 타일을 다 받았나(시작 전 준비가 기다린다) */
   tilesReady() { return this.tiles.size > 0 && [...this.tiles].every((k) => this.loaded.has(k)); }
   /** 이 자리 땅 높이 */
@@ -83,6 +102,7 @@ export class World {
       if (!s) return;
       s.kind = 'building';
       s.render = this.renderRings(f, x, y);
+      this.lift(s);
       if (s.render.rings.length) fresh.push(s);
       this.insert(s);
     });
@@ -160,13 +180,15 @@ export class World {
   }
 
   /** 직접 만든 덩어리(거리 가구·절차적 건물·망사르드 지붕)를 넣는다 */
-  addSolid(rings: Float64Array[], base: number, top: number, kind: Solid['kind'], render?: Solid['render']): Solid {
+  /** abs = 높이를 그대로(이미 땅 높이를 더했다). 아니면 그 자리 언덕 위로 올린다. */
+  addSolid(rings: Float64Array[], base: number, top: number, kind: Solid['kind'], render?: Solid['render'], abs = false): Solid {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const r of rings) for (let i = 0; i < r.length; i += 2) {
       if (r[i] < minX) minX = r[i]; if (r[i] > maxX) maxX = r[i];
       if (r[i + 1] < minY) minY = r[i + 1]; if (r[i + 1] > maxY) maxY = r[i + 1];
     }
     const s: Solid = { rings, top, base, minX, minY, maxX, maxY, stamp: 0, kind, render };
+    if (!abs) this.lift(s);
     this.insert(s);
     return s;
   }
@@ -380,7 +402,7 @@ export class World {
         if (s.top <= z + step || s.base >= z + h) continue; // 올라설 수 있는 높이이거나 머리 위에 떠 있다
         const c = World.closest(s, p.x, p.y);
         if (c.d >= r) continue;
-        if (z < 3 && this.onLane(p.x, p.y, 1.4) && (c.d < 0 || this.onLane(c.cx - c.nx * 1.5, c.cy - c.ny * 1.5, 1.6))) continue; // 건물 밑으로 난 길(이미 들어와 있거나, 길이 벽 안으로 이어진다)
+        if (z - this.relief.hill(p.x, p.y) < 3 && this.onLane(p.x, p.y, 1.4) && (c.d < 0 || this.onLane(c.cx - c.nx * 1.5, c.cy - c.ny * 1.5, 1.6))) continue; // 건물 밑으로 난 길(이미 들어와 있거나, 길이 벽 안으로 이어진다)
         const push = r - c.d;
         p.x += c.nx * push;
         p.y += c.ny * push;

@@ -104,8 +104,9 @@ void main() {
   vec3 N = normalize(vec3((h0 - hx) * 1.6, (h0 - hy) * 1.6, 1.0));
   vec3 V = normalize(uEye - vP + vec3(0.0, 0.0, 2.0));
   float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-  vec3 deep = vec3(0.13, 0.27, 0.30), sky = mix(uFog, vec3(0.62, 0.76, 0.88), 0.5);
-  vec3 col = mix(deep * (uAmb + uSunCol * 0.3), sky * (0.7 + 0.3 * uSunCol), 0.25 + 0.6 * fres);
+  // 센 강은 초록빛 도는 청록 — 하늘을 비추되 안개색에 묻히지 않게
+  vec3 deep = vec3(0.09, 0.25, 0.29), sky = mix(vec3(0.50, 0.67, 0.83), uFog, 0.25);
+  vec3 col = mix(deep * (uAmb + uSunCol * 0.35), sky * (0.65 + 0.35 * uSunCol), 0.15 + 0.55 * fres);
   vec3 H = normalize(uSun + V);
   col += uSunCol * pow(max(dot(N, H), 0.0), 90.0) * 1.2 * (1.0 - uNight);
   col = mix(col, uFog, smoothstep(900.0, 2400.0, length(vP - uEye)) * 0.8);
@@ -229,7 +230,7 @@ export class Ground {
     const N = this.N, step = this.size / (N - 1);
     const H = this.heights;
     // 먼 땅은 둔덕을 보지 않는다(강만 가라앉힌다) — 넓은 곳을 다 계산하면 무겁다
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) H[j * N + i] = this.far ? (world.water(ox + i * step, oy + j * step) ? BED_Z : 0) : world.terrain(ox + i * step, oy + j * step);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) H[j * N + i] = this.far ? world.relief.hill(ox + i * step, oy + j * step) + (world.water(ox + i * step, oy + j * step) ? BED_Z : 0) : world.terrain(ox + i * step, oy + j * step);
     const geo = this.mesh.geometry;
     const pos = geo.attributes.position.array as Float32Array;
     const nor = geo.attributes.normal.array as Float32Array;

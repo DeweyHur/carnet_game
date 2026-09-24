@@ -189,9 +189,9 @@ export class Street {
   private anchorOf(t: Target): () => Anchor | null {
     switch (t.kind) {
       case 'npc': return () => ({ x: t.npc.x, y: t.npc.y, z: t.npc.z + 2.05 * t.npc.scale + (t.npc.state === 'sit' ? -0.7 : 0) });
-      case 'spot': return () => ({ x: t.spot.x, y: t.spot.y, z: t.spot.kind === 'metro' ? 3.4 : t.spot.kind === 'morris' ? 4.4 : t.spot.kind === 'kiosk' ? 3.4 : 2.4 });
+      case 'spot': { const gz = this.c.hero.world.terrain(t.spot.x, t.spot.y); return () => ({ x: t.spot.x, y: t.spot.y, z: gz + (t.spot.kind === 'metro' ? 3.4 : t.spot.kind === 'morris' ? 4.4 : t.spot.kind === 'kiosk' ? 3.4 : 2.4) }); }
       case 'item': return () => ({ x: t.item.x, y: t.item.y, z: t.item.z + (t.item.kind === 'balloon' ? 1.6 : 0.9) });
-      case 'place': return () => ({ x: t.x, y: t.y, z: t.front ? 3.0 : 2.2 });
+      case 'place': { const gz = this.c.hero.world.terrain(t.x, t.y); return () => ({ x: t.x, y: t.y, z: gz + (t.front ? 3.0 : 2.2) }); }
     }
   }
 
@@ -322,7 +322,8 @@ export class Street {
     sfx.pageTurn();
     const info = this.c.info(p);
     this.cardPlace = p;
-    const at = () => ({ x: fr ? fr.x + fr.nx * 0.9 : px, y: fr ? fr.y + fr.ny * 0.9 : py, z: fr ? 4.6 : 3.2 });
+    const gz = this.c.hero.world.terrain(fr ? fr.x + fr.nx * 1.5 : px, fr ? fr.y + fr.ny * 1.5 : py);
+    const at = () => ({ x: fr ? fr.x + fr.nx * 0.9 : px, y: fr ? fr.y + fr.ny * 0.9 : py, z: gz + (fr ? 4.6 : 3.2) });
     this.ui.showCard(at, (root) => {
       const head = document.createElement('div');
       head.className = 'wc-head';
@@ -402,7 +403,7 @@ export class Street {
       if (d > l.clear + 90 && !high) continue;
       this.landmarksSeen.add(l.id);
       sfx.fanfare();
-      this.ui.say(() => ({ x: l.x, y: l.y, z: 30 }), `✨ ${l.emoji} ${l.name}`, 4, 'found big');
+      this.ui.say(() => ({ x: l.x, y: l.y, z: l.z + 30 }), `✨ ${l.emoji} ${l.name}`, 4, 'found big');
       this.c.toast(`${l.emoji} ${l.name}${high ? ' — 지붕 위에서 보인다' : ''}`);
     }
   }
@@ -794,11 +795,12 @@ export class Street {
     kid.scale = 0.66;
     kid.tag = 'quest-kid';
     const mesh = balloonMesh();
-    const it: Item = { kind: 'balloon', x: kx, y: ky, z: 1.2, mesh, t: 0, follow: false, flee: 0 };
+    const kz = h.world.terrain(kx, ky);
+    const it: Item = { kind: 'balloon', x: kx, y: ky, z: kz + 1.2, mesh, t: 0, follow: false, flee: 0 };
     this.items.add(mesh);
     this.quest = { kind: 'balloon', npc: kid, item: it, line: '아이의 풍선이 지붕 위에 걸렸다 — 올라가서 잡아 오자', t: 0 };
     // 풍선이 두둥실 날아가 지붕에 걸린다
-    const from = { x: kx, y: ky, z: 1.2 }, to = { x: roof.x, y: roof.y, z: roof.z + 0.3 };
+    const from = { x: kx, y: ky, z: kz + 1.2 }, to = { x: roof.x, y: roof.y, z: roof.z + 0.3 };
     const t0 = performance.now();
     const fly = () => {
       const k = Math.min(1, (performance.now() - t0) / 3500);
@@ -901,7 +903,7 @@ export class Street {
       if (h.world.buildingTopAt(nx, ny) === 0) { it.x = nx; it.y = ny; }
       it.mesh.rotation.z = -Math.atan2(tx - it.x, ty - it.y);
     }
-    it.mesh.position.set(it.x, it.y, 0);
+    it.mesh.position.set(it.x, it.y, h.world.terrain(it.x, it.y));
     const legs = it.mesh.userData.legs as THREE.Object3D[];
     const ph = it.t * (sp > 0.3 ? 16 : 0);
     legs.forEach((l, i) => { l.rotation.x = Math.sin(ph + (i % 2 ? Math.PI : 0)) * 0.6; });

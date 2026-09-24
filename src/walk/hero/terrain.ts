@@ -52,7 +52,53 @@ export function vnoise(x: number, y: number) {
 }
 const smooth = (a: number, b: number, x: number) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
+// 파리의 언덕(센 강 둑 = 0 기준, m). 실제 높이를 바탕으로 한 모양 — 반경 r0에서 절반, p가 클수록 가파른 둔덕.
+const HILLS: { pos: [number, number]; H: number; r0: number; p: number }[] = [
+  { pos: [2.3431, 48.8867], H: 100, r0: 560, p: 4 }, // 몽마르트르(사크레쾨르)
+  { pos: [2.3965, 48.8740], H: 95, r0: 1200, p: 4 }, // 벨빌·메닐몽탕 고개
+  { pos: [2.3830, 48.8800], H: 45, r0: 330, p: 4 }, // 뷔트쇼몽
+  { pos: [2.3461, 48.8462], H: 33, r0: 480, p: 4 }, // 생트주느비에브 언덕(팡테옹)
+  { pos: [2.2830, 48.8622], H: 38, r0: 480, p: 6 }, // 샤요 언덕(트로카데로)
+  { pos: [2.2950, 48.8738], H: 28, r0: 950, p: 3 }, // 에투알(개선문)
+];
+// 센 강 한가운데 선(서→동) — 강가로 갈수록 언덕이 낮아진다(강은 골짜기 바닥)
+const SEINE: [number, number][] = [
+  [2.2700, 48.8440], [2.2800, 48.8505], [2.2870, 48.8555], [2.2922, 48.8610], [2.3014, 48.8640], [2.3100, 48.8642], [2.3190, 48.8637],
+  [2.3290, 48.8600], [2.3413, 48.8570], [2.3470, 48.8563], [2.3520, 48.8545], [2.3575, 48.8525], [2.3610, 48.8500], [2.3665, 48.8455], [2.3760, 48.8385], [2.3900, 48.8300],
+];
+
 export class Relief {
+  private hillL: { x: number; y: number; H: number; r0: number; p: number }[] = [];
+  private seineL: number[] = [];
+  /** 도시 규모의 언덕을 쓰나(거리 세계만 — 지하철 장면은 평평) */
+  hillsOn = false;
+  enableHills(toLocal: (p: [number, number]) => [number, number]) {
+    this.hillsOn = true;
+    this.hillL = HILLS.map((h) => { const [x, y] = toLocal(h.pos); return { x, y, H: h.H, r0: h.r0, p: h.p }; });
+    this.seineL = SEINE.flatMap((p) => toLocal(p));
+    this.clear();
+  }
+  /** 언덕 높이만(건물을 올려 앉힐 때) — 둔덕·강바닥은 빼고 */
+  hill(x: number, y: number): number {
+    if (!this.hillsOn) return 0;
+    let h = 0;
+    for (const k of this.hillL) {
+      const d = Math.hypot(x - k.x, y - k.y) / k.r0;
+      if (d > 4) continue;
+      h += k.H / (1 + d ** k.p);
+    }
+    if (h < 0.05) return 0;
+    // 강가 골짜기: 강 한가운데서 30 m까지 0, 380 m에서 온전히
+    let d2 = Infinity;
+    const s = this.seineL;
+    for (let i = 0; i + 3 < s.length; i += 2) {
+      const ax = s[i], ay = s[i + 1], dx = s[i + 2] - ax, dy = s[i + 3] - ay;
+      const L = dx * dx + dy * dy;
+      const t = L ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L)) : 0;
+      d2 = Math.min(d2, (x - ax - dx * t) ** 2 + (y - ay - dy * t) ** 2);
+    }
+    return h * smooth(30, 380, Math.sqrt(d2));
+  }
   private cache = new Map<number, Float32Array>();
   readonly parks: Ring[] = [];
   private readonly w: World;
@@ -85,7 +131,9 @@ export class Relief {
 
   /** 계산(캐시 없이) */
   private wetBoxes: Ring[] = [];
-  sample(x: number, y: number): number {
+  sample(x: number, y: number): number { return this.hill(x, y) + this.local(x, y); }
+  /** 언덕 위에 얹는 것: 공원 둔덕, 강바닥 */
+  private local(x: number, y: number): number {
     // 빠른 길: 물·공원 근처가 아니면 평지
     const ws = this.w.waters;
     if (this.wetBoxes.length !== ws.length) this.wetBoxes = ws.map((r) => ringOf(r));

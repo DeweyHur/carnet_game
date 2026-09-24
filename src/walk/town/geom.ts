@@ -39,8 +39,10 @@ export class GeoBuilder {
 
   get count() { return this.pos.length / 3; }
 
+  /** 이 뒤로 넣는 모든 꼭짓점을 이만큼 올린다(언덕 위 건물·가구) */
+  dz = 0;
   vert(p: V3, n: V3, u: number, v: number, tile: number, tint: V3, glow = 0, seed = 0) {
-    this.pos.push(p[0], p[1], p[2]);
+    this.pos.push(p[0], p[1], p[2] + this.dz);
     this.nor.push(n[0], n[1], n[2]);
     this.uv.push(u, v);
     this.tile.push(tile);

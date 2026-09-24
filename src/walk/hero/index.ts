@@ -58,7 +58,7 @@ export class Hero {
   constructor(map: MlMap, onMap: () => void) {
     this.map = map;
     this.frame = new Frame([map.getCenter().lng, map.getCenter().lat]);
-    this.world = new World(this.frame);
+    this.world = new World(this.frame, { hills: true });
     this.view = new View(document.getElementById('map')!);
     this.input = new Input(this.view.el);
     this.hud = new HeroHud(this.input, onMap);
@@ -101,13 +101,13 @@ export class Hero {
   /** 새 자리에 선다(동네를 옮기면 세계도 새로 읽는다) */
   reset(at: LngLat, facing?: number) {
     this.frame = new Frame(at);
-    this.world = new World(this.frame);
+    this.world = new World(this.frame, { hills: true });
     this.town.reset(this.world, this.frame, this.theme);
     this.setLanes(this.lanes);
     this.crowd.reset(this.world, this.graphNodes.map((p) => this.frame.toLocal(p)), this.graphAdj, this.theme);
     this.crowd.seats = this.town.seats;
     this.crowd.spots = this.town.spots;
-    this.body.place(0, 0, 0);
+    this.body.place(0, 0, this.world.terrain(0, 0));
     if (facing !== undefined) this.body.facing = facing;
     this.cam.snap(this.body);
     if (import.meta.env.DEV) this.world.onLoad = (k, ms) => console.debug(`[hero] tile ${k} → ${this.world.count} solids (${Math.round(ms)} ms)`);
@@ -119,7 +119,7 @@ export class Hero {
     const at = this.lnglat;
     const b = this.body;
     this.frame = new Frame(at);
-    this.world = new World(this.frame);
+    this.world = new World(this.frame, { hills: true });
     this.town.reset(this.world, this.frame, this.theme);
     this.setLanes(this.lanes);
     this.crowd.reset(this.world, this.graphNodes.map((p) => this.frame.toLocal(p)), this.graphAdj, this.theme);
