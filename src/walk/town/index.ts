@@ -17,6 +17,7 @@ import { poolMaterial, townMaterial, townUniforms } from './material';
 import { awning, circleRing, rectRing, rotFacing, stamp, template } from './props';
 import { procedural } from './procedural';
 import { LANDMARKS, LB } from './landmarks';
+import { EIFFEL_ZONES } from '../eiffel';
 import { sharedRenderer } from './renderer';
 
 export type { Theme };
@@ -114,8 +115,11 @@ export class Town {
     this.procedural = false;
     this.builtOnce = false;
     world.onBuildings = (list) => this.absorb(list);
+    this.open = EIFFEL_ZONES.map((z) => { const r = new Float64Array(z.ring.length * 2); z.ring.forEach((p, i) => { const [x, y] = frame.toLocal(p); r[i * 2] = x; r[i * 2 + 1] = y; }); return r; });
     this.buildLandmarks();
   }
+  /** 공원·강·광장(지도 타일이 없을 때 이 안에는 절차적 건물을 세우지 않는다) */
+  private open: Float64Array[] = [];
 
   /** 랜드마크를 세운다(7 km 안). 멀리서도 보이게 따로 한 덩어리, 안개도 멀리. */
   private buildLandmarks() {
@@ -144,6 +148,7 @@ export class Town {
   /** 랜드마크 자리라서 보통 건물을 세우지 않는 곳인가 */
   cleared(x: number, y: number) {
     for (const l of this.landmarks) if (l.clear && Math.abs(l.x - x) < l.clear && Math.abs(l.y - y) < l.clear && Math.hypot(l.x - x, l.y - y) < l.clear) return true;
+    if (this.procedural) for (const r of this.open) if (inRing(r, x, y)) return true;
     return false;
   }
 
@@ -224,7 +229,7 @@ export class Town {
     const now = performance.now();
     const dt = Math.min(0.1, (now - this.lastT) / 1000);
     this.lastT = now;
-    for (const m of this.movers) { const sails = m.children[0]; if (sails) sails.rotation.y += dt * 0.5; }
+    for (const m of this.movers) { const k = m.children[0]; if (!k) continue; if (m.userData.spin === 'z') k.rotation.z += dt * 0.7; else k.rotation.y += dt * 0.5; }
     if (!this.enabled || !this.world) return;
     const R = Math.min(this.procedural ? 250 : 300, this.radius), DROP = R + 120;
     const t0 = performance.now();
@@ -735,3 +740,12 @@ export class Town {
 
 /** 벡터 → 방위(북 0°, 시계 방향) */
 function bearingOfVec(x: number, y: number) { return ((Math.atan2(x, y) * 180) / Math.PI + 360) % 360; }
+
+function inRing(r: Float64Array, x: number, y: number): boolean {
+  let inside = false;
+  for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) {
+    const xi = r[i], yi = r[i + 1], xj = r[j], yj = r[j + 1];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}

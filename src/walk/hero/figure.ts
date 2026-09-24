@@ -47,6 +47,8 @@ export class Figure {
   private readonly items = new Map<Item, THREE.Object3D>();
   private readonly baguette = new THREE.Group();
   private readonly glider = new THREE.Group();
+  private readonly wings: THREE.Mesh[] = [];
+  private gilded = false;
   private spinAcc = 0;
   private readonly shadow: THREE.Mesh;
   private readonly ripple: THREE.Mesh;
@@ -206,6 +208,7 @@ export class Figure {
       const cloth = new THREE.CylinderGeometry(1.6, 1.6, 0.85, 3, 1, true, -0.625 + i * span, span).scale(1, 1, 0.5);
       const wing = this.part(cloth, i % 2 ? 0xc8412f : 0xf4ead2, this.glider, 0, 0, 0.5);
       (wing.material as THREE.MeshToonMaterial).side = THREE.DoubleSide;
+      this.wings.push(wing);
     }
     this.part(new THREE.CylinderGeometry(0.018, 0.018, 0.62, 6).rotateZ(Math.PI / 2), 0x7b5130, this.glider, 0, 0, 0);
     const strings = new THREE.BufferGeometry().setFromPoints([
@@ -359,7 +362,12 @@ export class Figure {
     // 글라이더: 펼칠 때 부풀어 오른다
     const g = b.gliderOpen;
     this.glider.visible = g > 0.02;
-    const pk = b.parachute ? 2 : 1; // 낙하산은 크게
+    // 금빛 낙하산(숨은 보상) — 한 번 받으면 글라이더 천이 금색으로 바뀐다
+    if (b.golden && !this.gilded) {
+      this.gilded = true;
+      this.wings.forEach((w, i) => { const m = (w.material as THREE.MeshToonMaterial).clone(); m.color.setHex(i % 2 ? 0xe0a82e : 0xfff0b5); m.emissive.setHex(i % 2 ? 0x3a2600 : 0x2a2210); w.material = m; });
+    }
+    const pk = b.parachute || b.golden ? 2 : 1; // 낙하산은 크게
     this.glider.scale.set((0.3 + 0.7 * g) * pk, (0.3 + 0.7 * g) * pk, g * pk);
     this.glider.rotation.x = 0.1 + Math.sin(t * 1.7) * 0.03;
     // 그림자: 높이 올라갈수록 옅고 작아진다

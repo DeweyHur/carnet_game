@@ -177,6 +177,65 @@ function eiffel(b: LB) {
   b.sbox(0, 0, 13, 13, top - 1, 277);
 }
 
+// ───────── 샤요 궁(트로카데로) — 탑을 향해 두 팔을 벌린 초승달 날개 ─────────
+function chaillot(b: LB) {
+  const R = 170, CX = 150; // 호의 중심은 탑 쪽(+x)
+  for (const sy of [-1, 1]) {
+    for (let a = 14; a < 76; a += 7) {
+      const t = ((a + 3.5) * Math.PI) / 180;
+      const x = CX - R * Math.cos(t), y = sy * R * Math.sin(t);
+      const rz = sy * (Math.PI / 2 - t); // 호를 따라 눕힌다
+      b.box(x, y, 0, 17, 21.5, 20, STONE, rz);
+      b.box(x, y, 20, 17.6, 22, 1.4, STONE_D, rz);
+      b.box(x, y, 21.4, 15, 20, 3.2, '#cfc3a6', rz);
+      // 탑 쪽 벽의 높은 창(밤엔 은은히)
+      const c = Math.cos(rz), sn = Math.sin(rz);
+      for (const k of [-6, 0, 6]) b.box(x + c * 8.6 - sn * k, y + sn * 8.6 + c * k, 4, 0.4, 3, 11, '#2d2a26', rz, 0.25);
+      b.sbox(x, y, 17, 21.5, 0, 24.6, rz);
+    }
+    // 광장 끝 파빌리온
+    b.box(-12, sy * 44, 0, 26, 18, 24, STONE);
+    b.box(-12, sy * 44, 24, 27, 19, 1.4, STONE_D);
+    b.sbox(-12, sy * 44, 26, 18, 0, 25.4);
+    // 금빛 조각상들(광장 가장자리)
+    for (let k = 0; k < 4; k++) { b.box(4 + k * 7, sy * 33, 0, 1.6, 1.6, 2.2, STONE_D); b.cyl(4 + k * 7, sy * 33, 2.2, 0.35, 0.55, 3.2, 6, '#d8b24a', 0.6); }
+  }
+  // 광장 바닥 테라스(인권 광장) — 올라서서 탑을 본다
+  b.box(0, 0, 0, 40, 52, 0.4, '#e9dfc9');
+  b.sbox(0, 0, 40, 52, 0, 0.4);
+}
+
+// ───────── 탑 발밑 회전목마 ─────────
+function carrousel(b: LB) {
+  b.cyl(0, 0, 0, 5.6, 5.8, 0.45, 20, '#d9c7a0');
+  b.cyl(0, 0, 0.45, 0.5, 0.5, 5, 8, '#d8b24a', 0.5);
+  b.sbox(0, 0, 11, 11, 0, 0.45);
+  // 도는 부분: 기둥과 말, 줄무늬 지붕
+  const spin = new THREE.Group();
+  const gold = new THREE.MeshBasicMaterial({ color: 0xd8b24a });
+  const cols = [0xf4f1e9, 0xc9a45a, 0x8a5a3a, 0xe8d8c0];
+  for (let k = 0; k < 10; k++) {
+    const t = (k / 10) * Math.PI * 2;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.2, 5).rotateX(Math.PI / 2).translate(0, 0, 2.55), gold);
+    pole.position.set(Math.cos(t) * 4.2, Math.sin(t) * 4.2, 0);
+    const horse = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.3, 0.7).translate(0, 0, 1.55), new THREE.MeshBasicMaterial({ color: cols[k % 4] }));
+    horse.position.copy(pole.position);
+    horse.rotation.z = t;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.5, 0.6).translate(0, 0.7, 2.05), horse.material);
+    head.position.copy(pole.position);
+    head.rotation.z = t;
+    spin.add(pole, horse, head);
+  }
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(6.2, 2.2, 20, 1, true).rotateX(Math.PI / 2).translate(0, 0, 5.75), new THREE.MeshBasicMaterial({ color: 0xc8333a, side: THREE.DoubleSide }));
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(6.2, 6.2, 0.7, 20, 1, true).rotateX(Math.PI / 2).translate(0, 0, 4.4), new THREE.MeshBasicMaterial({ color: 0xf4efe2, side: THREE.DoubleSide }));
+  const top = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6).translate(0, 0, 7), gold);
+  spin.add(roof, band, top);
+  const hub = new THREE.Group();
+  hub.userData.spin = 'z';
+  hub.add(spin);
+  b.mover(hub, 0, 0, 0);
+}
+
 // ───────── 노트르담 ─────────
 function notreDame(b: LB) {
   // 서쪽 정면(-x)과 두 탑
@@ -440,6 +499,8 @@ function grandPalais(b: LB) {
 
 export const LANDMARKS: Landmark[] = [
   { id: 'eiffel', name: '에펠탑', emoji: '🗼', pos: [2.29448, 48.85826], bearing: 44, clear: 70, build: eiffel },
+  { id: 'chaillot', name: '샤요 궁', emoji: '🏛', pos: [2.28805, 48.86229], bearing: 133.6, clear: 0, build: chaillot },
+  { id: 'carrousel', name: '에펠탑 회전목마', emoji: '🎠', pos: [2.29268, 48.85871], bearing: 0, clear: 0, build: carrousel },
   { id: 'notre-dame', name: '노트르담 대성당', emoji: '⛪', pos: [2.34994, 48.85297], bearing: 112, clear: 62, build: notreDame },
   { id: 'sacre-coeur', name: '사크레쾨르 대성당', emoji: '⛪', pos: [2.34306, 48.88672], bearing: 0, clear: 80, build: sacreCoeur },
   { id: 'arc', name: '개선문', emoji: '🏛', pos: [2.29504, 48.87378], bearing: 112, clear: 115, build: arc },

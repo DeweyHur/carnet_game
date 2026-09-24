@@ -3,6 +3,7 @@
 import type { LngLat } from './graph';
 import type { RawPlace } from './places';
 import type { District } from './districts';
+import { mergeEiffel } from './eiffel';
 
 export interface WalkData { ways: LngLat[][]; places: RawPlace[] }
 
@@ -29,7 +30,8 @@ export async function loadDistrict(d: District, onStatus: (s: string) => void): 
   if (!r.ok) throw new Error(`${d.name} 거리 데이터를 찾을 수 없습니다 (${d.data}).`);
   const json = (await r.json()) as Packed;
   if (!json?.ways?.length) throw new Error(`${d.name} 거리 데이터가 비어 있습니다.`);
-  const out = unpack(json);
+  let out = unpack(json);
+  if (d.id === 'champs-elysees') out = mergeEiffel(out); // 에펠탑 둘레(손으로 그린 길·장소)를 붙인다
   cache.set(d.id, out);
   return out;
 }

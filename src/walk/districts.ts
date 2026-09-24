@@ -6,6 +6,7 @@ import { CURATED_SG } from './saintgermain';
 import { CURATED_MONTMARTRE } from './montmartre';
 import { CURATED_BELLEVILLE } from './belleville';
 import { CURATED_CHAMPS } from './champs';
+import { CURATED_EIFFEL } from './eiffel';
 import { STATION_POS } from './stations';
 import { BUS_LINES } from './bus';
 import { fareFor } from './trip';
@@ -122,10 +123,10 @@ export const DISTRICTS: Record<DistrictId, District> = {
     ],
   },
   'champs-elysees': {
-    id: 'champs-elysees', name: '샹젤리제', full: '샹젤리제·에투알 · 8구',
-    blurb: '개선문과 1.9km 대로, 유리 지붕의 궁전들. 블록이 크고 대로가 넓다.',
-    data: 'walk/champs-elysees.json', curated: CURATED_CHAMPS,
-    bbox: [48.8655, 2.2925, 48.8765, 2.3150],
+    id: 'champs-elysees', name: '샹젤리제·에펠탑', full: '샹젤리제·에펠탑 · 7·8·16구',
+    blurb: '개선문과 1.9km 대로, 강 건너 에펠탑과 샹드마르스, 트로카데로. 블록이 크고 대로가 넓다.',
+    data: 'walk/champs-elysees.json', curated: [...CURATED_CHAMPS, ...CURATED_EIFFEL],
+    bbox: [48.8490, 2.2830, 48.8765, 2.3150],
     start: [2.30061, 48.872207],
     stations: [
       { name: 'George V', lines: ['1'],

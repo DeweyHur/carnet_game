@@ -10,6 +10,7 @@ import type { Graph, LngLat } from './graph';
 import { CAT_INFO, TASTE_OF, parsePlaces } from './places';
 import type { Place, Taste } from './places';
 import { loadDistrict } from './data';
+import { EIFFEL_ZONES } from './eiffel';
 import { DISTRICTS, otherDistricts, planJourney, planOptions, stopPos, LINES } from './districts';
 import type { District, Gate, Journey } from './districts';
 import { ALL_RICH } from './rich';
@@ -181,6 +182,9 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
       paint: { 'fill-extrusion-color': '#e6dccb', 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 12], 'fill-extrusion-opacity': 0.85 } });
   }
   if (fallback) {
+    // 타일이 없으면 공원·강을 직접 칠한다(에펠탑 둘레 — 하늘에서 내려다볼 때 어디가 어딘지 보이게)
+    map.addSource('zones', { type: 'geojson', data: { type: 'FeatureCollection', features: EIFFEL_ZONES.map((z) => ({ type: 'Feature', properties: { kind: z.kind }, geometry: { type: 'Polygon', coordinates: [z.ring] } })) } });
+    map.addLayer({ id: 'zones', type: 'fill', source: 'zones', paint: { 'fill-color': ['match', ['get', 'kind'], 'water', '#7fa9c9', 'park', '#9fbf7a', '#dccfb4'] } });
     map.addSource('streets', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: ways } } });
     map.addLayer({ id: 'streets', type: 'line', source: 'streets', paint: { 'line-color': '#fff', 'line-width': 7 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
   }

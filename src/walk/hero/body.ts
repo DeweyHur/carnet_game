@@ -89,6 +89,8 @@ export class Body {
 
   /** 낙하산(시작할 때): 기력을 쓰지 않고, 땅에 닿을 때까지 펼쳐 둔다. Shift = 급강하 */
   parachute = false;
+  /** 숨은 보상: 에펠탑 꼭대기에 내려앉으면 글라이더가 금빛 낙하산이 된다(빠르고 기력을 안 쓴다) */
+  golden = false;
   skydive(x: number, y: number, z: number, facing: number) {
     this.place(x, y, z);
     this.facing = facing;
@@ -351,8 +353,8 @@ export class Body {
     if (gliding) {
       // 낙하산: 파리 어디로든 갈 수 있게 빠르게 난다(순항 20 m/s, 3 m/s씩 가라앉음 → 430 m에서 약 2.8 km).
       // 달리기 = 급강하(빨리 내려가며 더 빠르게), 손을 떼도 앞으로 흘러간다.
-      const chute = this.parachute;
-      const sink = chute ? (it.sprint ? 11 : 3.1) : GLIDE_SINK;
+      const chute = this.parachute || this.golden;
+      const sink = chute ? (it.sprint ? 11 : this.parachute ? 3.1 : 2.5) : GLIDE_SINK;
       this.vz += (-sink - this.vz) * Math.min(1, dt * 3.5);
       if (m >= 0.08) this.turn(bearingOf(ix, iy), (chute ? 110 : 150) * dt);
       const want = chute
@@ -362,8 +364,8 @@ export class Body {
       const s = Math.hypot(this.vx, this.vy);
       const ns = approach(s, want, dt * (chute ? 9 : 5));
       this.vx = fx * ns; this.vy = fy * ns;
-      if (!this.parachute) this.spend(dt * 0.06);
-      if (this.exhausted && !this.parachute) { this.mode = 'air'; this.fallTopZ = this.z; this.events.push('unglide'); }
+      if (!chute) this.spend(dt * 0.06);
+      if (this.exhausted && !chute) { this.mode = 'air'; this.fallTopZ = this.z; this.events.push('unglide'); }
       this.fallTopZ = this.z;
     } else {
       this.vz = Math.max(-45, this.vz - G * dt);
