@@ -27,6 +27,7 @@ export class FarCity {
   private anchored(cx: number, cy: number) { for (const a of this.anchors) if (Math.abs(a.x - cx) < a.r && Math.abs(a.y - cy) < a.r && Math.hypot(a.x - cx, a.y - cy) < a.r) return true; return false; }
   /** 아직 못 세운 덩어리 수(준비 진행률) */
   backlog = 0;
+  private scanX = 1e9; private scanY = 1e9; private scanAnchors: unknown = null;
 
   constructor(mat: THREE.Material) {
     this.mat = mat;
@@ -39,6 +40,7 @@ export class FarCity {
     this.dirty.clear();
     this.world = world;
     this.skip = skip;
+    this.scanX = 1e9;
   }
 
   /** 새 건물이 들어왔다 — 그 덩어리를 다시 세운다 */
@@ -50,6 +52,9 @@ export class FarCity {
   update(x: number, y: number, budget = 2) {
     const w = this.world;
     if (!w) return;
+    // 다 세웠고 새로 들어온 것도 없고 별로 움직이지 않았으면 덩어리 훑기를 건너뛴다(매 프레임 수백 칸을 훑지 않게)
+    if (!this.backlog && !this.dirty.size && Math.abs(x - this.scanX) < 48 && Math.abs(y - this.scanY) < 48 && this.anchors === this.scanAnchors) return;
+    this.scanX = x; this.scanY = y; this.scanAnchors = this.anchors;
     const t0 = performance.now();
     const cx = Math.floor(x / BLOCK), cy = Math.floor(y / BLOCK), span = Math.ceil(NEAR_R / BLOCK);
     const want: { k: string; ix: number; iy: number; d: number }[] = [];

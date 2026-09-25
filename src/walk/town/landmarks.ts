@@ -1,6 +1,6 @@
 // 랜드마크: 진짜 설계도가 아니라 멀리서도 한눈에 알아보는 모양. 실제 자리(경위도)에 세우고, 부딪힘도 넣어서 올라갈 수 있다.
 // 에펠탑(층마다 쉬어 가며 꼭대기까지 올라가 글라이더로 내려온다) · 노트르담 · 사크레쾨르(큰 계단) · 개선문(아래로 지나간다) ·
-// 퐁피두 센터(색색 파이프) · 시청 · 팡테옹 · 물랭 루주(날개가 돈다) · 생자크 탑 · 생제르맹데프레 · 몽파르나스 타워 · 뷔트쇼몽 신전 · 그랑 팔레.
+// 루브르(유리 피라미드) · 퐁피두 센터(색색 파이프) · 시청 · 팡테옹 · 물랭 루주(날개가 돈다) · 생자크 탑 · 생제르맹데프레 · 몽파르나스 타워 · 뷔트쇼몽 신전 · 그랑 팔레.
 import * as THREE from 'three';
 import type { LngLat } from '../graph';
 import { GeoBuilder, lin } from './geom';
@@ -351,6 +351,35 @@ function arc(b: LB) {
   b.sbox(0, 0, 22, 45, 28.5, 50);
 }
 
+// ───────── 루브르: 유리 피라미드 + 나폴레옹 안뜰을 둘러싼 궁전 날개(ㄷ자, 서쪽이 열렸다) ─────────
+function louvre(b: LB) {
+  const GLASS = '#a7cbe0', STEEL = '#4b5661', SLATE = '#5f6a74', PALE = '#efe6d2';
+  // 큰 피라미드(밑변 35 m, 높이 21.6 m) — 밤엔 은은히 빛난다
+  b.cyl(0, 0, 0, 0.01, 24.75, 21.6, 4, GLASS, 0.35, Math.PI / 4);
+  for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) b.beam([sx * 17.5, sy * 17.5, 0], [0, 0, 21.6], 0.22, 0.22, 4, STEEL, 0.2);
+  for (const z of [5.4, 10.8, 16.2]) { const h = 17.5 * (1 - z / 21.6); for (const [ax, ay, bx, by] of [[-h, -h, h, -h], [h, -h, h, h], [h, h, -h, h], [-h, h, -h, -h]]) b.beam([ax, ay, z], [bx, by, z], 0.12, 0.12, 4, STEEL, 0.2); }
+  // 작은 피라미드 셋과 물 웅덩이
+  for (const [px, py] of [[0, 34], [0, -34], [34, 0]]) b.cyl(px, py, 0, 0.01, 5.6, 5, 4, GLASS, 0.35, Math.PI / 4);
+  for (const [px, py, rz] of [[-26, 22, 0.6], [-26, -22, -0.6], [24, 24, -0.6], [24, -24, 0.6]]) b.box(px, py, 0, 22, 9, 0.35, '#6f9fbf', rz);
+  // 날개: 북(리슐리외)·남(드농)·동(쉴리) — 창 난 벽 + 슬레이트 지붕
+  for (const sy of [92, -92]) {
+    b.tbox(-70, sy, 0, 240, 30, 24, T.grand, PALE, SLATE);
+    b.gable(-70, sy, 24, 240, 30, 7, SLATE);
+    b.tbox(-20, sy, 0, 42, 38, 30, T.grand, PALE, SLATE); // 파비용
+    b.lathe(-20, sy, 30, [[21, 0], [18, 6], [10, 11], [0.5, 13]], 4, SLATE);
+    b.sbox(-70, sy, 240, 30, 0, 24);
+    b.sbox(-20, sy, 42, 38, 0, 30);
+  }
+  b.tbox(72, 0, 0, 30, 214, 24, T.grand, PALE, SLATE);
+  b.gable(72, 0, 24, 214, 30, 7, SLATE, Math.PI / 2);
+  b.tbox(72, 0, 0, 38, 40, 34, T.grand, PALE, SLATE); // 시계 파비용
+  b.lathe(72, 0, 34, [[24, 0], [20, 7], [11, 13], [0.5, 15]], 4, SLATE);
+  b.sbox(72, 0, 30, 214, 0, 24);
+  b.sbox(72, 0, 38, 40, 0, 34);
+  // 부딪힘: 피라미드는 계단 모양으로(꼭대기까지 기어오를 수 있다)
+  for (let k = 0; k < 4; k++) { const w = 35 * (1 - k / 4); b.sbox(0, 0, w, w, 0, 5.4 * (k + 1)); }
+}
+
 // ───────── 퐁피두 센터 ─────────
 function pompidou(b: LB) {
   const W = 166, D = 60, H = 42;
@@ -501,6 +530,7 @@ export const LANDMARKS: Landmark[] = [
   { id: 'eiffel', name: '에펠탑', emoji: '🗼', pos: [2.29448, 48.85826], bearing: 44, clear: 70, build: eiffel },
   { id: 'chaillot', name: '샤요 궁', emoji: '🏛', pos: [2.28805, 48.86229], bearing: 133.6, clear: 0, build: chaillot },
   { id: 'carrousel', name: '에펠탑 회전목마', emoji: '🎠', pos: [2.29268, 48.85871], bearing: 0, clear: 0, build: carrousel },
+  { id: 'louvre', name: '루브르 박물관', emoji: '🔺', pos: [2.33585, 48.86099], bearing: 115, clear: 150, build: louvre },
   { id: 'notre-dame', name: '노트르담 대성당', emoji: '⛪', pos: [2.34994, 48.85297], bearing: 112, clear: 62, build: notreDame },
   { id: 'sacre-coeur', name: '사크레쾨르 대성당', emoji: '⛪', pos: [2.34306, 48.88672], bearing: 0, clear: 80, build: sacreCoeur },
   { id: 'arc', name: '개선문', emoji: '🏛', pos: [2.29504, 48.87378], bearing: 112, clear: 115, build: arc },

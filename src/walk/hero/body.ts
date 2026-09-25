@@ -24,6 +24,8 @@ export interface Intent {
   roll?: boolean; // 이번 프레임에 눌렀다 — 앞구르기(공중에서 누르면 착지 구르기)
   pace: number; // 지치면 느려진다
   maxStamina: number;
+  /** 자동으로 걷는 중(지도에서 찍은 길) — 벽을 타거나 넘지 않는다 */
+  auto?: boolean;
 }
 
 export const R = 0.32;
@@ -61,6 +63,7 @@ export class Body {
   private slideT = 0; private slideV = 0;
   private rollBuf = 0; // 공중에서 구르기를 눌러 둔 시간
   private staggerT = 0;
+  private staggerCool = 0;
   crouch = false;
   act: { kind: Act; t: number; dur: number } | null = null;
   waveT = 0; // 걸으면서도 손을 흔든다(윗몸만)
@@ -148,6 +151,8 @@ export class Body {
   stagger(nx: number, ny: number, power = 2.2) {
     if (this.mode !== 'ground' && this.mode !== 'act') return;
     if (this.mods.steady) return; // 가죽 재킷: 버틴다
+    if (this.staggerCool > 0) return; // 한 번 휘청였으면 잠깐은 버틴다(사람 무리를 뚫고 가다 연달아 휘청이지 않게)
+    this.staggerCool = 2.2;
     this.mode = 'stagger';
     this.act = null;
     this.staggerT = 0.55;
@@ -179,6 +184,7 @@ export class Body {
       case 'stagger': this.staggering(dt, w); break;
     }
     if (this.waveT > 0) this.waveT -= dt;
+    if (this.staggerCool > 0) this.staggerCool -= dt;
     if (this.pointT > 0) this.pointT -= dt;
     this.idleT = (this.mode === 'ground' && this.speed < 0.1) ? this.idleT + dt : 0;
     this.gliderOpen = approach(this.gliderOpen, this.mode === 'glide' ? 1 : 0, dt * 4);
@@ -245,11 +251,17 @@ export class Body {
       // 벽에 막힌 만큼 실제 속력도 줄인다
       const into = -(fx * hit.nx + fy * hit.ny);
       if (into > 0.2) this.speed *= 1 - into * 0.5;
-      const toward = m >= 0.08 && -(ix * hit.nx + iy * hit.ny) > 0.55;
-      this.pushT = toward ? this.pushT + dt : 0;
+      // 걷다가 스치기만 해도 벽을 타면 이상하다: 벽 쪽으로 똑바로(±37°), 잠깐 밀고 있어야 오르거나 넘는다.
+      // 가로등·나무 줄기·난간처럼 가는 것은 타지 않고 비켜 간다(달리면 난간은 넘는다).
+      const dot = -(ix * hit.nx + iy * hit.ny);
+      const toward = m >= 0.08 && dot > 0.55 && !it.auto;
+      this.pushT = toward && dot > 0.78 ? this.pushT + dt : 0;
       const rise = hit.top - this.z;
-      if (toward && rise <= 1.4 && this.pushT > 0.08) { this.startMantle(hit.cx, hit.cy, hit.nx, hit.ny, hit.top); return; }
-      if (toward && this.pushT > 0.12 && this.canExert) { this.grab(hit); return; }
+      const so = hit.solid, w0 = Math.min(so.maxX - so.minX, so.maxY - so.minY), w1 = Math.max(so.maxX - so.minX, so.maxY - so.minY);
+      const thin = w0 < 0.45 || w1 < 1.2; // 기둥·말뚝·난간
+      const running = sprinting || this.speed > RUN * 0.85;
+      if (rise <= 1.4 && this.pushT > (running ? 0.06 : 0.28) && (!thin || (running && rise < 1.15))) { this.startMantle(hit.cx, hit.cy, hit.nx, hit.ny, hit.top); return; }
+      if (!thin && rise > 1.4 && this.pushT > (running ? 0.18 : so.kind === 'prop' ? 0.5 : 0.35) && this.canExert) { this.grab(hit); return; }
     } else this.pushT = 0;
     this.x = p.x; this.y = p.y;
     if (sprinting && this.speed > RUN) this.spend(dt * 0.17); else this.rest(dt);
@@ -416,8 +428,10 @@ export class Body {
     if (hit) {
       const rise = hit.top - nz;
       const toward = -((m >= 0.08 ? ix : this.vx) * hit.nx + (m >= 0.08 ? iy : this.vy) * hit.ny) > 0;
-      if (rise <= 1.1 && rise > -0.1 && this.vz < 3) { this.startMantle(hit.cx, hit.cy, hit.nx, hit.ny, hit.top); return; }
-      if (toward && this.canExert) { this.x = p.x; this.y = p.y; this.z = nz; this.grab(hit); return; }
+      // 떨어지며 방금 딛고 있던 것 모서리에 걸린 것(높이 차 없음·멀어지는 중)은 다시 올라서지 않는다 — 올라섰다 떨어졌다를 되풀이했다
+      if (rise <= 1.1 && rise > 0.25 && toward && this.vz < 3) { this.startMantle(hit.cx, hit.cy, hit.nx, hit.ny, hit.top); return; }
+      const so = hit.solid, thin = Math.min(so.maxX - so.minX, so.maxY - so.minY) < 0.45 || Math.max(so.maxX - so.minX, so.maxY - so.minY) < 1.2;
+      if (toward && !thin && rise > 1.1 && this.canExert) { this.x = p.x; this.y = p.y; this.z = nz; this.grab(hit); return; } // 낮은 것은 붙잡지 않는다(그냥 내려앉는다)
       const into = this.vx * hit.nx + this.vy * hit.ny;
       if (into < 0) { this.vx -= into * hit.nx; this.vy -= into * hit.ny; }
     }

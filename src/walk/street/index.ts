@@ -13,6 +13,7 @@ import type { Anchor } from './ui';
 import * as T from './lines';
 import * as sfx from '../sound';
 import { EiffelQuests } from './eiffel';
+import { Story } from './story';
 
 export interface StreetCtx {
   hero: Hero;
@@ -89,6 +90,7 @@ export class Street {
   readonly landmarksSeen = new Set<string>();
   readonly c: StreetCtx;
   readonly eiffel: EiffelQuests;
+  readonly story: Story;
   district = '';
 
   constructor(c: StreetCtx) {
@@ -96,6 +98,7 @@ export class Street {
     this.ui = new StreetUi((x, y, z, out) => c.hero.town.project(x, y, z, out));
     c.hero.crowd.scene.add(this.items);
     this.eiffel = new EiffelQuests({ ui: this.ui, c, items: this.items, helped: (what) => { this.stats.helped++; this.stats.quests.push(what); } });
+    this.story = new Story({ ui: this.ui, c, items: this.items, helped: (what) => { this.stats.helped++; this.stats.quests.push(what); }, sparkling: () => this.eiffel.sparkling });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && this.ui.talking) this.ui.onTalkKey?.(-1); });
   }
 
@@ -137,6 +140,7 @@ export class Street {
     this.stepItems(dt);
     this.stepQuest(dt);
     this.eiffel.update(dt);
+    this.story.update(dt, !this.quest && !this.eiffel.active);
     this.landmarkT -= dt;
     if (this.landmarkT < 0) { this.landmarkT = 1; this.spotLandmarks(); }
     this.ambient(dt);
@@ -175,7 +179,7 @@ export class Street {
     };
     for (const it of this.quest?.item && !this.quest.item.follow ? [this.quest.item] : []) consider({ kind: 'item', item: it }, it.x, it.y, it.kind === 'balloon' ? 2.2 : 2.6, 3);
     const npc = h.crowd.nearest(b.x, b.y, facing, 3.4, (n) => !n.bike);
-    if (npc) consider({ kind: 'npc', npc }, npc.x, npc.y, 3.4, this.quest?.npc === npc || this.eiffel.giverOf(npc) ? 3 : 0.8);
+    if (npc) consider({ kind: 'npc', npc }, npc.x, npc.y, 3.4, this.quest?.npc === npc || this.eiffel.giverOf(npc) || this.story.giverOf(npc) ? 3 : 0.8);
     for (const sp of h.town.spots) {
       if (sp.kind === 'bench' && Math.hypot(sp.x - b.x, sp.y - b.y) > 2.2) continue;
       consider({ kind: 'spot', spot: sp }, sp.x, sp.y, sp.kind === 'metro' ? 4.5 : sp.kind === 'terrace' ? 3.6 : 3.2, sp.kind === 'metro' ? 0.5 : 0);
@@ -225,7 +229,7 @@ export class Street {
       }
       case 'npc': {
         const n = t.npc;
-        const e = this.eiffel.label(n);
+        const e = this.eiffel.label(n) ?? this.story.label(n);
         if (e) return e;
         const q = this.quest?.npc === n ? '❗' : '';
         return [q || (n.greeted ? '🙂' : '💬'), ROLE_NAME[n.role] ?? '사람', n.greeted ? '인사함' : ''];
@@ -253,7 +257,7 @@ export class Street {
       }
       case 'npc': {
         const n = t.npc;
-        const ev = this.eiffel.verb(n);
+        const ev = this.eiffel.verb(n) ?? this.story.verb(n);
         if (ev) return [ev, null];
         if (this.quest?.npc === n && this.quest.kind === 'way') return ['그쪽을 보고 가리키기', '다시 물어보기'];
         if (this.quest?.npc === n && this.quest.kind === 'photo') return ['사진 찍어 주기 (3)', null];
@@ -422,6 +426,7 @@ export class Street {
       label = '관광객 부부';
       this.finishQuest(T.PHOTO_OK, `사진 부탁을 들어줬다`);
     }
+    if (!label) label = this.story.onShutter(yaw) ?? '';
     if (!label) label = this.eiffel.onShutter(yaw) ?? '';
     if (!label && h.crowd.pigeonsNear(b.x, b.y, 2.6) >= 3) { label = '비둘기들'; if (b.crouch || b.mode === 'act') this.c.toast('🐦 비둘기를 코앞에서 찍었다! (웅크리고 다가가면 날아가지 않는다)'); }
     if (!label) {
@@ -548,6 +553,7 @@ export class Street {
     const q = this.quest;
     // 에펠탑 둘레의 부탁·가게
     if (this.eiffel.owns(n)) { this.busy = true; try { await this.eiffel.talk(n); } finally { this.busy = false; } return; }
+    if (this.story.owns(n)) { this.busy = true; try { await this.story.talk(n); } finally { this.busy = false; } return; }
     // 부탁을 들어주는 중
     if (q && q.npc === n) { await this.questTalk(q); return; }
     if (n.role === 'jogger') { const l = T.pick(T.BUSY); this.ui.say(at, l.fr, 2); return; }
@@ -780,7 +786,7 @@ export class Street {
   /** 지금 가야 할 곳(빛기둥) — 로컬 좌표 */
   get beacon(): [number, number] | null {
     const q = this.quest;
-    if (!q) return this.eiffel.beacon;
+    if (!q) return this.eiffel.beacon ?? this.story.beacon;
     if (q.item && !q.item.follow && !(q.kind === 'balloon' && this.c.hero.body.carry === 'balloon')) return [q.item.x, q.item.y];
     if (q.kind === 'balloon' || q.kind === 'dog') return [q.npc.x, q.npc.y];
     return null;
@@ -971,6 +977,7 @@ export class Street {
     if (this.landmarksSeen.size) out.push(`본 랜드마크: ${[...this.landmarksSeen].map((id) => this.c.hero.town.landmarks.find((l) => l.id === id)?.name).filter(Boolean).join(', ')}.`);
     if (s.drinks) out.push(`월리스 분수에서 물을 ${s.drinks}번 마셨어요 — 물병 하나면 물값이 안 들어요.`);
     if (s.bumps >= 3) out.push(`사람과 ${s.bumps}번 부딪혔어요. 붐비는 보도에선 천천히!`);
+    out.push(...this.story.summary());
     out.push(...this.eiffel.summary());
     return out;
   }

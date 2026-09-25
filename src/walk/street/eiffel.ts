@@ -52,6 +52,8 @@ export class EiffelQuests {
   private sparkle: THREE.Points | null = null;
   private sparkleMat: THREE.ShaderMaterial | null = null;
   sawSparkle = false;
+  /** 지금 반짝이는 중 */
+  sparkling = false;
   souvenirs = 0;
   boated = false;
   goldenFound = false;
@@ -431,6 +433,7 @@ export class EiffelQuests {
   private twinkle(_dt: number, dTower: number) {
     const hour = (this.h.c.S.clock / 60) % 24, minute = this.h.c.S.clock % 60;
     const on = (hour >= 21 || hour < 2) && minute < 5 && dTower < 7000;
+    this.sparkling = on;
     if (!on) { if (this.sparkle) this.sparkle.visible = false; return; }
     if (!this.sparkle) this.buildSparkle();
     this.sparkle!.visible = true;

@@ -39,6 +39,8 @@ import * as THREE from 'three';
 import { Wardrobe, modsOf } from './gear';
 import { Closet } from './closet';
 import { Minimap } from './minimap';
+import { Journal } from './journal';
+import { CHAPTERS } from './street/story';
 
 maplibregl.setWorkerUrl(workerUrl);
 
@@ -103,6 +105,7 @@ let transit: Transit;
 let wardrobe: Wardrobe;
 let closet: Closet;
 let minimap: Minimap;
+let journal: Journal;
 let guideTarget: Place | null = null; // 빛기둥으로 안내하는 곳(현지인이 알려 준 곳 등)
 let entering = false;
 let mapMode = false; // 🗺 지도 보기(위에서 내려다보며 목적지를 찍는다)
@@ -163,6 +166,8 @@ async function boot() {
       hero.hud.onPrompt2 = () => hero.input.press('secondary');
       street = makeStreet();
       setupGear();
+      journal = new Journal(() => street?.story ?? null);
+      street.story.onChange = () => journal.refresh();
       setupMinimap();
       transit = new Transit({ hero, toast, hint: (s2) => hint(s2), fine: (eur, why) => toast(`🎫 검표원(contrôleur)! ${why} 벌금 €${eur}`) });
       status.textContent = '';
@@ -316,7 +321,7 @@ let wasCamOn = false;
 let lastTrail: LngLat = START;
 let splashed = false;
 let climbT = 0;
-const MODALS = ['inside', 'dest', 'trip', 'metro', 'summary', 'closet'];
+const MODALS = ['inside', 'dest', 'trip', 'metro', 'summary', 'closet', 'journal'];
 const modalOpen = () => MODALS.some((id) => document.getElementById(id)?.classList.contains('on'));
 const HANDLERS = ['dragPan', 'dragRotate', 'scrollZoom', 'boxZoom', 'doubleClickZoom', 'keyboard', 'touchZoomRotate', 'touchPitch'] as const;
 /** 직접 걷는 동안에는 지도가 끌리거나 돌지 않게 한다(카메라는 사람이 잡는다) */
@@ -345,7 +350,7 @@ function frameBody(t: number) {
     // 걷기 화면을 그린다(지도 보기 중엔 지도 엔진이 그린다)
     hero.view.visible = !mapMode && !document.body.classList.contains('metro-mode');
     hero.render(dt);
-    minimap.visible = S.started && !S.finished && !mapMode && !metroOpen && !document.body.classList.contains('metro-mode') && !closet.open;
+    minimap.visible = S.started && !S.finished && !mapMode && !metroOpen && !document.body.classList.contains('metro-mode') && !closet.open && !journal.open;
     minimap.update(dt);
     if (!mapMode) pins.update((p) => hero.frame.toLocal(p), (x, y) => hero.world.terrain(x, y), [hero.body.x, hero.body.y], (x, y, z, o) => hero.view.project(x, y, z, o));
   }
@@ -730,6 +735,13 @@ function setupMinimap() {
         out.push({ x, y, icon: p.emoji, dim: S.visits.some((v) => v.place.id === p.id) });
       }
       for (const { g } of allGates(district)) { const [x, y] = hero.frame.toLocal(g.pos); out.push({ x, y, icon: 'Ⓜ' }); }
+      // 메인 이벤트가 남은 랜드마크
+      const st = street?.story;
+      if (st) for (const ch of CHAPTERS) {
+        if (!ch.main || !ch.giver || st.done.has(ch.id)) continue;
+        const l = hero.town.landmarks.find((q) => q.id === ch.landmark);
+        if (l) out.push({ x: l.x, y: l.y, icon: '⭐' });
+      }
       return out;
     },
     dots: () => hero.crowd.npcs,
@@ -1502,21 +1514,26 @@ function paintEye() { eyeBtn.innerHTML = mapMode ? '🚶<span class="lbl"> 걷�
 paintEye();
 eyeBtn.addEventListener('click', () => { eyeBtn.blur(); setMapMode(!mapMode); });
 $('#end').addEventListener('click', finish);
-$('#gear-go').addEventListener('click', (e) => { (e.currentTarget as HTMLElement).blur(); if (S.started && !S.finished) closet.toggle(); });
+$('#gear-go').addEventListener('click', (e) => { (e.currentTarget as HTMLElement).blur(); if (S.started && !S.finished) { journal.toggle(false); closet.toggle(); } });
+$('#journal-go').addEventListener('click', (e) => { (e.currentTarget as HTMLElement).blur(); if (S.started && !S.finished) { closet.toggle(false); journal.toggle(); } });
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'KeyI' || !closet || !S.started || S.finished || e.repeat) return;
   if (closet.open) closet.toggle(false); else if (!modalOpen() && !mapMode && !openPlace && !metroOpen) closet.toggle(true);
+});
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'KeyJ' || !journal || !S.started || S.finished || e.repeat) return;
+  if (journal.open) journal.toggle(false); else if (!modalOpen() && !mapMode && !openPlace && !metroOpen) journal.toggle(true);
 });
 const muteBtn = $<HTMLButtonElement>('#mute');
 const paintMute = () => { muteBtn.textContent = sfx.isMuted() ? '🔇' : '🔊'; };
 paintMute();
 muteBtn.addEventListener('click', () => { muteBtn.blur(); sfx.unlock(); sfx.setMuted(!sfx.isMuted()); paintMute(); });
 $('#again').addEventListener('click', () => location.reload());
-window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (closet?.open) { closet.toggle(false); return; } if (openPlace) closeCard('pass'); else if (mapMode) setMapMode(false); } });
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (closet?.open) { closet.toggle(false); return; } if (journal?.open) { journal.toggle(false); return; } if (openPlace) closeCard('pass'); else if (mapMode) setMapMode(false); } });
 // 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
 // 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
 window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
-if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; if (heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; } $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map, heli: () => heli, sky: () => sky, wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap };
+if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; if (heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; } $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map, heli: () => heli, sky: () => sky, wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();

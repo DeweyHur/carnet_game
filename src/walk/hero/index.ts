@@ -192,6 +192,7 @@ export class Hero {
       roll: !o.frozen && f.roll,
       pace: o.pace,
       maxStamina: o.maxStamina,
+      auto: !user && !!o.waypoint,
     };
     const W = this.sceneWorld ?? this.world;
     if (o.hold) b.events.length = 0;
@@ -228,7 +229,7 @@ export class Hero {
       if (d >= R0 || d < 1e-4) continue;
       const push = R0 - d;
       b.shove((dx / d) * push, (dy / d) * push, W);
-      if ((b.speed > 4.9 || b.mode === 'roll' || b.mode === 'slide') && !this.bumped) {
+      if ((b.speed > 5.6 || b.mode === 'roll' || b.mode === 'slide') && !this.bumped) { // 전력 질주·구르기로 부딪힐 때만
         this.bumped = n;
         crowd.bump(n, b.x, b.y);
         if (b.mode !== 'roll') b.stagger(dx / d, dy / d, 1.8);
