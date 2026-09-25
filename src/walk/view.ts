@@ -108,16 +108,37 @@ export class View {
     return true;
   }
 
-  render(p: ViewParts, dt: number) {
+  /** 캔버스 크기·해상도를 맞춘다. 그릴 수 없으면 false */
+  private fit(c: THREE.PerspectiveCamera): boolean {
     const w = this.el.clientWidth, h = this.el.clientHeight;
-    if (!w || !h) return;
+    if (!w || !h) return false;
     const R = this.renderer;
     if (Math.abs(R.getPixelRatio() - this.dpr) > 0.01) R.setPixelRatio(this.dpr);
     const bw = Math.round(w * this.dpr), bh = Math.round(h * this.dpr);
-    if (this.canvas.width !== bw || this.canvas.height !== bh) { R.setSize(w, h, false); }
-    const c = this.camera;
-    if (c.aspect !== w / h) { c.aspect = w / h; }
+    if (this.canvas.width !== bw || this.canvas.height !== bh) R.setSize(w, h, false);
+    if (c.aspect !== w / h) c.aspect = w / h;
     c.updateProjectionMatrix();
+    return true;
+  }
+
+  /** 다른 장면(지하철·버스)을 같은 렌더러·캔버스로 그린다 — WebGL 문맥을 하나만 쓴다 */
+  renderWith(cam: THREE.PerspectiveCamera, scenes: THREE.Object3D[], figure: ViewParts['figure'] | undefined, clear: THREE.ColorRepresentation) {
+    if (!this.fit(cam)) return;
+    const R = this.renderer;
+    R.setClearColor(clear);
+    R.clear();
+    for (const s of scenes) R.render(s as THREE.Scene, cam);
+    if (figure?.visible) {
+      figure.scene.position.set(figure.x, figure.y, figure.z);
+      figure.scene.updateMatrixWorld(true);
+      R.render(figure.scene as THREE.Scene, cam);
+    }
+  }
+
+  render(p: ViewParts, dt: number) {
+    const c = this.camera;
+    if (!this.fit(c)) return;
+    const R = this.renderer;
     c.updateMatrixWorld();
     this.viewProj.multiplyMatrices(c.projectionMatrix, c.matrixWorldInverse);
     if (!this.visible) return;

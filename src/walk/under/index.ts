@@ -41,8 +41,6 @@ export interface TransitCtx {
 
 export class Transit {
   active = false;
-  private canvas: HTMLCanvasElement;
-  private renderer: THREE.WebGLRenderer | null = null;
   private camera = new THREE.PerspectiveCamera(62, 1, 0.05, 600);
   private scene = new THREE.Scene();
   private stationA: { built: StationBuilt; name: string } | null = null; // 지금(또는 떠나는) 역
@@ -69,11 +67,6 @@ export class Transit {
 
   constructor(c: TransitCtx) {
     this.c = c;
-    this.canvas = document.createElement('canvas');
-    this.canvas.className = 'under';
-    // 걷기 화면(#view) 위에 — 지하철·버스 장면이 거리를 덮는다
-    const host = document.getElementById('view') ?? document.getElementById('map')!;
-    host.after(this.canvas);
     this.hud = document.createElement('div');
     this.hud.className = 'transit-hud';
     document.body.appendChild(this.hud);
@@ -120,23 +113,6 @@ export class Transit {
   }
 
   // ───────── 준비·정리 ─────────
-  private ensureRenderer() {
-    if (this.renderer) return;
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.autoClear = false;
-    this.renderer.setClearColor(0x0b0a09);
-  }
-
-  private resize() {
-    const w = window.innerWidth, h = window.innerHeight;
-    const r = this.renderer!;
-    const dpr = Math.min(matchMedia('(pointer: coarse)').matches ? 1.25 : 1.6, window.devicePixelRatio || 1);
-    if (this.canvas.width !== Math.round(w * dpr) || this.canvas.height !== Math.round(h * dpr)) { r.setPixelRatio(dpr); r.setSize(w, h, false); }
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
-  }
-
   private setStation(slot: 'A' | 'B', built: StationBuilt | null, name = '') {
     const cur = slot === 'A' ? this.stationA : this.stationB;
     if (cur) { this.scene.remove(cur.built.group); cur.built.dispose(); }
@@ -203,7 +179,7 @@ export class Transit {
 
   // ───────── 매 프레임(main이 부른다) ─────────
   frame(dt: number) {
-    if (!this.active || !this.renderer) return;
+    if (!this.active) return;
     const h = this.c.hero, b = h.body;
     h.input.enabled = !document.querySelector('.under-fade.on');
     h.hud.show(true);
@@ -254,15 +230,8 @@ export class Transit {
     const br = (shot.bearing * Math.PI) / 180, el = ((shot.pitch - 90) * Math.PI) / 180;
     this.camera.position.set(shot.x, shot.y, shot.z);
     this.camera.lookAt(shot.x + Math.sin(br) * Math.cos(el), shot.y + Math.cos(br) * Math.cos(el), shot.z + Math.sin(el));
-    this.resize();
-    const R = this.renderer;
-    R.clear();
-    R.render(this.scene, this.camera);
-    R.render(this.crowd.scene, this.camera);
-    R.render(this.riders.scene, this.camera);
-    h.figure.scene.position.set(b.x, b.y, b.z);
-    h.figure.scene.updateMatrixWorld(true);
-    R.render(h.figure.scene, this.camera);
+    // 거리와 같은 렌더러·캔버스(걷기 화면)에 그린다
+    h.view.renderWith(this.camera, [this.scene, this.crowd.scene, this.riders.scene], { scene: h.figure.scene, x: b.x, y: b.y, z: b.z, visible: true }, 0x0b0a09);
     // 기력 바퀴를 머리 옆에
     const v = new THREE.Vector3(b.x, b.y, b.z + 1.5).project(this.camera);
     h.hud.anchor(((v.x + 1) / 2) * window.innerWidth, ((1 - v.y) / 2) * window.innerHeight, v.z < 1);
@@ -278,7 +247,6 @@ export class Transit {
 
   // ───────── 여정 전체 ─────────
   async run(from: District, dest: District, j: Journey, entered: Gate, want: Curated | null, preload: () => void): Promise<MetroResult | null> {
-    this.ensureRenderer();
     const h = this.c.hero;
     const b = h.body;
     const saved = { x: b.x, y: b.y, z: b.z, facing: b.facing };
@@ -286,7 +254,7 @@ export class Transit {
     this.active = true;
     document.body.classList.add('underground');
     await this.fade(true);
-    this.canvas.classList.add('on');
+    document.body.classList.add('transit-on'); // 걷기 화면 캔버스가 이 장면을 그린다
     const st = { mins: 0, wrong: 0, fraud: false, validated: false, preloaded: false, exit: entered as Gate, extra: 0 };
     const pre = () => { if (!st.preloaded) { st.preloaded = true; preload(); } };
     const legs = j.legs;
@@ -342,7 +310,7 @@ export class Transit {
     this.waits.length = 0;
     this.prompt = null;
     this.leafMeshes = [];
-    this.canvas.classList.remove('on');
+    document.body.classList.remove('transit-on');
     this.hud.classList.remove('on');
     this.active = false;
     document.body.classList.remove('underground');

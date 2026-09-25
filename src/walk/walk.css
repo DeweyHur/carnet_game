@@ -347,6 +347,9 @@ body.touch-play.hero-on #hint { top:170px; }
 #view .pins { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
 #view .pins > * { pointer-events:auto; position:absolute; left:0; top:0; transform-origin:50% 100%; }
 body.map-mode #view, body.metro-mode #view { visibility:hidden; }
+/* 지하철·버스 장면도 같은 캔버스에 그린다 — 거리 핀·낮빛은 숨긴다 */
+body.transit-on #view { visibility:visible; }
+body.transit-on #view .pins, body.transit-on #view::after { display:none; }
 
 /* ───────── 거리에서 주고받기: 말풍선·이름표·가게 안내판·대화·사진 ───────── */
 .street-layer { position:fixed; inset:0; pointer-events:none; z-index:3; overflow:hidden; }
@@ -407,8 +410,6 @@ body.hero-on .mstation .nm { display:none; }
 body.hero-on .mstation { opacity:.85; }
 
 /* ───────── 지하철·버스 안(따로 그린 장면) ───────── */
-canvas.under { position:absolute; inset:0; width:100%; height:100%; display:none; background:#0b0a09; }
-canvas.under.on { display:block; }
 .under-fade { position:fixed; inset:0; background:#0b0a09; opacity:0; pointer-events:none; transition:opacity .45s; z-index:6; }
 .under-fade.on { opacity:1; }
 .transit-hud { position:fixed; left:50%; top:62px; translate:-50% -8px; width:min(620px, 94vw); background:#152a52ee; color:#fff; border-radius:14px; padding:10px 14px; z-index:4; opacity:0; pointer-events:none; transition:.3s; box-shadow:0 4px 18px #0006; }
