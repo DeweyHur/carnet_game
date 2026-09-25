@@ -21,6 +21,10 @@ export class FarCity {
   private readonly mat: THREE.Material;
   private dirty = new Set<string>();
   private skip: (x: number, y: number) => boolean = () => false;
+  /** 사람과 멀어도 세워 두는 곳(헬기 노선) */
+  private anchors: { x: number; y: number; r: number }[] = [];
+  keepNear(points: [number, number][], r: number) { this.anchors = points.map(([x, y]) => ({ x, y, r })); }
+  private anchored(cx: number, cy: number) { for (const a of this.anchors) if (Math.abs(a.x - cx) < a.r && Math.abs(a.y - cy) < a.r && Math.hypot(a.x - cx, a.y - cy) < a.r) return true; return false; }
   /** 아직 못 세운 덩어리 수(준비 진행률) */
   backlog = 0;
 
@@ -49,13 +53,28 @@ export class FarCity {
     const t0 = performance.now();
     const cx = Math.floor(x / BLOCK), cy = Math.floor(y / BLOCK), span = Math.ceil(NEAR_R / BLOCK);
     const want: { k: string; ix: number; iy: number; d: number }[] = [];
+    const seen = new Set<string>();
+    const consider = (ix: number, iy: number, d: number) => {
+      const k = `${ix},${iy}`;
+      const b = this.blocks.get(k);
+      if (b && !this.dirty.has(k)) return;
+      if (seen.has(k)) return;
+      seen.add(k);
+      want.push({ k, ix, iy, d });
+    };
+    // 노선 둘레(멀어도)
+    for (const a of this.anchors) {
+      const s0 = Math.ceil(a.r / BLOCK);
+      const ax = Math.floor(a.x / BLOCK), ay = Math.floor(a.y / BLOCK);
+      for (let ix = ax - s0; ix <= ax + s0; ix++) for (let iy = ay - s0; iy <= ay + s0; iy++) {
+        if (Math.hypot((ix + 0.5) * BLOCK - a.x, (iy + 0.5) * BLOCK - a.y) > a.r) continue;
+        consider(ix, iy, Math.hypot((ix + 0.5) * BLOCK - x, (iy + 0.5) * BLOCK - y) + 500);
+      }
+    }
     for (let ix = cx - span; ix <= cx + span; ix++) for (let iy = cy - span; iy <= cy + span; iy++) {
       const d = Math.hypot((ix + 0.5) * BLOCK - x, (iy + 0.5) * BLOCK - y);
       if (d > NEAR_R) continue;
-      const k = `${ix},${iy}`;
-      const b = this.blocks.get(k);
-      if (b && !this.dirty.has(k)) continue;
-      want.push({ k, ix, iy, d });
+      consider(ix, iy, d);
     }
     want.sort((a, b) => a.d - b.d);
     this.backlog = want.length;
@@ -66,7 +85,7 @@ export class FarCity {
     }
     for (const b of this.blocks.values()) {
       const [ix, iy] = b.key.split(',').map(Number);
-      if (Math.hypot((ix + 0.5) * BLOCK - x, (iy + 0.5) * BLOCK - y) > DROP_R) { this.drop(b); this.blocks.delete(b.key); }
+      if (Math.hypot((ix + 0.5) * BLOCK - x, (iy + 0.5) * BLOCK - y) > DROP_R && !this.anchored((ix + 0.5) * BLOCK, (iy + 0.5) * BLOCK)) { this.drop(b); this.blocks.delete(b.key); }
     }
   }
 

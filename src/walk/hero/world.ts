@@ -70,6 +70,8 @@ export class World {
   }
   /** 둘레 타일을 다 받았나(시작 전 준비가 기다린다) */
   tilesReady() { return this.tiles.size > 0 && [...this.tiles].every((k) => this.loaded.has(k)); }
+  /** 받은 타일 수 / 부탁한 타일 수 */
+  tileProgress(): [number, number] { let n = 0; for (const k of this.tiles) if (this.loaded.has(k)) n++; return [n, this.tiles.size]; }
   /** 이 자리 땅 높이 */
   terrain(x: number, y: number) { return this.relief.height(x, y); }
 

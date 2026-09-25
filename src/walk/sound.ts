@@ -228,6 +228,27 @@ export function wind(level: number) {
   windFilter!.frequency.setTargetAtTime(350 + l * 900 + Math.random() * 120, ctx.currentTime, 0.6);
 }
 
+// ───────── 열기구 버너(쉬익) · 여객기(낮게 우르릉) ─────────
+export const burner = () => { if (!ctx) return; hiss(0.9, 0.12, 700, 900, 'bandpass'); };
+let jetGain: GainNode | null = null;
+export function jet(level: number) {
+  if (!ctx) return;
+  if (!jetGain) {
+    const src = noiseSrc(true);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 420;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'bandpass'; hp.frequency.value = 2200; hp.Q.value = 0.8;
+    const whine = ctx.createGain(); whine.gain.value = 0.12;
+    jetGain = ctx.createGain(); jetGain.gain.value = 0;
+    src.connect(lp).connect(jetGain);
+    src.connect(hp).connect(whine).connect(jetGain);
+    jetGain.connect(ambBus!);
+    src.start();
+  }
+  jetGain.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.8, ctx.currentTime, 0.5);
+}
+
 // ───────── 헬기: 낮게 웅웅거리는 소리를 초당 11번 끊어 '두두두' ─────────
 let heliGain: GainNode | null = null;
 export function heli(level: number) {

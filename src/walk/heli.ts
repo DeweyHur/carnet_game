@@ -1,25 +1,36 @@
-// 시작 헬기(배틀그라운드 수송기처럼): 불로뉴 숲에서 파리 북동쪽까지 정해진 길로 날아간다.
+// 시작 헬기(배틀그라운드 수송기처럼): 에펠탑(트로카데로)에서 마레까지 정해진 길로 날아간다.
 // 여행자는 열린 옆문에 앉아 있다가, 원하는 곳에서 뛰어내린다(점프). 끝까지 가면 저절로 뛰어내린다.
 import * as THREE from 'three';
 import type { LngLat } from './graph';
 
 export const HELI_ALT = 420; // m
-export const HELI_SPEED = 70; // m/s (약 250 km/h)
+export const HELI_SPEED = 55; // m/s (약 200 km/h) — 6 km 남짓을 2분쯤
 
 /** 노선(서 → 북동): 이름은 화면 안내("곧: …")에 쓴다 */
 export const HELI_ROUTE: { pos: LngLat; name: string }[] = [
-  { pos: [2.2380, 48.8590], name: '불로뉴 숲' },
-  { pos: [2.2720, 48.8575], name: '파시' },
-  { pos: [2.2905, 48.8600], name: '트로카데로·에펠탑' },
+  { pos: [2.2885, 48.8620], name: '트로카데로' },
+  { pos: [2.2950, 48.8590], name: '에펠탑' },
   { pos: [2.3080, 48.8620], name: '앵발리드' },
   { pos: [2.3213, 48.8656], name: '콩코르드' },
   { pos: [2.3370, 48.8610], name: '루브르' },
-  { pos: [2.3522, 48.8570], name: '시청·마레' },
-  { pos: [2.3640, 48.8675], name: '레퓌블리크' },
-  { pos: [2.3790, 48.8720], name: '벨빌' },
-  { pos: [2.3850, 48.8800], name: '뷔트쇼몽' },
-  { pos: [2.3980, 48.8900], name: '파리 북동쪽 끝' },
+  { pos: [2.3522, 48.8570], name: '시청' },
+  { pos: [2.3610, 48.8570], name: '마레' },
+  { pos: [2.3655, 48.8556], name: '보주 광장' },
 ];
+
+/** 노선 위를 step m마다 짚은 점들(미리 받을 타일·먼 도시 자리) */
+export function routeSamples(step: number): LngLat[] {
+  const out: LngLat[] = [];
+  const M = 111320 * Math.cos((48.86 * Math.PI) / 180), N = 111130;
+  for (let i = 1; i < HELI_ROUTE.length; i++) {
+    const a = HELI_ROUTE[i - 1].pos, b = HELI_ROUTE[i].pos;
+    const L = Math.hypot((b[0] - a[0]) * M, (b[1] - a[1]) * N);
+    const n = Math.max(1, Math.ceil(L / step));
+    for (let k = 0; k < n; k++) out.push([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+  }
+  out.push(HELI_ROUTE[HELI_ROUTE.length - 1].pos);
+  return out;
+}
 
 export class Heli {
   readonly group = new THREE.Group();

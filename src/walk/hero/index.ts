@@ -89,6 +89,14 @@ export class Hero {
     this.world.ensure(lng, lat, template);
   }
 
+  /** 이 점들 둘레 타일도 미리 받아 둔다(헬기 노선) — 타일 주소가 없으면(폴백) 아무것도 안 한다 */
+  ensureAlong(points: LngLat[]) {
+    const src = this.map.getSource(SOURCE) as { tiles?: string[] } | undefined;
+    const template = src?.tiles?.[0];
+    if (!template) return;
+    for (const [lng, lat] of points) this.world.ensure(lng, lat, template);
+  }
+
   get lnglat(): LngLat { return this.frame.toLngLat(this.body.x, this.body.y); }
   get heading() { return this.body.facing; }
 
