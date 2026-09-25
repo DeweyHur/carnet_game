@@ -228,6 +228,38 @@ export function wind(level: number) {
   windFilter!.frequency.setTargetAtTime(350 + l * 900 + Math.random() * 120, ctx.currentTime, 0.6);
 }
 
+// ───────── 헬기: 낮게 웅웅거리는 소리를 초당 11번 끊어 '두두두' ─────────
+let heliGain: GainNode | null = null;
+export function heli(level: number) {
+  if (!ctx) return;
+  if (!heliGain) {
+    const src = noiseSrc(true);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 260;
+    const chop = ctx.createGain();
+    chop.gain.value = 0.55;
+    const lfo = ctx.createOscillator();
+    lfo.type = 'square';
+    lfo.frequency.value = 11;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.45;
+    lfo.connect(depth).connect(chop.gain);
+    const hum = ctx.createOscillator();
+    hum.type = 'sawtooth';
+    hum.frequency.value = 62;
+    const humG = ctx.createGain();
+    humG.gain.value = 0.05;
+    heliGain = ctx.createGain();
+    heliGain.gain.value = 0;
+    src.connect(lp).connect(chop).connect(heliGain);
+    hum.connect(humG).connect(heliGain);
+    heliGain.connect(sfxBus!);
+    src.start(); lfo.start(); hum.start();
+  }
+  heliGain.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.9, ctx.currentTime, 0.3);
+}
+
 // ───────── 거리의 공기: 도시 웅성임 · 새 · 카페 수다 · 분수 · 비둘기 · 종소리 · 스쿠터 ─────────
 export interface AmbState { night: number; hour: number; z: number; underground: boolean; terrace: number; fountain: number; flock: number; park: number; crowd: number }
 let hum: GainNode | null = null;

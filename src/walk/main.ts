@@ -27,6 +27,7 @@ import type { Dish } from './content';
 import { openMenu, openVisit } from './inside';
 import type { Shot } from './inside';
 import { Hero } from './hero';
+import { Heli, HELI_ROUTE, HELI_SPEED } from './heli';
 import { Pins } from './pins';
 import type { Pin } from './pins';
 import { Street } from './street';
@@ -198,6 +199,9 @@ function dressMap(fallback: boolean, ways: LngLat[][]) {
   map.addLayer({ id: 'trail', type: 'line', source: 'trail', paint: { 'line-color': '#e4572e', 'line-width': 4, 'line-opacity': 0.55 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
   map.addSource('route', { type: 'geojson', data: line([]) });
   map.addLayer({ id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#2d6cdf', 'line-width': 5, 'line-dasharray': [0.2, 1.6] }, layout: { 'line-cap': 'round' } });
+  // 헬기 노선(지도 보기에서 — 뛰어내리면 지운다)
+  map.addSource('heli', { type: 'geojson', data: line([]) });
+  map.addLayer({ id: 'heli', type: 'line', source: 'heli', paint: { 'line-color': '#f28c28', 'line-width': 4, 'line-dasharray': [1.2, 1] }, layout: { 'line-cap': 'round' } });
   // 지하철 구간(탈 때만 보인다)
   map.addSource('metro', { type: 'geojson', data: line([]) });
   map.addLayer({ id: 'metro', type: 'line', source: 'metro', paint: { 'line-color': '#bf3283', 'line-width': 7, 'line-opacity': 0.95 }, layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' } });
@@ -400,14 +404,15 @@ function soundscape() {
   const night = S.clock >= 19.5 * 60 ? Math.min(1, (S.clock - 19.5 * 60) / 120) : 0;
   sfx.ambient({ night, hour, z: b.z, underground: under, terrace: near('terrace', 16), fountain: near('fountain', 12), flock, park, crowd: Math.min(1, hero.crowd.npcs.length / 40) });
   const g = b.mode === 'glide' ? 0.55 + (b.parachute ? 0.2 : 0) : 0;
-  sfx.wind(under ? 0 : Math.max(g, Math.min(0.8, (b.z - 12) / 70), b.mode === 'air' && b.vz < -8 ? 0.6 : 0));
+  sfx.heli(heli ? (heli.riding ? 1 : Math.max(0, 1 - Math.hypot(heli.x - b.x, heli.y - b.y, heli.z - b.z) / 900)) : 0);
+  sfx.wind(under ? 0 : heli?.riding ? 0.35 : Math.max(g, Math.min(0.8, (b.z - 12) / 70), b.mode === 'air' && b.vz < -8 ? 0.6 : 0));
 }
 
 // ───────── 어디든: 다른 동네로 걸어·날아 들어가면 그 동네를 읽는다 ─────────
 let districtAcc = 0;
 let switching = false;
 function autoDistrict() {
-  if (switching || !S.started || S.finished || metroOpen || transit?.active || mapMode || openPlace) return;
+  if (switching || !S.started || S.finished || metroOpen || transit?.active || mapMode || openPlace || heli?.riding) return;
   const [lng, lat] = S.pos;
   const inside = (d: District, pad: number) => lat > d.bbox[0] - pad && lat < d.bbox[2] + pad && lng > d.bbox[1] - pad && lng < d.bbox[3] + pad;
   if (inside(district, 0.004)) return;
@@ -446,6 +451,7 @@ function heroFrame(dt: number) {
     else { map.setCenterClampedToGround(true); mapHandlers(true); if (mapMode) avatar.getElement().classList.remove('hidden'); }
     if (map.getLayer('vision')) map.setLayoutProperty('vision', 'visibility', camOn || quiet ? 'none' : 'visible');
   }
+  if (heli) { heli.update(dt); if (heli.riding) seatOnHeli(); else if (heli.s > heli.length + 2500) { hero.crowd.scene.remove(heli.group); heli = null; } }
   if (preparing) {
     hero.visible = true;
     hero.tick(dt, { waypoint: null, frozen: true, hold: true, pace: 1, maxStamina: 1, beacon: null });
@@ -465,9 +471,21 @@ function heroFrame(dt: number) {
     pace: paceFactor(S),
     maxStamina: 1 - 0.45 * (S.tired / 100), // 지칠수록 기력 바퀴가 작아진다
     beacon,
+    hold: !!heli?.riding, // 헬기에 앉아 있는 동안은 몸을 움직이지 않는다
   });
+  if (heli?.riding) {
+    // 점프 = 뛰어내리기. 노선 끝까지 가면 저절로.
+    if ((r.f.jump && live && !modal) || heli.s >= heli.length) jumpFromHeli();
+    else if ((heliHintT -= dt) < 0) {
+      heliHintT = 0.5;
+      const n = heli.next();
+      const touch = document.body.classList.contains('touch-play');
+      hint(`🚁 헬기 · 곧 ${n.name}${n.dist > 60 ? ` (${n.dist >= 1000 ? (n.dist / 1000).toFixed(1) + ' km' : Math.round(n.dist / 10) * 10 + ' m'})` : ''} — ${touch ? '뛰어내리기 버튼' : 'Space'}로 아무 데서나 뛰어내린다`);
+    }
+  }
   if (r.f.map && live && !modal && !talking) { setMapMode(!mapMode); return; } // 이번 프레임에 카메라를 잡으면 지도 보기 전환(easeTo)이 끊긴다
   street?.update(dt, r.f, live && !modal && !mapMode && !openPlace && !entering);
+  if (heli?.riding) { hero.hud.setPrompt(null); hero.hud.setPrompt2(null); } // 헬기에서는 '일어서기' 대신 뛰어내리기(점프)
   if (!live) { if (camOn) hero.drive(dt); return; }
   if (r.user && S.path.length > 1) cancelAuto();
   if (guideTarget && dist(S.pos, guideTarget.pos) < 18) { toast(`${guideTarget.emoji} ${guideTarget.name}에 왔다`); guideTarget = null; }
@@ -923,9 +941,10 @@ async function enterDistrict(d: District, at: LngLat, keep = false) {
   if (!keep) { S.trail = [S.pos]; lastTrail = S.pos; }
   const next = graph.adj[S.node]?.[0];
   hero.theme = d.id;
-  hero.setWays(data.ways);
+  if (heli && !heli.riding) { hero.crowd.scene.remove(heli.group); heli = null; } // 원점이 바뀐다 — 날아가던 헬기는 치운다
+  hero.setWays(allWays.length ? allWays : data.ways);
   hero.setGraph(graph.nodes, graph.adj.map((es) => es.map((e) => e.to)));
-  hero.setLanes(laneSegments(graph));
+  hero.setLanes(allLanes.length ? allLanes : laneSegments(graph));
   if (keep) hero.rebase();
   else hero.reset(S.pos, next ? bearing(S.pos, graph.nodes[next.to]) : 0);
   dressTown();
@@ -1115,27 +1134,84 @@ function closeCard(_why: 'enter' | 'pass') {
   hud();
 }
 
-const EIFFEL: LngLat = [2.29448, 48.85826];
 /** 시작 전 준비: 몸을 하늘에 세워 두고(멈춤), 보이는 칸을 다 짓고 지도 타일을 다 받고, 화면을 몇 번 그려 둔다.
  *  첫 화면(에펠탑 위)에서 읽고 짓느라 끊기지 않게 — 인트로 뒤에서 미리 한다. */
 let preparing = false;
+/** 시작 헬기(타고 있거나, 뛰어내린 뒤 날아가는 중) */
+let heli: Heli | null = null;
+let heliHintT = 0;
+/** 모든 동네의 길(어디에 내려앉든 거리·건물이 있게) */
+let allWays: LngLat[][] = [];
+let allLanes: LngLat[][] = [];
+
+/** 헬기 옆문에 앉힌다 */
+function seatOnHeli() {
+  if (!heli) return;
+  const st = heli.seat(), b = hero.body;
+  b.x = st.x; b.y = st.y; b.z = st.z;
+  b.vx = b.vy = b.vz = 0;
+  b.speed = 0;
+  b.facing = st.facing;
+  b.mode = 'sit';
+  b.seatZ = st.z;
+  b.freefall = false;
+  b.parachute = false;
+}
+
+/** 헬기에서 뛰어내린다 — 자유낙하로 */
+function jumpFromHeli() {
+  if (!heli?.riding) return;
+  heli.riding = false;
+  const b = hero.body, h = (heli.heading * Math.PI) / 180;
+  const rx = Math.cos(h), ry = -Math.sin(h);
+  b.mode = 'air';
+  b.skydive(b.x + rx * 1.6, b.y + ry * 1.6, b.z - 0.8, heli.heading);
+  // 헬기의 속도를 조금 안고 떨어진다
+  b.vx += Math.sin(h) * HELI_SPEED * 0.3 + rx * 3; b.vy += Math.cos(h) * HELI_SPEED * 0.3 + ry * 3;
+  hero.cam.pitch = 34;
+  hero.hud.jumpLabel = null;
+  sfx.chute();
+  S.pos = hero.lnglat;
+  S.origin = S.pos;
+  S.trail = [S.pos];
+  lastTrail = S.pos;
+  if (map.getSource('heli')) (map.getSource('heli') as GeoJSONSource).setData(line([]));
+  const touch = document.body.classList.contains('touch-play');
+  hint(touch ? '🪂 뛰어내렸다! 왼쪽을 끌어 방향, 점프 버튼으로 낙하산을 편다(낮아지면 저절로).' : '🪂 뛰어내렸다! WASD로 방향, Space로 낙하산 펴기(낮아지면 저절로). 펴고 나면 Shift 급강하, Space 접기.');
+  setTimeout(() => hint(''), 8000);
+}
+
+/** 모든 동네의 길을 한데 모은다(헬기 노선 어디에 내려앉아도 길·가구·건물이 있게) */
+async function unifyStreets() {
+  const all = await Promise.all(Object.values(DISTRICTS).map((d) => loadDistrict(d, () => undefined).then((x) => ({ d, x })).catch(() => null)));
+  const ok = all.filter((a): a is { d: District; x: Awaited<ReturnType<typeof loadDistrict>> } => !!a);
+  allWays = ok.flatMap((a) => a.x.ways);
+  allLanes = ok.flatMap((a) => laneSegments(buildGraph(a.x.ways)));
+  const others = ok.filter((a) => a.d.id !== district.id).flatMap((a) => a.x.ways);
+  hero.setWays(allWays);
+  hero.setLanes(allLanes);
+  hero.town.addProcedural(others.map((w) => w.map((p) => hero.frame.toLocal(p))));
+}
 async function prepare(fallback: boolean) {
   const go = $<HTMLButtonElement>('#go');
   const status = $('#status');
   preparing = true;
-  // 탑에서 150 m 뒤, 430 m 높이(탑 꼭대기보다 100 m 위) — 내려다보면 탑 전체와 그 너머 시내가 보인다
-  const [x, y] = hero.frame.toLocal(EIFFEL);
-  const B = (44 * Math.PI) / 180; // 바라보는 방향(58°)과 조금 어긋나게 — 탑이 주인공 몸에 가리지 않게
-  hero.body.skydive(x - Math.sin(B) * 150, y - Math.cos(B) * 150, 430, 58);
+  // 헬기: 불로뉴 숲 위에서 에펠탑 쪽을 보며 떠 있다(시작하면 북동쪽으로 날아간다)
+  heli = new Heli();
+  heli.setFrame((p) => hero.frame.toLocal(p));
+  hero.crowd.scene.add(heli.group); // 사람들 장면(조명이 있다)
+  seatOnHeli();
   hero.cam.snap(hero.body);
-  hero.cam.yaw = 58;
-  hero.cam.pitch = 36;
-  hero.cam.wantDist = 13;
+  hero.cam.yaw = (heli.heading + 330) % 360; // 헬기 옆구리와 앞쪽 시내가 같이 보이게
+  hero.cam.pitch = 14;
+  hero.cam.wantDist = 17;
+  hero.hud.jumpLabel = '뛰어내리기';
+  if (map.getSource('heli')) (map.getSource('heli') as GeoJSONSource).setData(line(HELI_ROUTE.map((w) => w.pos)));
   map.setCenterClampedToGround(false);
   if (map.getLayer('vision')) map.setLayoutProperty('vision', 'visibility', 'none');
   // 다른 동네 거리 데이터도 미리 받아 둔다 — 낙하산으로 경계를 넘을 때 기다리지 않게
   let fetched = false;
-  void Promise.all(Object.values(DISTRICTS).map((d) => loadDistrict(d, () => undefined).catch(() => null))).then(() => { fetched = true; });
+  void unifyStreets().catch(() => undefined).then(() => { fetched = true; });
   const town = hero.town;
   town.budget = 40; // 인트로가 가리고 있으니 한 프레임에 많이 지어도 된다
   const t0 = performance.now();
@@ -1167,7 +1243,7 @@ async function prepare(fallback: boolean) {
   lastTrail = S.pos;
   status.textContent = '';
   go.removeAttribute('disabled');
-  go.textContent = '🪂 뛰어내리기';
+  go.textContent = '🚁 헬기 타기';
 }
 
 async function start() {
@@ -1186,12 +1262,10 @@ async function start() {
   $('#hud').classList.add('on');
   mapHandlers(false);
   avatar.getElement().classList.add('hidden');
-  sfx.wind(1);
+  if (heli) heli.flying = true;
   hud();
   const touch = hero.input.touched || matchMedia('(pointer: coarse)').matches;
   if (touch) document.body.classList.add('touch-play');
-  hint(touch ? '🪂 파리 위로 떨어지는 중! 왼쪽을 끌어 방향, 점프 버튼으로 낙하산을 편다(낮아지면 저절로). 어디든 내려앉아 걸어 보자.' : '🪂 파리 위로 떨어지는 중! WASD로 방향, Space로 낙하산 펴기(낮아지면 저절로). 펴고 나면 Shift 급강하, Space 접기.');
-  setTimeout(() => hint(''), 9000);
 }
 
 const mode = (xs: string[]) => [...xs.reduce((m, x) => m.set(x, (m.get(x) ?? 0) + 1), new Map<string, number>())].sort((a, b) => b[1] - a[1])[0][0];
@@ -1313,7 +1387,7 @@ window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (openPl
 // 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
 // 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
 window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
-if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map };
+if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; if (heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; } $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map, heli: () => heli };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();

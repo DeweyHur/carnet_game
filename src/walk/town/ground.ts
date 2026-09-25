@@ -267,6 +267,14 @@ export class Ground {
     c.beginPath(); for (const [ax, ay, bx, by] of near) { c.moveTo(ax, ay); c.lineTo(bx, by); } c.stroke();
     c.strokeStyle = '#0000ff'; c.lineWidth = 6.4;
     c.beginPath(); for (const [ax, ay, bx, by] of near) { c.moveTo(ax, ay); c.lineTo(bx, by); } c.stroke();
+    // 타일의 길(동네 그래프 밖도): 보도 → 차도
+    const roads = world.roads.filter((r) => overlaps(r.line, ox, oy, 20, this.size));
+    for (const pass of [0, 1]) for (const r of roads) {
+      c.strokeStyle = pass ? '#0000ff' : '#000080';
+      c.lineWidth = pass ? r.w : r.w + 5;
+      const l = r.line;
+      c.beginPath(); c.moveTo(l[0], l[1]); for (let i = 2; i < l.length; i += 2) c.lineTo(l[i], l[i + 1]); c.stroke();
+    }
     // 2) 공원(잔디) — 공원 안의 길은 3) 자갈로
     const greens = world.greens.filter(inView);
     if (greens.length) {

@@ -37,6 +37,8 @@ export class World {
   readonly greens: Float64Array[] = [];
   /** 물(강) 고리 */
   readonly waters: Float64Array[] = [];
+  /** 타일에서 읽은 길(선, 폭 m) */
+  readonly roads: { line: Float64Array; w: number }[] = [];
   private tiles = new Set<string>();
   private lanes = new Map<number, Float64Array[]>(); // 걸어 다니는 길(OSM) — 건물 밑 통로·아케이드는 1층이 뚫려 있다
   private stamp = 1;
@@ -114,6 +116,15 @@ export class World {
     each('park', (f) => { const s = this.solidOf(f, x, y, 0, 0); if (s) greens.push(...s.rings); });
     each('landcover', (f) => { const c = String(f.properties.class ?? ''); if (c !== 'grass' && c !== 'wood' && c !== 'farmland') return; const s = this.solidOf(f, x, y, 0, 0); if (s) greens.push(...s.rings); });
     if (greens.length) { this.greens.push(...greens); this.relief.addParks(greens); } else if (wet) this.relief.clear();
+    // 길(땅에 포석·보도를 칠한다 — 거리 그래프가 없는 동네 밖도)
+    const ROADW: Record<string, number> = { motorway: 14, trunk: 13, primary: 11, secondary: 9, tertiary: 8, minor: 6.4, service: 4, pedestrian: 5, path: 2.5 };
+    let roads = 0;
+    each('transportation', (f) => {
+      const w = ROADW[String(f.properties.class)];
+      if (!w || f.properties.brunnel === 'tunnel') return;
+      for (const line of this.ringsOf(f, x, y)) if (line.length >= 4) { this.roads.push({ line, w }); roads++; }
+    });
+    if (roads) this.relief.clear(); // 땅을 다시 칠할 때가 됐다
     each('transportation', (f) => {
       if (f.properties.brunnel !== 'bridge') return;
       const half = /motorway|trunk|primary|secondary/.test(String(f.properties.class)) ? 13 : 8;

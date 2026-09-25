@@ -222,6 +222,13 @@ export class Town {
     if (import.meta.env.DEV) console.debug(`[town] procedural ${list.length} buildings in ${Math.round(performance.now() - t0)} ms`);
   }
 
+  /** 다른 동네의 길을 따라서도 절차적 건물을 세운다(헬기에서 뛰어내려 어디든 내려앉을 수 있게) */
+  addProcedural(ways: [number, number][][]) {
+    if (!this.procedural || !this.world || !ways.length) return;
+    const list = procedural(this.world, ways, this.theme).filter((b) => { const r = b.rings[0]; return !this.cleared((r[0] + r[4]) / 2, (r[1] + r[5]) / 2); });
+    this.world.addBuildings(list);
+  }
+
   private cellOf(x: number, y: number, make = false): Cell | undefined {
     const ix = Math.floor(x / CELL), iy = Math.floor(y / CELL);
     const k = cellKey(ix, iy);
