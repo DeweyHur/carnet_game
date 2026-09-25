@@ -363,7 +363,8 @@ const COARSE = matchMedia('(pointer: coarse)').matches;
 const Q_DPR = [Math.min(2, window.devicePixelRatio || 1), Math.min(1.5, window.devicePixelRatio || 1), 1, 0.8];
 const Q_RADIUS = [300, 240, 190, 150];
 const Q_CROWD = [46, 34, 24, 14];
-const Q_GRASS = [30, 24, 16, 0]; // 풀이 나는 반경(m) — 가장 낮은 품질에선 풀 없이 결만
+const Q_GRASS = [30, 24, 16, 0];
+const Q_SHADOW = [2048, 2048, 1024, 0]; // 해 그림자 지도 크기(0 = 끔) // 풀이 나는 반경(m) — 가장 낮은 품질에선 풀 없이 결만
 let quality = COARSE ? 1 : 0;
 let slowT = 0, fastT = 0, frameEma = 16;
 function govern(dt: number) {
@@ -379,6 +380,7 @@ function applyQuality() {
   hero.crowd.target = Q_CROWD[quality];
   hero.crowd.outlines = quality < 2;
   hero.town.grass.setRadius(Q_GRASS[quality]);
+  hero.shadow.setSize(Q_SHADOW[quality]);
   if (import.meta.env.DEV) console.debug(`[quality] ${quality} (${Math.round(frameEma)} ms)`);
 }
 

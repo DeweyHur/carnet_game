@@ -10,6 +10,8 @@ import { HeroHud } from './hud';
 import { Input } from './input';
 import type { Frame as InputFrame } from './input';
 import { View } from '../view';
+import { SunShadow } from '../shadow';
+import * as THREE from 'three';
 import { World } from './world';
 import { Town } from '../town';
 import { Crowd } from '../town/crowd';
@@ -49,6 +51,10 @@ export class Hero {
   private blend: { from: { x: number; y: number; z: number; fx: number; fy: number; fz: number }; t0: number; secs: number } | null = null;
   /** 걷기 화면(three.js가 전부 그린다) */
   readonly view: View;
+  /** 해 그림자(깊이 지도) */
+  readonly shadow: SunShadow;
+  private shadeAcc = 0;
+  private readonly sc = new THREE.Vector3();
   private stuck = { t: 0, x: 0, y: 0 };
 
   private readonly map: MlMap;
@@ -61,6 +67,7 @@ export class Hero {
     this.world = new World(this.frame, { hills: true });
     this.view = new View(document.getElementById('map')!);
     this.input = new Input(this.view.el);
+    this.shadow = new SunShadow(this.town.uniforms);
     this.hud = new HeroHud(this.input, onMap);
   }
 
@@ -250,6 +257,23 @@ export class Hero {
   /** 한 장 그린다(지하철 장면 중엔 그 장면이 따로 그린다) */
   render(dt: number) {
     const b = this.body;
+    // 해 그림자: 해가 낮거나 밤이면 옅어진다. 땅·풀·먼 도시는 그림자를 드리우지 않는다(받기만).
+    const sun = this.town.uniforms.uSun.value;
+    const k = Math.max(0, Math.min(1, (sun.z - 0.08) / 0.22)) * (1 - this.town.uniforms.uNight.value);
+    this.figure.scene.position.set(b.x, b.y, b.z);
+    this.figure.scene.updateMatrixWorld(true);
+    const t = this.town;
+    if (this.view.visible) this.shadow.render(this.view.renderer, this.visible ? [t.scene, this.crowd.scene, this.figure.scene] : [t.scene, this.crowd.scene], [t.ground.group, t.farGround.group, t.grass.group, t.far.group], this.sc.set(b.x, b.y, this.world.terrain(b.x, b.y)), sun, k);
+    // 여행자가 그늘에 서 있나(해 쪽으로 몇 걸음 짚어 본다) — 모습의 햇빛을 줄인다
+    if ((this.shadeAcc -= dt) < 0) {
+      this.shadeAcc = 0.15;
+      let lit = 1;
+      if (k > 0.02) {
+        const L = Math.hypot(sun.x, sun.y, sun.z) || 1;
+        for (let d = 1.2; d < 90; d += 1.5) if (this.world.solidAt(b.x + (sun.x / L) * d, b.y + (sun.y / L) * d, b.z + 1.2 + (sun.z / L) * d)) { lit = 0.35; break; }
+      }
+      this.figure.setShade(lit);
+    }
     this.view.render({ scenes: [this.town.scene, this.crowd.scene], figure: { scene: this.figure.scene, x: b.x, y: b.y, z: b.z, visible: this.visible } }, dt);
     this.town.setView(this.view.viewProj, this.view.el.clientWidth, this.view.el.clientHeight);
     // 기력 바퀴를 머리 옆에

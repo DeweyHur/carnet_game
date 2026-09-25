@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { World } from '../hero/world';
 import { BED_Z, WATER_Z } from '../hero/terrain';
 import type { TownUniforms } from './material';
+import { SHADOW_GLSL } from '../shadow';
 
 export const G_SIZE = 640; // 한 장이 덮는 넓이(m)
 
@@ -31,6 +32,7 @@ uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uAmb; uniform vec3 uFog; u
 varying vec3 vP;
 varying vec3 vN;
 ${NOISE}
+${SHADOW_GLSL}
 void main() {
   vec2 p = vP.xy;
   if (p.x > uHole.x && p.y > uHole.y && p.x < uHole.z && p.y < uHole.w) discard;
@@ -75,7 +77,7 @@ void main() {
   vec3 base = (grassC * grass + gravelC * gravel + roadC * road + paveC * side + blockC * block + mudC * water) / sum;
   vec3 N = normalize(vN);
   float ndl = max(dot(N, uSun), 0.0);
-  vec3 col = base * (uAmb * 0.92 + uSunCol * ndl * 0.8);
+  vec3 col = base * (uAmb * 0.92 + uSunCol * ndl * 0.8 * shadowAt(vP + N * 0.1));
   // 가장자리는 안개로 — 한 장의 끝이 보이지 않게
   float edgeFade = smoothstep(uSize * 0.36, uSize * 0.5, max(abs(p.x - uOrigin.x - uSize * 0.5), abs(p.y - uOrigin.y - uSize * 0.5)));
   // 땅은 칸마다 튀어나오지 않으니 건물보다 멀리까지 또렷하게(하늘에서 내려다볼 때도)
@@ -173,7 +175,7 @@ export class Ground {
     this.typeTex.generateMipmaps = false;
     this.heightTex = new THREE.DataTexture(new Uint16Array(N * N), N, N, THREE.RedFormat, THREE.HalfFloatType);
     this.heightTex.minFilter = this.heightTex.magFilter = THREE.LinearFilter;
-    const shared = { uSun: u.uSun, uSunCol: u.uSunCol, uAmb: u.uAmb, uFog: u.uFog, uEye: u.uEye, uFar: u.uFar, uNight: u.uNight };
+    const shared = { uSun: u.uSun, uSunCol: u.uSunCol, uAmb: u.uAmb, uFog: u.uFog, uEye: u.uEye, uFar: u.uFar, uNight: u.uNight, uShadowMap: u.uShadowMap, uShadowMatrix: u.uShadowMatrix, uShadowOn: u.uShadowOn, uShadowTexel: u.uShadowTexel };
     this.mat = new THREE.ShaderMaterial({ uniforms: { ...shared, uType: { value: this.typeTex }, uOrigin: { value: this.origin }, uSize: { value: this.size }, uHole: { value: this.hole }, uEdge: { value: this.far ? 1 : 0 } }, vertexShader: VERT, fragmentShader: FRAG });
     this.waterMat = new THREE.ShaderMaterial({ uniforms: { ...shared, uTime: this.time, uHole: { value: this.hole } }, vertexShader: VERT, fragmentShader: WATER_FRAG });
     this.wallMat = new THREE.ShaderMaterial({ uniforms: shared, vertexShader: VERT, fragmentShader: WALL_FRAG, side: THREE.DoubleSide });

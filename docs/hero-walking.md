@@ -200,6 +200,8 @@ ground ──사람과 세게 부딪힘──▶ stagger(0.55 s)
 | `map.once('render')` 후 캔버스 뜨기(사진) | `view.capture()` — 그린 직후 같은 틱에서 |
 | `map.areTilesLoaded()`(시작 준비) | `world.tilesReady()` + 먼 도시 backlog |
 | `map.setPixelRatio`(품질) | `view.setPixelRatio` |
+| (없음) | 해 그림자 `SunShadow`: 해 쪽 직교 카메라(±70 m, 텍셀 단위로 붙임)로 거리·사람·여행자의 깊이만 그린다(땅·풀·먼 도시는 받기만). 건물(`townMaterial`)·땅·풀 셰이더가 `SHADOW_GLSL`의 `shadowAt()`(3×3 PCF, 법선 방향으로 0.1~0.15 m 띄워 본다)로 햇빛 항만 줄인다. 세기 = 해 높이(z 0.08→0.3) × (1 − 밤). 품질별 지도 크기 [2048, 2048, 1024, 끔]. 여행자는 해 쪽으로 90 m까지 `solidAt`으로 짚어 그늘이면 모습의 해 조명을 35%로 |
+| 지하철·버스 전용 캔버스·렌더러 | `view.renderWith(전용 카메라, 장면들)` — 같은 캔버스·렌더러 |
 
 ## 12. 검증하는 법
 

@@ -4,6 +4,7 @@
 // 풀 사이엔 들꽃이 드문드문, 공원에 있으면 꽃잎이 바람에 날린다.
 import * as THREE from 'three';
 import type { TownUniforms } from './material';
+import { SHADOW_GLSL } from '../shadow';
 import type { Ground } from './ground';
 import { G_SIZE } from './ground';
 
@@ -22,6 +23,8 @@ varying float vT;
 varying float vShade;
 varying float vFog;
 uniform vec3 uEye; uniform float uFar;
+varying float vSun;
+${SHADOW_GLSL}
 float hh(vec2 p) { p = mod(p, 289.0); return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float vn(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
   return mix(mix(hh(i), hh(i + vec2(1, 0)), u.x), mix(hh(i + vec2(0, 1)), hh(i + vec2(1, 1)), u.x), u.y); }
@@ -51,6 +54,7 @@ vec3 place(out float scale, out float rot, out vec2 bend, float heightAt) {
   if (abs(uHero.z - z) < 1.5) bend += normalize(away + 1e-4) * near * 1.4;
   vShade = 0.8 + 0.4 * r2;
   vFog = smoothstep(uFar * 0.55, uFar, distance(base, uEye.xy)) * 0.85;
+  vSun = shadowAt(vec3(base, z + 0.3)); // 풀포기 하나는 한 번만 본다(꼭짓점 셰이더에서)
   return vec3(base, z);
 }
 `;
@@ -78,10 +82,11 @@ uniform vec3 uSunCol; uniform vec3 uAmb; uniform vec3 uFog; uniform float uNight
 varying float vT;
 varying float vShade;
 varying float vFog;
+varying float vSun;
 void main() {
   vec3 root = vec3(0.16, 0.30, 0.09), tip = vec3(0.58, 0.74, 0.30);
   vec3 base = mix(root, tip, vT) * vShade;
-  vec3 col = base * (uAmb * 0.85 + uSunCol * (0.45 + 0.4 * vT)); // 끝이 햇빛을 머금는다
+  vec3 col = base * (uAmb * 0.85 + uSunCol * (0.45 + 0.4 * vT) * mix(0.35, 1.0, vSun)); // 끝이 햇빛을 머금는다
   col = mix(col, uFog, vFog);
   gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
@@ -113,10 +118,10 @@ void main() {
 const FLOWER_FRAG = /* glsl */ `
 precision highp float;
 uniform vec3 uSunCol; uniform vec3 uAmb; uniform vec3 uFog;
-varying float vPetal; varying vec3 vCol; varying float vT; varying float vShade; varying float vFog;
+varying float vPetal; varying vec3 vCol; varying float vT; varying float vShade; varying float vFog; varying float vSun;
 void main() {
   vec3 base = vPetal > 0.5 ? vCol : vec3(0.22, 0.4, 0.12);
-  vec3 col = base * (uAmb * 0.8 + uSunCol * 0.65);
+  vec3 col = base * (uAmb * 0.8 + uSunCol * 0.65 * mix(0.35, 1.0, vSun));
   col = mix(col, uFog, vFog);
   gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
@@ -195,7 +200,7 @@ export class Grass {
     this.uniforms = {
       uType: { value: ground.typeTex }, uHeight: { value: ground.heightTex }, uOrigin: { value: ground.origin },
       uHero: { value: new THREE.Vector3() }, uHScale: { value: new THREE.Vector2((ground.N - 1) / ground.N, 0.5 / ground.N) }, uTime: ground.time, uWind: { value: this.wind }, uCell: { value: 0.5 }, uRadius: { value: 30 },
-      uSunCol: u.uSunCol, uAmb: u.uAmb, uFog: u.uFog, uNight: u.uNight, uEye: u.uEye, uFar: u.uFar,
+      uSunCol: u.uSunCol, uAmb: u.uAmb, uFog: u.uFog, uNight: u.uNight, uEye: u.uEye, uFar: u.uFar, uShadowMap: u.uShadowMap, uShadowMatrix: u.uShadowMatrix, uShadowOn: u.uShadowOn, uShadowTexel: u.uShadowTexel,
     };
     // 꽃잎: 사람 둘레 상자 안에서 바람 따라 날다가 돌아온다
     const P = 160;

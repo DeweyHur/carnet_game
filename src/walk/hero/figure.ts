@@ -68,11 +68,16 @@ export class Figure {
   /** 하루의 빛: 햇빛 색·세기와 하늘빛 */
   light(sunColor: string, sunI: number, skyColor: string, skyI: number) {
     this.sun.color.set(sunColor);
-    this.sun.intensity = sunI;
+    this.baseSun = sunI;
+    this.sun.intensity = sunI * this.shade;
     this.sky.color.set(skyColor);
     this.sky.intensity = skyI;
   }
   private t = 0;
+  private baseSun = 1;
+  private shade = 1;
+  /** 그늘에 들어가면(0.35) 햇빛을 줄인다 — 부드럽게 */
+  setShade(k: number) { this.shade += (k - this.shade) * 0.35; this.sun.intensity = this.baseSun * this.shade; }
 
   constructor() {
     this.scene.add(this.flip);

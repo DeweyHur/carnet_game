@@ -3,8 +3,10 @@
 // 밤이 되면 유리 칸의 일부에 불이 켜지고, glow가 있는 꼭짓점(가로등 등)은 스스로 빛난다.
 import * as THREE from 'three';
 import { ATLAS_N, facadeAtlas } from './atlas';
+import { SHADOW_GLSL, shadowUniforms } from '../shadow';
+import type { ShadowUniforms } from '../shadow';
 
-export interface TownUniforms {
+export interface TownUniforms extends ShadowUniforms {
   uAtlas: { value: THREE.Texture };
   uSun: { value: THREE.Vector3 };
   uSunCol: { value: THREE.Color };
@@ -25,6 +27,7 @@ export function townUniforms(): TownUniforms {
     uFog: { value: new THREE.Color('#efe3d2') },
     uEye: { value: new THREE.Vector3() },
     uFar: { value: 330 },
+    ...shadowUniforms(),
   };
 }
 
@@ -68,6 +71,7 @@ varying float vGlow;
 varying float vSeed;
 varying vec3 vN;
 varying vec3 vP;
+${SHADOW_GLSL}
 // 큰 수를 sin에 넣으면 GPU마다 정밀도가 달라 픽셀마다 들쭉날쭉해진다 — 작은 정수로 섞는다
 float hash(vec3 p) { p = mod(floor(p + 0.5), 97.0); return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 437.5453); }
 void main() {
@@ -88,7 +92,8 @@ void main() {
   float ndl = max(dot(N, uSun), 0.0);
   // 땅 가까이는 살짝 어둡게(그늘·때), 위로 갈수록 하늘빛을 더 받는다
   float ao = mix(0.72, 1.0, smoothstep(0.0, 3.0, vP.z)) * (0.92 + 0.08 * N.z);
-  vec3 col = base * (uAmb * ao + uSunCol * ndl * 0.85);
+  float sh = ndl > 0.0 ? shadowAt(vP + N * 0.15) : 1.0; // 해 그림자(해를 등진 면은 원래 어둡다)
+  vec3 col = base * (uAmb * ao + uSunCol * ndl * 0.85 * sh);
   // 밤: 유리창 일부에 불이 켜진다(창마다 다르게)
   if (glassMask > 0.5 && uNight > 0.01) {
     float h = hash(vec3(floor(vUv), floor(vSeed + 0.5)));
