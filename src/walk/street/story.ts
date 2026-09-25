@@ -55,7 +55,7 @@ export const CHAPTERS: Chapter[] = [
     giver: { name: '귀스타브 (탑 안내인)', role: 'reader', at: [-30, -80], facing: 0, call: 'Vous voulez voir Paris d’en haut ?' },
     intro: { fr: 'En 1889, tout le monde détestait cette tour. Montez tout en haut, et vous comprendrez pourquoi on l’a gardée.', ko: '1889년엔 다들 이 탑을 싫어했어요. "흉물"이라고요. 꼭대기까지 올라가 보면 왜 허물지 않았는지 알게 될 거예요. 꼭대기에서 파리를 한 장 찍어 와 줄래요?' },
     beats: [
-      { kind: 'high', at: [0, 0], r: 24, dz: 270, line: '🗼 에펠탑 꼭대기(276 m)까지 — 다리를 타고 층마다 쉬어 가며', done: '🗼 꼭대기! 바람이 세다. 파리가 발밑에 깔려 있다' },
+      { kind: 'high', at: [0, 0], r: 24, dz: 270, line: '🗼 에펠탑 꼭대기(276 m)까지 — 다리 바깥쪽 면을 타고, 턱마다 기력을 채우며', done: '🗼 꼭대기! 바람이 세다. 파리가 발밑에 깔려 있다' },
       { kind: 'photo', minDz: 240, line: '📷 꼭대기에서 파리를 한 장 (3)', label: '에펠탑 꼭대기에서 본 파리' },
       { kind: 'talk', line: '🗼 귀스타브에게 사진을 보여 주자 (뛰어내려 글라이더로)', fr: 'Voilà ! Vous avez vu ? Paris entier. Gustave Eiffel avait raison.', ko: '봤죠? 파리 전체요. 에펠 씨 말이 맞았어요 — 이 탑은 무선 전신 안테나로 쓸모가 생겨서 살아남았답니다.' },
     ],
