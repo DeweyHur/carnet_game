@@ -395,7 +395,7 @@ export class Body {
       const s = Math.hypot(this.vx, this.vy);
       const ns = approach(s, want, dt * (chute ? 9 : 5));
       this.vx = fx * ns; this.vy = fy * ns;
-      if (!chute) this.spend(dt * 0.06);
+      if (!chute) this.spend(dt * 0.025); // 한 바퀴로 40초쯤 — 70 m 탑(노트르담) 꼭대기에서 바로 펴도 내려온다
       if (this.exhausted && !chute) { this.mode = 'air'; this.fallTopZ = this.z; this.events.push('unglide'); }
       this.fallTopZ = this.z;
     } else if (this.freefall) {

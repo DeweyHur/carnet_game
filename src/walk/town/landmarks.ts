@@ -20,6 +20,8 @@ export interface Landmark {
   clear: number;
   /** 이 반경 안 건물은 이 겉모습으로(보주 광장 등) */
   zone?: { style: string; r: number };
+  /** 앞마당: 랜드마크 좌표 (u, v)에 반지름 r — 보통 건물을 세우지 않는다(성당 앞 광장 등) */
+  plazas?: [number, number, number][];
   build?: (b: LB) => void;
   /** 매 프레임 움직이는 부분(물랭 루주 날개) */
   anim?: THREE.Object3D;
@@ -238,21 +240,30 @@ function carrousel(b: LB) {
 
 // ───────── 노트르담 ─────────
 function notreDame(b: LB) {
-  // 서쪽 정면(-x)과 두 탑
-  b.tbox(-56, 0, 0, 10, 40, 44, T.blankStone, '#f3ece0', STONE, 6);
-  for (const sy of [-13, 13]) {
-    b.tbox(-56, sy, 0, 14, 14, 69, T.blankStone, '#efe6d4', STONE, 6);
-    b.box(-56, sy, 69, 14.6, 14.6, 1.2, STONE_D);
-    for (const [px, py] of [[-6.5, -6.5], [6.5, -6.5], [-6.5, 6.5], [6.5, 6.5]]) b.cyl(-56 + px, sy + py, 69, 0.2, 0.5, 3, 6, STONE_D);
+  // 서쪽 정면(-x)은 층마다 1 m씩 들어간다 — 왕들의 회랑(17 m)·장미창 회랑(31 m)·큰 회랑(46 m), 탑은 57 m에서 한 번 더 좁아진다.
+  // 그 턱들이 쉬어 가는 자리라서 69 m 탑 꼭대기까지 기어오를 수 있다(한 번에 15 m 안팎).
+  b.tbox(-55, 0, 0, 12, 42, 17, T.blankStone, '#f3ece0', STONE, 6);
+  b.tbox(-54.5, 0, 17, 11, 41, 14, T.blankStone, '#f3ece0', STONE, 6);
+  b.tbox(-54, 0, 31, 10, 40, 15, T.blankStone, '#f3ece0', STONE, 6);
+  for (const sy of [-14, 14]) {
+    b.tbox(-52, sy, 46, 12, 12, 11, T.blankStone, '#efe6d4', STONE, 6);
+    b.tbox(-51.5, sy, 57, 10, 10, 12, T.blankStone, '#efe6d4', STONE, 6);
+    b.box(-51.5, sy, 69, 10.6, 10.6, 1.2, STONE_D);
+    for (const [px, py] of [[-4.6, -4.6], [4.6, -4.6], [-4.6, 4.6], [4.6, 4.6]]) b.cyl(-51.5 + px, sy + py, 69, 0.2, 0.5, 3, 6, STONE_D);
     // 탑 창(길고 좁은)
-    for (const k of [-3, 3]) b.box(-61.1, sy + k, 48, 0.3, 2.2, 16, '#2a2622');
+    for (const k of [-2.6, 2.6]) { b.box(-58.1, sy + k, 47.5, 0.3, 2, 8.5, '#2a2622'); b.box(-56.6, sy + k, 58.5, 0.3, 1.8, 9, '#2a2622'); }
+    b.box(-57.8, sy, 57, 0.8, 12.4, 0.7, STONE_D); // 탑 턱
   }
-  // 정면 장식: 장미창·포털 셋·왕들의 회랑
-  b.geo(new THREE.CylinderGeometry(5.2, 5.2, 0.4, 28).rotateZ(Math.PI / 2), b.M(-61.2, 0, 29), '#3a3f86', 0.8);
-  b.geo(new THREE.TorusGeometry(5.4, 0.45, 6, 28).rotateY(Math.PI / 2), b.M(-61.3, 0, 29), STONE_D);
+  // 정면 장식: 포털 셋 · 왕들의 회랑 · 장미창 · 큰 회랑(턱마다 난간 띠)
   for (const k of [-11, 0, 11]) { b.box(-61.2, k, 0, 0.6, k === 0 ? 7 : 6, 11, '#2b2620'); b.box(-61.3, k, 11, 0.5, k === 0 ? 7.6 : 6.6, 1.5, STONE_D); }
-  b.box(-61.3, 0, 17, 0.6, 40, 2.2, STONE_D);
-  b.box(-61.3, 0, 40, 0.8, 40, 1.4, STONE_D);
+  b.box(-61.3, 0, 14.4, 0.6, 42, 2.6, STONE_D);
+  for (let k = -19; k <= 19; k += 2.4) b.box(-61.35, k, 14.8, 0.3, 1.1, 1.8, '#b9ab8a'); // 왕들
+  b.geo(new THREE.CylinderGeometry(5.2, 5.2, 0.4, 28).rotateZ(Math.PI / 2), b.M(-60.2, 0, 24), '#3a3f86', 0.8);
+  b.geo(new THREE.TorusGeometry(5.4, 0.45, 6, 28).rotateY(Math.PI / 2), b.M(-60.3, 0, 24), STONE_D);
+  b.box(-60.1, 0, 29.6, 0.5, 41, 1.4, STONE_D);
+  b.box(-59.2, 0, 38, 0.6, 40, 1.4, STONE_D);
+  for (let k = -18; k <= 18; k += 1.6) b.box(-59.2, k, 39.4, 0.25, 0.5, 5, '#d4c7a8'); // 큰 회랑 기둥
+  b.box(-59.1, 0, 45.2, 0.5, 40, 0.8, STONE_D);
   // 신랑(가운데 높고 양옆 낮게) + 급한 납 지붕
   b.tbox(-8, 0, 0, 86, 14, 33, T.blankStone, '#f0e8d8', STONE, 6);
   b.gable(-8, 0, 33, 86, 14.5, 11, LEAD);
@@ -276,8 +287,10 @@ function notreDame(b: LB) {
     b.beam([x, s * 21, 20], [x, s * 7.5, 30], 0.45, 0.45, 4, STONE_D);
   }
   // 부딪힘
-  b.sbox(-56, 0, 10, 40, 0, 44);
-  for (const sy of [-13, 13]) b.sbox(-56, sy, 14, 14, 0, 69);
+  b.sbox(-55, 0, 12, 42, 0, 17);
+  b.sbox(-54.5, 0, 11, 41, 17, 31);
+  b.sbox(-54, 0, 10, 40, 31, 46);
+  for (const sy of [-14, 14]) { b.sbox(-52, sy, 12, 12, 46, 57); b.sbox(-51.5, sy, 10, 10, 57, 69); }
   b.sbox(-8, 0, 86, 34, 0, 20);
   b.sbox(-8, 0, 86, 14, 0, 38);
   b.sbox(12, 0, 14, 46, 0, 38);
@@ -331,24 +344,31 @@ function dome(r: number, h: number): [number, number][] {
 
 // ───────── 개선문 ─────────
 function arc(b: LB) {
-  // 큰 아치는 x축을 따라 뚫려 있다(샹젤리제 방향)
-  for (const sy of [-15.3, 15.3]) {
-    b.box(0, sy, 0, 22, 14.6, 29, STONE);
-    // 부조(밝은 판)
-    for (const sx of [-11.1, 11.1]) b.box(sx, sy, 6, 0.4, 9, 11, '#ece3cc');
-    b.box(0, sy, 0, 22.6, 15.2, 2.5, STONE_D);
+  // 큰 아치는 x축을 따라 뚫려 있다(샹젤리제 방향).
+  // 네 단 — 기단(0~15)·아치 기둥(15~29)·프리즈(29~42)·아티크(42~50) — 단마다 1 m씩 들어가 쉬어 가며 옥상까지 오른다.
+  for (const sy of [-1, 1]) {
+    b.box(0, sy * 15.8, 0, 24, 15.6, 15, STONE);
+    for (const sx of [-12.1, 12.1]) b.box(sx, sy * 15.8, 3, 0.4, 9, 10, '#ece3cc'); // 부조(밝은 판)
+    b.box(0, sy * 15.8, 0, 24.6, 16.2, 2.5, STONE_D);
+    b.box(0, sy * 15.8, 14.4, 24.4, 16, 0.6, STONE_D);
+    b.box(0, sy * 15.3, 15, 22, 14.6, 14, STONE);
   }
-  b.box(0, 0, 29, 22, 45, 21, STONE);
-  b.box(0, 0, 29, 22.6, 45.6, 1.4, STONE_D);
-  b.box(0, 0, 42, 23, 46, 1.6, STONE_D);
-  b.box(0, 0, 48.5, 23.2, 46.2, 1.5, STONE_D);
+  b.box(0, 0, 27, 22, 16, 2, STONE);
+  b.box(0, 0, 29, 20, 43.2, 13, STONE);
+  b.box(0, 0, 28.6, 22.4, 45.4, 0.8, STONE_D);
+  b.box(0, 0, 36, 20.3, 43.5, 3, '#e8dec6'); // 프리즈
+  b.box(0, 0, 42, 18, 41.2, 8, STONE);
+  b.box(0, 0, 41.5, 20.4, 43.6, 0.9, STONE_D);
+  b.box(0, 0, 48.8, 18.4, 41.6, 1.2, STONE_D);
   // 아치 천장 곡면
-  b.geo(new THREE.CylinderGeometry(7.3, 7.3, 22, 16, 1, true, -Math.PI / 2, Math.PI).rotateZ(Math.PI / 2), b.M(0, 0, 29 - 7.3), '#cfc2a4');
+  b.geo(new THREE.CylinderGeometry(7.3, 7.3, 24, 16, 1, true, -Math.PI / 2, Math.PI).rotateZ(Math.PI / 2), b.M(0, 0, 29 - 7.3), '#cfc2a4');
   // 무명용사의 불꽃
   b.cyl(0, 0, 0, 0.5, 0.6, 0.4, 10, '#3a342c');
   b.cyl(0, 0, 0.4, 0.05, 0.25, 0.7, 6, '#ffb347', 1);
-  for (const sy of [-15.3, 15.3]) b.sbox(0, sy, 22, 14.6, 0, 29);
-  b.sbox(0, 0, 22, 45, 28.5, 50);
+  for (const sy of [-1, 1]) { b.sbox(0, sy * 15.8, 24, 15.6, 0, 15); b.sbox(0, sy * 15.3, 22, 14.6, 15, 29); }
+  b.sbox(0, 0, 22, 16, 27, 29);
+  b.sbox(0, 0, 20, 43.2, 28.5, 42);
+  b.sbox(0, 0, 18, 41.2, 42, 50);
 }
 
 // ───────── 루브르: 유리 피라미드 + 나폴레옹 안뜰을 둘러싼 궁전 날개(ㄷ자, 서쪽이 열렸다) ─────────
@@ -527,12 +547,12 @@ function grandPalais(b: LB) {
 }
 
 export const LANDMARKS: Landmark[] = [
-  { id: 'eiffel', name: '에펠탑', emoji: '🗼', pos: [2.29448, 48.85826], bearing: 44, clear: 70, build: eiffel },
+  { id: 'eiffel', name: '에펠탑', emoji: '🗼', pos: [2.29448, 48.85826], bearing: 44, clear: 130, build: eiffel },
   { id: 'chaillot', name: '샤요 궁', emoji: '🏛', pos: [2.28805, 48.86229], bearing: 133.6, clear: 0, build: chaillot },
   { id: 'carrousel', name: '에펠탑 회전목마', emoji: '🎠', pos: [2.29268, 48.85871], bearing: 0, clear: 0, build: carrousel },
   { id: 'louvre', name: '루브르 박물관', emoji: '🔺', pos: [2.33585, 48.86099], bearing: 115, clear: 150, build: louvre },
-  { id: 'notre-dame', name: '노트르담 대성당', emoji: '⛪', pos: [2.34994, 48.85297], bearing: 112, clear: 62, build: notreDame },
-  { id: 'sacre-coeur', name: '사크레쾨르 대성당', emoji: '⛪', pos: [2.34306, 48.88672], bearing: 0, clear: 80, build: sacreCoeur },
+  { id: 'notre-dame', name: '노트르담 대성당', emoji: '⛪', pos: [2.34994, 48.85297], bearing: 112, clear: 62, plazas: [[-112, 0, 56]], build: notreDame },
+  { id: 'sacre-coeur', name: '사크레쾨르 대성당', emoji: '⛪', pos: [2.34306, 48.88672], bearing: 0, clear: 80, plazas: [[-100, 0, 42]], build: sacreCoeur },
   { id: 'arc', name: '개선문', emoji: '🏛', pos: [2.29504, 48.87378], bearing: 112, clear: 115, build: arc },
   { id: 'pompidou', name: '퐁피두 센터', emoji: '🎨', pos: [2.35222, 48.86065], bearing: 8, clear: 90, build: pompidou },
   { id: 'hotel-de-ville', name: '파리 시청', emoji: '🏛', pos: [2.35222, 48.85641], bearing: 8, clear: 80, build: hotelDeVille },

@@ -86,6 +86,8 @@ export class Town {
   backlog = 0;
   inView = 0;
   /** 이 동네 원점 기준 랜드마크(로컬 m) */
+  /** 랜드마크 앞마당(로컬 x, y, 반지름) */
+  private plazas: [number, number, number][] = [];
   landmarks: { id: string; name: string; emoji: string; x: number; y: number; z: number; clear: number; zone?: { style: string; r: number } }[] = [];
   private landmarkMesh: THREE.Mesh | null = null;
   private movers: THREE.Object3D[] = [];
@@ -147,6 +149,7 @@ export class Town {
     for (const m of this.extras) this.scene.remove(m);
     this.extras = [];
     this.landmarks = [];
+    this.plazas = [];
     const g = new GeoBuilder();
     for (const L of LANDMARKS) {
       const [x, y] = this.frame.toLocal(L.pos);
@@ -155,6 +158,7 @@ export class Town {
       this.landmarks.push({ id: L.id, name: L.name, emoji: L.emoji, x, y, z: oz, clear: L.clear, zone: L.zone });
       if (!L.build) continue;
       const rot = ((90 - L.bearing) * Math.PI) / 180;
+      for (const [u, v, r] of L.plazas ?? []) this.plazas.push([x + u * Math.cos(rot) - v * Math.sin(rot), y + u * Math.sin(rot) + v * Math.cos(rot), r]);
       const b = new LB(g, x, y, rot, (rings, base, top) => { this.world.addSolid(rings, base + oz, top + oz, 'building', undefined, true); });
       g.dz = oz;
       L.build(b);
@@ -169,6 +173,7 @@ export class Town {
   /** 랜드마크 자리라서 보통 건물을 세우지 않는 곳인가 */
   cleared(x: number, y: number) {
     for (const l of this.landmarks) if (l.clear && Math.abs(l.x - x) < l.clear && Math.abs(l.y - y) < l.clear && Math.hypot(l.x - x, l.y - y) < l.clear) return true;
+    for (const [px, py, r] of this.plazas) if (Math.hypot(px - x, py - y) < r) return true;
     if (this.procedural) for (const r of this.open) if (inRing(r, x, y)) return true;
     return false;
   }

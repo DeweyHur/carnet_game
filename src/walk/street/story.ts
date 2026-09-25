@@ -68,7 +68,7 @@ export const CHAPTERS: Chapter[] = [
     intro: { fr: 'Sous l’Arc dort un soldat inconnu. Chaque soir depuis 1923, on ranime sa flamme.', ko: '개선문 아래엔 이름 모를 병사가 잠들어 있어요. 1923년부터 매일 저녁 그 불꽃을 다시 지핀답니다. 불꽃 앞에 잠깐 서 있다가, 옥상에 올라가 샹젤리제를 봐 주세요. 내 다리로는 이제 284계단이 무리라서.' },
     beats: [
       { kind: 'reach', at: [0, 0], r: 3.2, line: '🔥 아치 한가운데, 꺼지지 않는 불꽃 앞에 서자', done: '🔥 무명용사의 불꽃 앞에 섰다 — 잠깐 고개를 숙인다' },
-      { kind: 'high', at: [0, 0], r: 26, dz: 49, line: '🏛 개선문 옥상 테라스(50 m)로 — 기둥 벽을 타고 올라가자', done: '🏛 옥상! 열두 길이 별처럼 뻗어 나간다(그래서 "에투알", 별 광장)' },
+      { kind: 'high', at: [0, 0], r: 26, dz: 49, line: '🏛 개선문 옥상 테라스(50 m)로 — 단마다 난 턱에서 기력을 채우며 올라가자', done: '🏛 옥상! 열두 길이 별처럼 뻗어 나간다(그래서 "에투알", 별 광장)' },
       { kind: 'photo', minDz: 44, face: 112, faceTol: 25, line: '📷 옥상에서 샹젤리제 쪽(동남, 콩코르드 방향)을 보고 한 장 (3)', label: '개선문 위에서 본 샹젤리제' },
       { kind: 'talk', line: '🏛 마르셀에게 돌아가자', fr: 'Les Champs, jusqu’à la Concorde… Merci, vraiment.', ko: '샹젤리제가 콩코르드까지… 정말 고마워요. 옛날엔 저 길을 행진했었지.' },
     ],
@@ -93,7 +93,7 @@ export const CHAPTERS: Chapter[] = [
     intro: { fr: 'Tout part d’ici : le point zéro des routes de France. Trouvez-le, puis montez voir mes gargouilles.', ko: '프랑스의 모든 길은 여기서 시작해요 — 광장 바닥의 "푸앵 제로(0 km)". 그걸 밟고 나서, 탑 꼭대기에 올라가 내 가고일들한테 안부 좀 전해 줘요. 불이 난 뒤로 다시 올라갈 수 있게 됐거든요.' },
     beats: [
       { kind: 'reach', at: [-100, 0], r: 2.6, line: '⭐ 성당 앞 광장의 "푸앵 제로"(파리 거리의 기준점)를 밟자', done: '⭐ 푸앵 제로! 여기를 밟으면 파리에 다시 온다는 말이 있다' },
-      { kind: 'high', at: [-56, 0], r: 24, dz: 67, line: '🔔 탑 꼭대기(69 m)로 — 앞면을 타고 올라가자', done: '🔔 탑 위! 가고일들이 파리를 내려다보고 있다' },
+      { kind: 'high', at: [-56, 0], r: 24, dz: 67, line: '🔔 탑 꼭대기(69 m)로 — 정면의 회랑 턱(17·31·46·57 m)에서 쉬어 가며', done: '🔔 탑 위! 가고일들이 파리를 내려다보고 있다' },
       { kind: 'photo', minDz: 60, line: '📷 탑 위에서 가고일 너머 파리를 한 장 (3)', label: '노트르담 탑 위에서 본 파리' },
       { kind: 'talk', line: '🔔 캉탱에게 돌아가자', fr: 'Elles vont bien ? Ah, mes belles !', ko: '다들 잘 있던가요? 아, 내 예쁜이들! 2019년 불 속에서도 저 탑은 버텼어요.' },
     ],
@@ -440,13 +440,14 @@ export class Story {
     for (const m of r.items) this.h.items.remove(m);
     r.items = []; r.picked = [];
     if (msg) { this.h.c.toast(msg); sfx.chime(); }
-    if (r.beat >= r.ch.beats.length) this.complete(r);
+    if (r.beat >= r.ch.beats.length) this.complete(r, msg ? 2500 : 0); // 마지막 할 일의 알림이 먼저 보이게
     else if (msg === undefined) sfx.questStart();
     this.onChange?.();
   }
 
-  private complete(r: Run) {
+  private complete(r: Run, wait = 0) {
     const ch = r.ch;
+    const toast = (t: string, ms = 0) => { if (wait + ms) setTimeout(() => this.h.c.toast(t), wait + ms); else this.h.c.toast(t); };
     this.done.add(ch.id);
     if (ch.main) this.save();
     if (ch.reward.eur) this.h.c.S.money = Math.round((this.h.c.S.money + ch.reward.eur) * 100) / 100;
@@ -455,10 +456,10 @@ export class Story {
     sfx.questDone();
     if (ch.main) {
       const n = CHAPTERS.filter((c) => c.main && c.id !== 'm-finale' && this.done.has(c.id)).length;
-      setTimeout(() => sfx.fanfare(), 600);
-      this.h.c.toast(`📖 메인 이벤트 완료 · ${ch.emoji} ${ch.title}${ch.reward.eur ? ` · €${ch.reward.eur}` : ''}${ch.id === 'm-finale' ? '' : ` — 수첩 도장 ${n}/5`}`);
-      if (ch.id === 'm-finale') setTimeout(() => this.h.c.toast('🎉 파리 수첩의 메인 이벤트를 모두 마쳤다!'), 3500);
-    } else this.h.c.toast(`✨ ${ch.reward.note}${ch.reward.eur ? ` · €${ch.reward.eur}` : ''}`);
+      setTimeout(() => sfx.fanfare(), 600 + wait);
+      toast(`📖 메인 이벤트 완료 · ${ch.emoji} ${ch.title}${ch.reward.eur ? ` · €${ch.reward.eur}` : ''}${ch.id === 'm-finale' ? '' : ` — 수첩 도장 ${n}/5`}`);
+      if (ch.id === 'm-finale') toast('🎉 파리 수첩의 메인 이벤트를 모두 마쳤다!', 3500);
+    } else toast(`✨ ${ch.reward.note}${ch.reward.eur ? ` · €${ch.reward.eur}` : ''}`);
     if (this.tracked === ch.id) this.tracked = this.nextTrack();
   }
 
