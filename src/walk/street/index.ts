@@ -35,6 +35,10 @@ export interface StreetCtx {
   shot: (label: string) => void;
   terrace: (p: Place | undefined, what: string, cost: number, mins: number) => void;
   frozen: () => boolean;
+  /** 마리니에르를 입었나(사람들이 더 반긴다) */
+  charm?: () => boolean;
+  /** 장비를 얻었다 */
+  gear?: (id: string) => void;
 }
 
 type Target =
@@ -362,7 +366,7 @@ export class Street {
         // 가까이서 이쪽을 볼 수 있는 사람이 인사를 받는다
         const n = h.crowd.nearest(b.x, b.y, b.facing, 9, (q) => !q.bike && q.role !== 'jogger');
         if (n) {
-          if (!n.greeted) { n.greeted = true; this.stats.bonjour++; n.mood = Math.min(1, n.mood + 0.4); }
+          if (!n.greeted) { n.greeted = true; this.stats.bonjour++; n.mood = Math.min(1, n.mood + (this.c.charm?.() ? 0.7 : 0.4)); }
           setTimeout(() => { h.crowd.gesture(n, 'wave', 1.4); this.ui.say(this.npcAt(n), n.mood < -0.3 ? 'Mouais…' : T.pick(T.WAVE_BACK), 2.2, '', n.id); }, 350);
         }
         return;
@@ -570,11 +574,11 @@ export class Street {
         await wait(700);
       }
       n.talked++;
-      if (n.talked > 2) { this.ui.say(at, 'Encore vous ? Bonne journée !', 2.2); return; }
+      if (n.talked > (this.c.charm?.() ? 4 : 2)) { this.ui.say(at, 'Encore vous ? Bonne journée !', 2.2); return; }
       // 관광객은 가끔 부탁을 한다
       if (!this.quest && n.role === 'tourist' && Math.random() < 0.55) { this.busy = false; await this.startAsk(n); return; }
       // 가까운 곳 하나를 알려 주거나, 쓸모 있는 이야기를 해 준다
-      const p = n.mood > -0.2 && Math.random() < 0.6 ? this.unseenNear(400) : null;
+      const p = n.mood > -0.2 && Math.random() < (this.c.charm?.() ? 0.9 : 0.6) ? this.unseenNear(this.c.charm?.() ? 600 : 400) : null;
       if (p) {
         const [px, py] = this.pos(p);
         h.crowd.gesture(n, 'point', 2.5);

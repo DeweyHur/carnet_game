@@ -92,6 +92,8 @@ export class Body {
   parachute = false;
   /** 숨은 보상: 에펠탑 꼭대기에 내려앉으면 글라이더가 금빛 낙하산이 된다(빠르고 기력을 안 쓴다) */
   golden = false;
+  /** 입은 장비가 몸에 주는 것(곱) — gear.ts의 modsOf */
+  mods = { run: 1, climb: 1, glide: 1, hurt: 1, swim: 1, steady: false };
   skydive(x: number, y: number, z: number, facing: number) {
     this.place(x, y, z);
     this.facing = facing;
@@ -145,6 +147,7 @@ export class Body {
   /** 사람과 부딪혀 휘청인다 */
   stagger(nx: number, ny: number, power = 2.2) {
     if (this.mode !== 'ground' && this.mode !== 'act') return;
+    if (this.mods.steady) return; // 가죽 재킷: 버틴다
     this.mode = 'stagger';
     this.act = null;
     this.staggerT = 0.55;
@@ -223,6 +226,7 @@ export class Body {
     const sprinting = it.sprint && m > 0.2 && this.canExert && !this.crouch;
     let want = m < 0.08 ? 0 : m < 0.6 ? WALK + (RUN - WALK) * ((m - 0.08) / 0.52) : RUN;
     if (sprinting) want = SPRINT;
+    if (want > WALK) want *= this.mods.run;
     if (this.crouch) want = Math.min(want, SNEAK * Math.max(0.4, m));
     if (this.pointT > 0) want = 0;
     if (this.exhausted) want = Math.min(want, TIRED);
@@ -369,7 +373,7 @@ export class Body {
       // 낙하산: 파리 어디로든 갈 수 있게 빠르게 난다(순항 20 m/s, 3 m/s씩 가라앉음 → 430 m에서 약 2.8 km).
       // 달리기 = 급강하(빨리 내려가며 더 빠르게), 손을 떼도 앞으로 흘러간다.
       const chute = this.parachute || this.golden;
-      const sink = chute ? (it.sprint ? 11 : this.parachute ? 3.1 : 2.5) : GLIDE_SINK;
+      const sink = chute ? (it.sprint ? 11 : (this.parachute ? 3.1 : 2.5) * this.mods.glide) : GLIDE_SINK * this.mods.glide;
       this.vz += (-sink - this.vz) * Math.min(1, dt * 3.5);
       if (m >= 0.08) this.turn(bearingOf(ix, iy), (chute ? 110 : 150) * dt);
       const want = chute
@@ -427,8 +431,8 @@ export class Body {
       const buffered = this.rollBuf > 0;
       this.rollBuf = 0;
       // 착지 직전에 구르면 충격을 흘려 보낸다(낙법)
-      if (!gliding && buffered && fell < SAFE_ROLL) { this.startRoll(Math.hypot(this.vx, this.vy) > 0.5 ? bearingOf(this.vx, this.vy) : this.facing, true); return; }
-      if (!gliding && fell > HURT_FALL) { this.mode = 'down'; this.downT = 1.1; this.speed = 0; this.events.push('hurt'); }
+      if (!gliding && buffered && fell < SAFE_ROLL * this.mods.hurt) { this.startRoll(Math.hypot(this.vx, this.vy) > 0.5 ? bearingOf(this.vx, this.vy) : this.facing, true); return; }
+      if (!gliding && fell > HURT_FALL * this.mods.hurt) { this.mode = 'down'; this.downT = 1.1; this.speed = 0; this.events.push('hurt'); }
       else { this.mode = 'ground'; this.events.push('land'); this.speed = gliding ? Math.min(this.speed * 0.5, 4) : this.speed * 0.8; } // 빨리 날다 내려앉아도 몇 걸음에 선다
       return;
     }
@@ -465,13 +469,13 @@ export class Body {
       if (it.jump && this.stamina > 0.02) {
         const k = Math.hypot(up, side);
         this.climbJump = { t: 0.34, uz: k > 0.2 ? up / k : 1, ux: k > 0.2 ? side / k : 0 };
-        this.spend(0.22);
+        this.spend(0.22 * this.mods.climb);
         this.events.push('climbjump');
         return;
       }
       const s = Math.min(1, Math.hypot(up, side));
       this.climbMove = s;
-      if (s > 0.08) this.spend(dt * 0.055 * s); // 한 바퀴로 25 m쯤 — 파리 건물(15~25 m)은 끝까지 오를 수 있다
+      if (s > 0.08) this.spend(dt * 0.055 * s * this.mods.climb); // 한 바퀴로 25 m쯤 — 파리 건물(15~25 m)은 끝까지 오를 수 있다
       this.z += up * CLIMB_UP * it.pace * dt;
       this.x += rx * side * CLIMB_SIDE * it.pace * dt; this.y += ry * side * CLIMB_SIDE * it.pace * dt;
       this.phase += s * dt * 5.5;
@@ -551,7 +555,7 @@ export class Body {
     this.phase += dt * (1.6 + this.speed * 1.3);
     if (Math.floor(this.phase / Math.PI) !== before && this.speed > 0.4) this.events.push('stroke');
     this.restT = 0;
-    this.spend(dt * (fast ? 0.2 : this.speed > 0.3 ? 0.035 : 0.012));
+    this.spend(dt * (fast ? 0.2 : this.speed > 0.3 ? 0.035 : 0.012) * this.mods.swim);
     const [fx, fy] = dirOf(this.facing);
     const p = { x: this.x + fx * this.speed * dt, y: this.y + fy * this.speed * dt };
     w.collide(p, WATER_Z - 1, R, H, 0.3);

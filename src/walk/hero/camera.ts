@@ -13,6 +13,10 @@ export class OrbitCam {
   private fx = 0; private fy = 0; private fz = 1.5;
   private idle = 9;
   private recenterT = 0;
+  /** 옷장을 여는 동안 얼굴 쪽에서 본다 */
+  portrait = false;
+  /** 옷장일 때 비켜 세우기 [옆 m, 위아래 m, 거리 m] */
+  portraitShift: [number, number, number] = [0, 0, 3.1];
 
   snap(b: Body) {
     this.fx = b.x; this.fy = b.y; this.fz = b.z + 1.45;
@@ -30,7 +34,11 @@ export class OrbitCam {
     this.pitch = Math.max(-35, Math.min(75, this.pitch + dPitch)); // 음수 = 발밑에서 올려다본다(하늘·탑 꼭대기)
     if (zoom) this.wantDist = Math.max(2.4, Math.min(22, this.wantDist * Math.exp(zoom * 0.0012)));
 
-    if (this.recenterT > 0) {
+    if (this.portrait) {
+      // 옷장: 앞으로 돌아와 가까이서 본다
+      this.yaw = (this.yaw + angleDiff(this.yaw, b.facing + 180) * Math.min(1, dt * 5) + 360) % 360;
+      this.pitch += (6 - this.pitch) * Math.min(1, dt * 5);
+    } else if (this.recenterT > 0) {
       this.recenterT -= dt;
       this.yaw = (this.yaw + angleDiff(this.yaw, b.facing) * Math.min(1, dt * 14) + 360) % 360;
       this.pitch += (14 - this.pitch) * Math.min(1, dt * 10);
@@ -51,9 +59,15 @@ export class OrbitCam {
     // 헤엄칠 땐(움직이는 중에도) 둑 너머로 보이게 높이서
     if (b.mode === 'swim' && this.pitch < 42) this.pitch += (42 - this.pitch) * Math.min(1, dt * 3);
     const kh = 1 - Math.exp(-dt * 11), kv = 1 - Math.exp(-dt * (b.mode === 'ground' || b.mode === 'swim' ? 7 : 4.5));
-    const focusZ = b.z + (b.mode === 'swim' ? 0.55 : b.mode === 'glide' ? 1.9 : 1.45);
-    this.fx += (b.x - this.fx) * kh;
-    this.fy += (b.y - this.fy) * kh;
+    let tx = b.x, ty = b.y, focusZ = b.z + (b.mode === 'swim' ? 0.55 : b.mode === 'glide' ? 1.9 : 1.45);
+    if (this.portrait) {
+      // 옷장 판에 가리지 않게 사람을 화면 옆(위)으로 비켜 세운다
+      const [lx0, ly0] = dirOf(this.yaw - 90);
+      tx += lx0 * this.portraitShift[0]; ty += ly0 * this.portraitShift[0];
+      focusZ = b.z + 1.05 + this.portraitShift[1];
+    }
+    this.fx += (tx - this.fx) * kh;
+    this.fy += (ty - this.fy) * kh;
     this.fz += (focusZ - this.fz) * kv;
 
     // 벽에 가리면 가까이 당긴다
@@ -61,7 +75,7 @@ export class OrbitCam {
     const cp = Math.cos((this.pitch * Math.PI) / 180), sp = Math.sin((this.pitch * Math.PI) / 180);
     const bx = -lx * cp, by = -ly * cp, bz = sp; // 초점에서 카메라 쪽
     // 올려다볼수록 카메라가 사람 가까이 내려온다(땅에 박히지 않고 하늘이 보이게)
-    const want = this.pitch < 0 ? this.wantDist * Math.max(0.4, 1 + this.pitch / 50) : this.wantDist;
+    const want = this.portrait ? this.portraitShift[2] : this.pitch < 0 ? this.wantDist * Math.max(0.4, 1 + this.pitch / 50) : this.wantDist;
     let free = want;
     for (let d = 0.6; d <= want; d += 0.35) {
       if (w.solidAt(this.fx + bx * d, this.fy + by * d, this.fz + bz * d)) { free = Math.max(1.1, d - 0.45); break; }

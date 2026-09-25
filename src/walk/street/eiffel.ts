@@ -247,6 +247,7 @@ export class EiffelQuests {
         const i = await ui.talk(g.name, 'Une heure sur la Seine, jusqu’à Notre-Dame. Dix-sept euros.', '센 강 한 시간 — 노트르담까지 갔다 돌아와요. 17유로. 해 질 녘이 제일 좋아요.', ['타요 (€17)', '다음에요']);
         if (i !== 0 || !c.pay(17, '센 강 유람선')) return;
         await this.cruise();
+        c.gear?.('marin');
         return;
       }
       case 'carrousel': {
@@ -259,6 +260,7 @@ export class EiffelQuests {
         const i = await ui.talk(g.name, 'Tour Eiffel ! Cinq pour deux euros ! Très jolie !', '미니 에펠탑 다섯 개 2유로! (허가 없이 파는 장수다. 경찰이 오면 순식간에 사라진다.)', ['하나 살게요 (€2)', '괜찮아요']);
         if (i !== 0 || !c.pay(2, '미니 에펠탑')) return;
         this.souvenirs++;
+        c.gear?.('flag');
         sfx.coin();
         ui.say(this.at(n), 'Merci ! Bonne journée !', 2, '', n.id);
         c.toast('🗼 미니 에펠탑 다섯 개를 샀다 — 공식 기념품점보다 싸지만, 파리 사람들은 잘 안 산다');
@@ -283,6 +285,7 @@ export class EiffelQuests {
     if (g.npc) { this.h.ui.say(this.at(g.npc), fr, 3, '', g.npc.id); this.hero.crowd.gesture(g.npc, 'clap', 2.5); }
     if (eur) this.h.c.S.money = Math.round((this.h.c.S.money + eur) * 100) / 100;
     this.h.helped(what);
+    this.h.c.gear?.(({ hat: 'panama', race: 'aviator', photo: 'camera', picnic: 'mariniere' } as const)[id]);
     sfx.questDone();
     this.h.c.toast(`✨ ${what}${eur ? ` · 고맙다며 €${eur}` : ''}`);
     if (this.done.size === 4) setTimeout(() => { sfx.fanfare(); this.h.c.toast('🗼 에펠탑 둘레의 부탁을 전부 들어줬다!'); }, 2500);

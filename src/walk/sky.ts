@@ -48,6 +48,16 @@ export class Sky {
     this.group.matrixAutoUpdate = true;
   }
 
+  /** 미니맵에 찍을 것들 */
+  blips(): { kind: 'balloon' | 'jumper' | 'jet' | 'birds'; x: number; y: number; h?: number }[] {
+    const out: { kind: 'balloon' | 'jumper' | 'jet' | 'birds'; x: number; y: number; h?: number }[] = [];
+    for (const b of this.balloons) out.push({ kind: 'balloon', x: b.x, y: b.y });
+    for (const j of this.jumpers) out.push({ kind: 'jumper', x: j.cx + Math.cos(j.a) * j.r, y: j.cy + Math.sin(j.a) * j.r });
+    for (const f of this.flocks) out.push({ kind: 'birds', x: f.x, y: f.y });
+    if (this.jet) out.push({ kind: 'jet', x: this.jet.x, y: this.jet.y, h: Math.atan2(this.jet.dx, this.jet.dy) });
+    return out;
+  }
+
   private once(key: string, msg: string) { if (this.told.has(key)) return; this.told.add(key); this.c.toast(msg); }
 
   /** 사람 둘레에 새로 흩뿌린다(동네를 새로 읽었을 때) */
