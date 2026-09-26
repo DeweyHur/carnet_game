@@ -24,6 +24,8 @@
   };
   requestAnimationFrame(loop);
   const bot = {
+    steerAt(x, y) { steer = { x, y }; }, unsteer() { steer = null; },
+    hold(code, down) { key(code, down); },
     log, sleep, press, key,
     stopRender() { h.view.render = () => {}; h.shadow.render = () => {}; },
     at: (lm, uv) => st.at(lm, uv), lm: (id) => st.lm(id),
@@ -68,7 +70,7 @@
         await bot.walkTo(npc.x, npc.y, 2.2 - k * 0.4, 30000);
         h.cam.yaw = bearing(npc.x - b.x, npc.y - b.y); b.facing = h.cam.yaw;
         await sleep(400);
-        await press('KeyE');
+        await press('KeyF');
         for (let i = 0; i < 30 && !document.querySelector('.talk.on'); i++) await sleep(100);
         opened = !!document.querySelector('.talk.on');
         if (!opened) log.push(`talk try ${k} failed: d=${Math.hypot(npc.x - b.x, npc.y - b.y).toFixed(1)} mode=${b.mode} prompt=${document.querySelector('.hprompt.on')?.textContent ?? '-'}`);

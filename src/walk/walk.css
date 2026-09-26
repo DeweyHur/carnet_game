@@ -569,3 +569,47 @@ body:not(.map-mode) .wp-pin { display:none; }
 @media (max-width:1180px) { .hud-right .lbl { display:none; } }
 #resume { display:block; margin:12px auto 0; background:#6fe3ff; color:#0b2a36; }
 #resume[hidden] { display:none; }
+
+/* ───────── 싸움(원신처럼) ───────── */
+.cbt { position:fixed; inset:auto 0 0 0; pointer-events:none; z-index:4; display:none; }
+.cbt.on { display:block; }
+body:not(.hero-on) .cbt, body.closet-on .cbt, body.map-mode .cbt { display:none; }
+.cbt .hp { position:fixed; left:50%; bottom:calc(22px + env(safe-area-inset-bottom)); translate:-50% 0; width:min(46vw, 320px); height:9px; border-radius:5px; background:#1f1b16aa; box-shadow:0 1px 4px #0005; opacity:0; transition:opacity .4s; }
+.cbt.fight .hp { opacity:1; }
+.cbt .hp i { display:block; height:100%; width:100%; border-radius:5px; background:linear-gradient(90deg, #6fd06a, #a9f07e); transition:width .15s; }
+.cbt .hp i.low { background:linear-gradient(90deg, #e0493a, #f08f5a); }
+.cbt .hp span { position:absolute; left:50%; top:-17px; translate:-50% 0; font-size:11px; color:#fff; text-shadow:0 1px 2px #000a; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cbt button { pointer-events:auto; position:fixed; border-radius:50%; padding:0; display:grid; place-items:center; background:#1f1b16cc; color:#fff; box-shadow:0 2px 8px #0006; }
+.cbt .atk { display:none; }
+.cbt .skill, .cbt .burst { width:52px; height:52px; right:18px; font-size:22px; overflow:hidden; }
+.cbt .skill { bottom:calc(150px + env(safe-area-inset-bottom)); }
+.cbt .burst { bottom:calc(84px + env(safe-area-inset-bottom)); width:60px; height:60px; right:14px; }
+.cbt button em { font-style:normal; z-index:1; }
+.cbt button kbd { position:absolute; bottom:1px; right:5px; font-size:10px; font-family:inherit; color:#ffe7a8; z-index:1; }
+.cbt button i { position:absolute; inset:0; background:conic-gradient(#000a var(--p, 0%), transparent 0); }
+.cbt .burst.ready { box-shadow:0 0 0 3px #9ff3e0, 0 0 18px #9ff3e0; }
+body:not(.hero-on) .cbt button { display:none; }
+body.touch-play .cbt .atk { display:grid; width:70px; height:70px; right:100px; bottom:calc(18px + env(safe-area-inset-bottom)); font-size:28px; background:#fffe; color:#1f1b16; }
+body.touch-play .cbt .skill { right:180px; bottom:calc(30px + env(safe-area-inset-bottom)); }
+body.touch-play .cbt .burst { right:172px; bottom:calc(96px + env(safe-area-inset-bottom)); }
+body.touch-play .cbt kbd { display:none; }
+.cbt-layer { position:fixed; inset:0; pointer-events:none; z-index:3; overflow:hidden; display:none; }
+.cbt-layer.on { display:block; }
+body.map-mode .cbt-layer, body.closet-on .cbt-layer { display:none; }
+.cbt-num { position:absolute; left:0; top:0; font-weight:800; font-size:17px; color:#fff; text-shadow:0 1px 0 #000, 0 0 6px #0008; white-space:nowrap; will-change:transform; }
+.cbt-num.crit { color:#ffd166; font-size:22px; }
+.cbt-num.wind { color:#9ff3e0; }
+.cbt-num.hurt { color:#ff6b5a; }
+.cbt-num.heal { color:#a9f07e; font-size:14px; }
+.cbt-bar { position:absolute; left:0; top:0; display:flex; align-items:center; gap:4px; will-change:transform; }
+.cbt-bar small { font-size:10px; color:#fff; text-shadow:0 1px 2px #000; }
+.cbt-bar span { width:52px; height:5px; border-radius:3px; background:#0009; overflow:hidden; }
+.cbt-bar i { display:block; height:100%; background:#e0493a; }
+.cbt-hurt { position:fixed; inset:0; pointer-events:none; z-index:4; box-shadow:inset 0 0 90px #ff2a1a; opacity:0; }
+.cbt-hurt.go { animation:cbtHurt .5s; }
+@keyframes cbtHurt { from { opacity:.9; } to { opacity:0; } }
+.cbt-boss { position:fixed; top:64px; left:50%; translate:-50% 0; width:min(70vw, 460px); display:none; flex-direction:column; gap:4px; z-index:4; pointer-events:none; }
+.cbt-boss.on { display:flex; }
+.cbt-boss b { color:#fff; font-size:13px; text-shadow:0 1px 2px #000; text-align:center; }
+.cbt-boss span { height:8px; border-radius:4px; background:#0009; overflow:hidden; }
+.cbt-boss i { display:block; height:100%; background:linear-gradient(90deg, #b3262c, #e0493a); transition:width .2s; }

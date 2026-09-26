@@ -9,6 +9,7 @@ import { LANDMARKS } from './town/landmarks';
 import { DISTRICTS } from './districts';
 import type { Progress } from './progress';
 import * as sfx from './sound';
+import { inRing, ringOf, type Ring } from './hero/terrain';
 
 export interface ExploreCtx {
   hero: Hero;
@@ -20,6 +21,8 @@ export interface ExploreCtx {
   revealNear(pos: LngLat, r: number): number;
   /** XP 배율(실크해트 등) */
   xpMul(): number;
+  /** 요괴 야영지를 세운다(싸움) */
+  camp?(key: string, x: number, y: number, z: number, seed: number): void;
 }
 
 const TAU = Math.PI * 2;
@@ -76,6 +79,7 @@ interface Ent {
   tier?: Tier;
   wp?: Waypoint;
   opened?: number; // 연 뒤 흐른 초
+  locked?: boolean; // 요괴 야영지가 지키는 상자(다 물리치면 풀린다)
   path?: [number, number, number][]; hop?: number; // 고양이
   cell?: string;
 }
@@ -183,7 +187,7 @@ export class Explore {
   private genCell(ix: number, iy: number): boolean {
     const key = `c:${ix}:${iy}`;
     const r = hash(ix, iy, 1);
-    const kind = r < 0.5 ? 'common' : r < 0.68 ? 'roof' : r < 0.77 ? 'cat' : r < 0.84 ? 'challenge' : r < 0.93 ? 'plume' : null;
+    const kind = r < 0.38 ? 'common' : r < 0.5 ? 'camp' : r < 0.68 ? 'roof' : r < 0.77 ? 'cat' : r < 0.84 ? 'challenge' : r < 0.93 ? 'plume' : null;
     if (!kind) return true;
     if (kind === 'plume' ? this.P.plumesGot.has(key) : this.P.chests.has(key)) return true;
     const w = this.hero.world;
@@ -204,10 +208,20 @@ export class Explore {
       }
       return false;
     }
-    const spot = this.groundSpot(cx, cy, ix, iy, 70);
+    const campSpot = kind === 'camp' ? this.groundSpot(cx, cy, ix, iy, 85, true) : null;
+    const spot = campSpot ?? this.groundSpot(cx, cy, ix, iy, 70);
     if (!spot) return false;
     const [x, y, z] = spot;
     if (kind === 'common') { this.add({ key, kind: 'chest', tier: 'common', x, y, z, obj: this.chestModel('common'), cell: key }); return true; }
+    if (kind === 'camp' && !campSpot) { this.add({ key, kind: 'chest', tier: 'common', x, y, z, obj: this.chestModel('common'), cell: key }); return true; } // 싸울 만한 자리가 없으면 그냥 상자
+    if (kind === 'camp') {
+      // 요괴 야영지: 봉인된 상자를 셋이 지킨다
+      const tier: Tier = hash(ix, iy, 9) < 0.35 ? 'precious' : 'exquisite';
+      const e = this.add({ key, kind: 'chest', tier, x, y, z, obj: this.chestModel(tier), cell: key, locked: true });
+      this.seal(e, true);
+      this.c.camp?.(key, x, y, z, hash(ix, iy, 11));
+      return true;
+    }
     if (kind === 'challenge') { this.add({ key, kind: 'challenge', x, y, z, obj: this.pedestalModel(), cell: key }); return true; }
     // 고양이: 이 자리에서 기다렸다가, 가까이 가면 상자 있는 데까지 세 번 뛰어 데려간다
     const end = this.groundSpot(cx + (hash(ix, iy, 5) - 0.5) * 120, cy + (hash(ix, iy, 6) - 0.5) * 120, ix, iy + 7, 60);
@@ -222,17 +236,27 @@ export class Explore {
   }
 
   /** 걸어갈 수 있는 바닥(물·건물 아님, 길에서 2~9 m) */
-  private groundSpot(cx: number, cy: number, ix: number, iy: number, R: number): [number, number, number] | null {
+  private greenCache: { src: unknown; n: number; rings: Ring[] } = { src: null, n: -1, rings: [] };
+  /** 공원·잔디 고리(바운딩 박스와 함께, 늘어나면 다시) */
+  private greens(): Ring[] {
+    const g = this.hero.world.greens, C = this.greenCache;
+    if (C.src !== g || C.n !== g.length) this.greenCache = { src: g, n: g.length, rings: g.map((r) => ringOf(r)) };
+    return this.greenCache.rings;
+  }
+  private groundSpot(cx: number, cy: number, ix: number, iy: number, R: number, camp = false): [number, number, number] | null {
     const w = this.hero.world;
-    for (let k = 0; k < 24; k++) {
+    // 야영지: 먼저 공원·잔디 안에서, 없으면 길에서 떨어진 탁 트인 곳(사람 다니는 보도 한가운데는 피한다)
+    for (let pass = camp ? 0 : 2; pass < (camp ? 2 : 3); pass++) for (let k = 0; k < 24; k++) {
       const a = hash(ix, iy, 100 + k) * TAU, r = Math.sqrt(hash(ix, iy, 200 + k)) * R;
       const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
       if (w.water(x, y)) continue;
       const g = w.terrain(x, y);
       if (w.ground(x, y, g + 3, 0) > g + 0.3) continue; // 무언가 위(지붕·가구)
       if (w.near(x, y, 0.9).some((s) => s.base < g + 2 && s.top > g + 0.3 && Math.max(s.minX - x, x - s.maxX, s.minY - y, y - s.maxY) < 0.9)) continue;
-      const ld = w.laneDist(x, y, 12);
-      if (ld < 2 || ld > 9) continue;
+      const ld = w.laneDist(x, y, 30);
+      if (pass === 0 && !this.greens().some((r) => inRing(r, x, y))) continue;
+      if (pass === 1 && (ld < 8 || ld > 28 || w.near(x, y, 5).some((s) => s.kind === 'building' && s.top > g + 1 && Math.max(s.minX - x, x - s.maxX, s.minY - y, y - s.maxY) < 5))) continue;
+      if (pass === 2 && (ld < 2 || ld > 9)) continue;
       if (this.ents.some((e) => Math.hypot(e.x - x, e.y - y) < 12)) continue;
       return [x, y, g];
     }
@@ -386,6 +410,7 @@ export class Explore {
           }
           u.glow.material.opacity = 0.55 + 0.35 * Math.sin(t * 3 + e.x);
           if (d < 2.2 && Math.abs(dz) < 1.6 && d < nd) { near = e; nd = d; }
+          if (e.locked) { const s = e.obj.userData.seal as THREE.Object3D | undefined; if (s) s.rotation.z = t * 1.5; }
           break;
         }
         case 'cat': this.stepCat(e, d, dt); break;
@@ -409,14 +434,14 @@ export class Explore {
   prompt(): { verb: string; what: string } | null {
     const e = this.near;
     if (!e) return null;
-    if (e.kind === 'chest') return { verb: '열기', what: `🎁 ${TIER[e.tier!].name}` };
+    if (e.kind === 'chest') return e.locked ? { verb: '🔒 봉인됨', what: '둘레의 요괴를 모두 물리치자' } : { verb: '열기', what: `🎁 ${TIER[e.tier!].name}` };
     if (e.kind === 'challenge') return { verb: '도전 시작', what: '⏱ 빛 구슬 모으기' };
     if (e.kind === 'waypoint') return { verb: this.P.plumes ? `바람 깃털 바치기 (${this.P.plumes})` : '성상에 기도하기', what: '🗽 잔 다르크 성상' };
     return null;
   }
 
   private use(e: Ent) {
-    if (e.kind === 'chest') this.open(e);
+    if (e.kind === 'chest') { if (e.locked) { this.c.hint('🔒 봉인된 상자 — 둘레의 요괴를 모두 물리치면 열린다'); setTimeout(() => this.c.hint(''), 2500); sfx.exhausted(); } else this.open(e); }
     else if (e.kind === 'challenge') this.startChallenge(e);
     else if (e.kind === 'waypoint') this.offer();
   }
@@ -547,7 +572,7 @@ export class Explore {
       this.challenge = null;
       this.c.hint('');
       sfx.exhausted();
-      this.c.toast('⏱ 시간 초과 — 받침에서 E로 다시 도전할 수 있다');
+      this.c.toast('⏱ 시간 초과 — 받침에서 F로 다시 도전할 수 있다');
     }
   }
 
@@ -577,12 +602,38 @@ export class Explore {
     }
   }
 
+  /** 봉인(보랏빛 고리) */
+  private seal(e: Ent, on: boolean) {
+    const old = e.obj.userData.seal as THREE.Object3D | undefined;
+    if (old) { e.obj.remove(old); e.obj.userData.seal = undefined; }
+    if (!on) return;
+    const s = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.04, 6, 32), new THREE.MeshBasicMaterial({ color: 0xb58cff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+    s.position.z = 0.45;
+    e.obj.add(s);
+    e.obj.userData.seal = s;
+  }
+  /** 야영지를 다 물리쳤다 — 봉인을 푼다 */
+  unlock(key: string) {
+    const e = this.ents.find((q) => q.key === key && q.kind === 'chest');
+    if (!e || !e.locked) return;
+    e.locked = false;
+    this.seal(e, false);
+    this.spawnBurst(e.x, e.y, e.z + 0.8, 0xb58cff);
+  }
+  /** 켠 순간이동 포인트 곁인가(싸움: 회복) */
+  atWaypoint() {
+    const b = this.hero.body;
+    return this.ents.some((e) => e.kind === 'waypoint' && this.P.waypoints.has(e.wp!.id) && Math.hypot(e.x - b.x, e.y - b.y) < 9 && Math.abs(e.z - b.z) < 6);
+  }
+  /** 우두머리 자리: 노트르담 뒤뜰(장 23세 광장) */
+  bossSpot(): [number, number, number] | null { return this.lmAt('notre-dame', 62, -32, 0); }
+
   /** 미니맵: 순간이동 포인트(켜진 것 🔷, 아직 ◇) · 성상 */
   marks(): { x: number; y: number; icon: string; dim?: boolean }[] {
     return this.ents.filter((e) => e.kind === 'waypoint').map((e) => ({ x: e.x, y: e.y, icon: e.wp!.statue ? '🗽' : '🔷', dim: !this.P.waypoints.has(e.wp!.id) }));
   }
   /** 디버그·시험 */
-  list() { return this.ents.map((e) => ({ key: e.key, kind: e.kind, tier: e.tier, x: e.x, y: e.y, z: e.z })); }
+  list() { return this.ents.map((e) => ({ key: e.key, kind: e.kind, tier: e.tier, x: e.x, y: e.y, z: e.z, locked: !!e.locked })); }
   get challenging() { return !!this.challenge; }
 }
 

@@ -737,7 +737,7 @@ export class Street {
       q.t = 1;
       const l = T.ASK_WAY(q.place.name);
       this.ui.say(at, l.fr, 3);
-      await this.ui.talk('관광객', l.fr, `${l.ko} — ${q.place.emoji} ${q.place.name} 쪽을 보고 E로 가리켜 준다.`, ['알았어요']);
+      await this.ui.talk('관광객', l.fr, `${l.ko} — ${q.place.emoji} ${q.place.name} 쪽을 보고 F로 가리켜 준다.`, ['알았어요']);
       return;
     }
     if (q.kind === 'balloon') {

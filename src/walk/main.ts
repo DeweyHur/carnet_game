@@ -44,6 +44,7 @@ import { Progress, arNeed, COMMISSION_TEXT } from './progress';
 import { Explore, WAYPOINTS } from './explore';
 import type { Waypoint } from './explore';
 import { Wish } from './wish';
+import { Combat } from './combat';
 import { CHAPTERS } from './street/story';
 
 maplibregl.setWorkerUrl(workerUrl);
@@ -113,6 +114,7 @@ let journal: Journal;
 let progress: Progress;
 let explore: Explore;
 let wish: Wish;
+let combat: Combat;
 let guideTarget: Place | null = null; // 빛기둥으로 안내하는 곳(현지인이 알려 준 곳 등)
 let entering = false;
 let mapMode = false; // 🗺 지도 보기(위에서 내려다보며 목적지를 찍는다)
@@ -523,6 +525,7 @@ function heroFrame(dt: number) {
   }
   if (r.f.map && live && !modal && !talking) { setMapMode(!mapMode); return; } // 이번 프레임에 카메라를 잡으면 지도 보기 전환(easeTo)이 끊긴다
   const exploring = live && !modal && !mapMode && !openPlace && !entering && !talking && !heli?.riding && !sky?.riding;
+  combat?.update(dt, r.f, exploring); // 먼저: 원점이 바뀌면 싸움이 먼저 비우고, 탐험이 야영지를 다시 세운다
   explore?.update(dt, r.f, exploring);
   hero.hud.override = exploring ? explore?.prompt() ?? null : null;
   street?.update(dt, r.f, live && !modal && !mapMode && !openPlace && !entering);
@@ -583,6 +586,7 @@ function onBodyEvent(e: BodyEvent) {
       sfx.hurt();
       S.tired = Math.min(100, S.tired + 6);
       toast('쿵! 높은 데서 그냥 뛰어내렸다 (지침 +6) — 착지 직전에 V를 누르면 굴러서 안 다친다');
+      combat?.fallDamage(12);
       break;
     case 'glide': if (hero.body.parachute) sfx.chute(); else sfx.glide(); break;
     case 'unglide': sfx.unglide(); break;
@@ -674,7 +678,7 @@ function makeStreet(): Street {
       hud();
       return true;
     },
-    eat: (amount, sat = 0) => { eat(S, amount, sat); S.ate++; hud(); },
+    eat: (amount, sat = 0) => { eat(S, amount, sat); S.ate++; combat?.heal(0.35); hud(); },
     rest: (amount) => { rest(S, amount); hud(); },
     passTime: (mins) => { S.clock += mins; drain(S, mins, 0); hud(); },
     shot: (label) => captureShot(label),
@@ -721,9 +725,24 @@ function setupAdventure() {
   progress.onChange = () => { journal?.refresh(); hud(); };
   explore = new Explore({
     hero, progress, toast, hint: (s2) => hint(s2), money: addMoney, xpMul,
+    camp: (key, x, y, z, seed) => combat?.spawnCamp(key, x, y, z, seed),
     revealNear: (pos, r) => { let n = 0; for (const p of places) if (!p.known && !p.minor && dist(p.pos, pos) < r) { revealPlace(p, '순간이동 포인트에서 내려다봤다'); n++; } return n; },
   });
   hero.crowd.scene.add(explore.group);
+  combat = new Combat({
+    hero, progress, toast, hint: (s2) => hint(s2), money: addMoney, xpMul,
+    atWaypoint: () => explore.atWaypoint(),
+    night: () => hero.town.uniforms.uNight.value,
+    cleared: (key) => explore.unlock(key),
+    bossSpot: () => explore.bossSpot(),
+    respawn: async () => {
+      // 가장 가까운 켠 순간이동 포인트(없으면 동네 가운데)
+      const on = WAYPOINTS.filter((w) => progress.waypoints.has(w.id)).sort((a, b) => dist(a.pos, S.pos) - dist(b.pos, S.pos));
+      if (on[0]) await teleport(on[0]);
+      else { hero.moveTo(district.start); S.pos = hero.lnglat; }
+    },
+  });
+  hero.crowd.scene.add(combat.group);
   wish = new Wish(progress, wardrobe, addMoney);
   wish.onToggle = (on) => { if (!on) hud(); };
   // 지도 보기의 순간이동 포인트(누르면 순간이동)
@@ -875,7 +894,7 @@ function setupMinimap() {
     },
     heli: () => (heli ? { x: heli.x, y: heli.y, h: heli.heading } : null),
     sky: () => sky?.blips() ?? [],
-    extra: () => explore?.marks() ?? [],
+    extra: () => [...(explore?.marks() ?? []), ...(combat?.marks() ?? [])],
     beacon: () => miniBeacon,
   }, () => { if (S.started && !S.finished && !modalOpen()) setMapMode(true); });
 }
@@ -1669,7 +1688,7 @@ window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (wish?.
 // 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
 // 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
 window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
-if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; if (heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; } $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map, heli: () => heli, sky: () => sky, wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal, progress: () => progress, explore: () => explore, wish: () => wish, teleport: (id: string) => { const wp = WAYPOINTS.find((w) => w.id === id); return wp ? teleport(wp) : null; } };
+if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; if (heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; } $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map, heli: () => heli, sky: () => sky, wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal, progress: () => progress, explore: () => explore, wish: () => wish, combat: () => combat, teleport: (id: string) => { const wp = WAYPOINTS.find((w) => w.id === id); return wp ? teleport(wp) : null; } };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();

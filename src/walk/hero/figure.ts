@@ -30,7 +30,7 @@ type Pose = {
   tL: number; tR: number; kL: number; kR: number; scarf: number;
 };
 const ZERO: Pose = { bob: 0, pitch: 0, lean: 0, twist: 0, side: 0, headX: 0, headY: 0, sLx: 0, sLy: 0, sRx: 0, sRy: 0, eL: 0, eR: 0, tL: 0, tR: 0, kL: 0, kR: 0, scarf: 0 };
-type Item = 'camera' | 'crepe' | 'coffee' | 'balloon' | 'flowers' | 'book' | 'coin';
+type Item = 'camera' | 'crepe' | 'coffee' | 'balloon' | 'flowers' | 'book' | 'coin' | 'umbrella';
 
 export class Figure {
   readonly scene = new THREE.Scene();
@@ -328,6 +328,12 @@ export class Figure {
     for (const [fx, fy, c] of [[0.03, 0, 0xe0436c], [-0.03, 0.02, 0xf2c14e], [0, -0.03, 0xb04ad6], [0.01, 0.04, 0xf07f3c]] as const) this.part(new THREE.SphereGeometry(0.04, 8, 6), c, flowers, fx, 0.02 + fy, 0.27, false);
     const book = item('book', new THREE.Group());
     this.part(new THREE.BoxGeometry(0.15, 0.03, 0.2), 0x2f5d8a, book, 0, 0.03, 0.04);
+    // 싸움: 접은 파리 우산(칼처럼 쥔다) — 손에서 팔 방향(-z)으로 뻗는다
+    const umb = item('umbrella', new THREE.Group());
+    this.part(new THREE.CylinderGeometry(0.012, 0.012, 0.95, 6).rotateX(Math.PI / 2).translate(0, 0, -0.42), 0x2b2b2b, umb, 0, 0.03, 0, false);
+    this.part(new THREE.ConeGeometry(0.12, 0.9, 8).rotateX(-Math.PI / 2).translate(0, 0, -0.58), 0xe0393f, umb, 0, 0.03, 0);
+    this.part(new THREE.TorusGeometry(0.05, 0.014, 6, 10, Math.PI).rotateY(Math.PI / 2), 0x6b4423, umb, 0, 0.08, 0.06, false); // 손잡이
+    this.part(new THREE.SphereGeometry(0.016, 6, 6), 0xd9b44a, umb, 0, 0.03, -0.9, false);
     const coin = item('coin', new THREE.Group());
     this.part(new THREE.CylinderGeometry(0.025, 0.025, 0.006, 12), 0xd9b44a, coin, 0, 0.03, 0, false);
     // 겨드랑이에 낀 바게트(왼쪽)
@@ -519,10 +525,17 @@ export class Figure {
           case 'pet': Object.assign(want, { tL: 1.0, tR: 0.3, kL: -2.2, kR: -1.2, lean: 0.55, bob: -0.5, sRx: 0.95, eR: 0.35 + 0.25 * Math.sin(t * 6), sLx: 0.3, eL: 0.6, headX: -0.3 }); break;
           case 'stretch': Object.assign(want, { sLx: 2.95, sRx: 2.95, sLy: 0.15, sRy: -0.15, eL: 0.1, eR: 0.1, lean: -0.18, bob: 0.03, headX: 0.35 }); break;
           case 'think': Object.assign(want, { sRx: 0.55, eR: 2.35, sRy: 0.2, sLx: 0.55, sLy: -0.55, eL: 1.45, headX: 0.12, headY: 0.2 }); break;
+          // 싸움: 가로 베기 → 되베기 → 내려찍기 · 스킬(돌며 바람) · 폭발(두 팔 들었다 내뻗기)
+          case 'atk1': { const q = Math.min(1, at / 0.2); Object.assign(want, { sRx: 1.45, sRy: -1.25 + 2.0 * q, eR: 0.15, twist: -0.55 + 1.0 * q, lean: 0.18, tL: 0.4, kL: -0.35, tR: -0.15, sLx: 0.3, sLy: 0.5, eL: 0.6, scarf: 1.2 }); break; }
+          case 'atk2': { const q = Math.min(1, at / 0.2); Object.assign(want, { sRx: 1.35, sRy: 0.85 - 2.0 * q, eR: 0.2, twist: 0.5 - 1.0 * q, lean: 0.2, tR: 0.4, kR: -0.35, tL: -0.15, sLx: 0.3, sLy: 0.6, eL: 0.6, scarf: 1.3 }); break; }
+          case 'atk3': { const q = Math.min(1, Math.max(0, (at - 0.12) / 0.18)); Object.assign(want, { sRx: 2.95 - 2.1 * q, sLx: 2.95 - 2.1 * q, sRy: -0.25, sLy: 0.25, eR: 0.15, eL: 0.4, lean: 0.05 + 0.35 * q, bob: -0.12 * q, tL: 0.55 * q, kL: -0.5 * q, tR: -0.2 * q, headX: -0.1, scarf: 1.6 }); break; }
+          case 'skill': Object.assign(want, { sLx: 1.5, sRx: 1.5, sLy: 1.35, sRy: -1.35, eL: 0.1, eR: 0.1, lean: 0.05, bob: 0.08 * Math.sin(at * 12), scarf: 2 }); break;
+          case 'burst': if (at < 0.45) Object.assign(want, { sLx: 2.9, sRx: 2.9, sLy: 0.35, sRy: -0.35, eL: 0.1, eR: 0.1, lean: -0.25, headX: 0.4, bob: 0.05, scarf: 1.8 }); else Object.assign(want, { sLx: 1.55, sRx: 1.55, sLy: -0.2, sRy: 0.2, eL: 0.05, eR: 0.05, lean: 0.3, tL: 0.7, kL: -0.7, tR: -0.3, bob: -0.12, scarf: 2.2 }); break;
         }
         break;
       }
       case 'air': {
+        if (b.plunging) { Object.assign(want, { sLx: 2.9, sRx: 2.9, sLy: 0.2, sRy: -0.2, eL: 0.2, eR: 0.2, tL: 1.0, tR: 0.9, kL: -1.6, kR: -1.5, lean: 0.25, headX: -0.2, scarf: 2.4 }); break; }
         const up = b.vz > -2;
         const drop = b.fallTopZ - b.z; // 얼마나 떨어졌나
         if (!up && (b.vz < -11 || drop > 9)) {
@@ -598,11 +611,12 @@ export class Figure {
     this.lastFacing = b.facing;
     if (dt > 0) this.turnRate += (df / dt - this.turnRate) * Math.min(1, dt * 4);
     // 부드럽게 옮겨 간다
-    const k = 1 - Math.exp(-dt * (b.mode === 'ground' ? 16 : 11));
+    const fighting = !!act && ['atk1', 'atk2', 'atk3', 'skill', 'burst'].includes(act);
+    const k = 1 - Math.exp(-dt * (fighting ? 34 : b.mode === 'ground' ? 16 : 11));
     const p = this.pose;
     for (const key of Object.keys(p) as (keyof Pose)[]) p[key] += (want[key] - p[key]) * k;
     this.root.position.set(0, 0, p.bob);
-    this.root.rotation.z = (-b.facing * Math.PI) / 180;
+    this.root.rotation.z = (-b.facing * Math.PI) / 180 - (act === 'skill' ? (b.act?.t ?? 0) * 17 : 0); // 스킬: 제자리에서 두 바퀴 반
     if (b.mode !== 'roll') this.spinAcc = 0;
     this.tilt.rotation.set(-p.pitch - (b.mode === 'roll' ? Math.min(Math.PI * 2, this.spinAcc) : 0), p.side, 0);
     this.spine.rotation.set(-p.lean, p.side * 0.5, p.twist);
@@ -613,7 +627,7 @@ export class Figure {
     this.kL.rotation.x = p.kL; this.kR.rotation.x = p.kR;
     this.scarf.rotation.x = -0.25 - p.scarf + Math.sin(t * 13) * 0.08 * p.scarf;
     for (const l of this.legs) l.visible = b.mode !== 'swim';
-    const showItem: Item | null = act === 'photo' ? 'camera' : act === 'tip' ? 'coin' : b.carry && b.carry !== 'baguette' && !(act && act !== 'eat') ? b.carry : null;
+    const showItem: Item | null = fighting || b.plunging || b.drawn > 0 ? 'umbrella' : act === 'photo' ? 'camera' : act === 'tip' ? 'coin' : b.carry && b.carry !== 'baguette' && !(act && act !== 'eat') ? b.carry : null;
     for (const [k, o] of this.items) o.visible = k === showItem && b.mode !== 'swim' && b.mode !== 'climb' && b.mode !== 'glide';
     this.baguette.visible = b.carry === 'baguette' && b.mode !== 'swim';
     // 글라이더: 펼칠 때 부풀어 오른다

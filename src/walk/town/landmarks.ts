@@ -568,7 +568,7 @@ export const LANDMARKS: Landmark[] = [
   { id: 'chaillot', name: '샤요 궁', emoji: '🏛', pos: [2.28805, 48.86229], bearing: 133.6, clear: 0, build: chaillot },
   { id: 'carrousel', name: '에펠탑 회전목마', emoji: '🎠', pos: [2.29268, 48.85871], bearing: 0, clear: 0, build: carrousel },
   { id: 'louvre', name: '루브르 박물관', emoji: '🔺', pos: [2.33585, 48.86099], bearing: 115, clear: 150, build: louvre },
-  { id: 'notre-dame', name: '노트르담 대성당', emoji: '⛪', pos: [2.34994, 48.85297], bearing: 112, clear: 62, plazas: [[-112, 0, 56]], build: notreDame },
+  { id: 'notre-dame', name: '노트르담 대성당', emoji: '⛪', pos: [2.34994, 48.85297], bearing: 112, clear: 62, plazas: [[-112, 0, 56], [62, -32, 36]], build: notreDame },
   { id: 'sacre-coeur', name: '사크레쾨르 대성당', emoji: '⛪', pos: [2.34306, 48.88672], bearing: 0, clear: 80, plazas: [[-100, 0, 42]], build: sacreCoeur },
   { id: 'arc', name: '개선문', emoji: '🏛', pos: [2.29504, 48.87378], bearing: 112, clear: 115, build: arc },
   { id: 'pompidou', name: '퐁피두 센터', emoji: '🎨', pos: [2.35222, 48.86065], bearing: 8, clear: 90, build: pompidou },

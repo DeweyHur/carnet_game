@@ -359,7 +359,7 @@ export class Transit {
     this.crowd.spots = [{ kind: 'fountain', x: 79, y: 5.5, facing: 200 }];
     this.placeHero(o.entry === 'street' ? built.spawnExit(enteredIdx) : built.spawnTransfer);
     if (o.first) st.mins += 3;
-    this.say(`Ⓜ ${l.from}`, needTicket ? '개찰구에서 표를 찍고(E), "Direction" 표지판을 보고 승강장으로 내려간다.' : `${r.label} 승강장으로. 가는 방향은 종착역 이름(Direction)으로 적혀 있다.`, [], -1, r.color, l.line);
+    this.say(`Ⓜ ${l.from}`, needTicket ? '개찰구에서 표를 찍고(F), "Direction" 표지판을 보고 승강장으로 내려간다.' : `${r.label} 승강장으로. 가는 방향은 종착역 이름(Direction)으로 적혀 있다.`, [], -1, r.color, l.line);
     await this.fade(false);
     this.c.hint(`${l.to}에 가려면: ${r.label} Direction ${r.dirs[r.right]} — 노선에서 ${l.to}가 ${r.dirs[r.right]} 쪽에 있다.`);
     setTimeout(() => this.c.hint(''), 9000);
@@ -652,7 +652,7 @@ export class Transit {
     const names: string[] = [];
     for (let i = r.a + step; i !== r.b + step; i += step) names.push(r.stations[i]);
     const chips = [l.from, ...names];
-    this.say(`🚌 ${r.label} → ${r.dirs[r.right]}`, '앞문으로 탔다. 단말기(파란 상자)에 표를 찍자(E). 앉아도(4) 된다.', chips, 0, r.color);
+    this.say(`🚌 ${r.label} → ${r.dirs[r.right]}`, '앞문으로 탔다. 단말기(파란 상자)에 표를 찍자(F). 앉아도(4) 된다.', chips, 0, r.color);
     await this.fade(false);
     // 표 찍기(선택) — 안 찍고 내리면 검표에 걸릴 수 있다
     const validator = () => {

@@ -8,16 +8,18 @@ export interface Frame {
   sprint: boolean;
   jump: boolean; drop: boolean; interact: boolean; recenter: boolean; map: boolean;
   crouch: boolean; roll: boolean; secondary: boolean;
+  /** 싸움(원신처럼): 공격(마우스 톡) · 원소 스킬(E) · 원소 폭발(Q) */
+  attack: boolean; skill: boolean; burst: boolean;
   emote: Emote | null; // 이번 프레임에 누른 몸짓
   pad: boolean; // 게임패드를 쓰는 중
 }
 
 export type Emote = 'wave' | 'dance' | 'photo' | 'sit';
-type Edge = 'jump' | 'drop' | 'interact' | 'recenter' | 'map' | 'crouch' | 'roll' | 'secondary' | Emote;
+type Edge = 'jump' | 'drop' | 'interact' | 'recenter' | 'map' | 'crouch' | 'roll' | 'secondary' | 'attack' | 'skill' | 'burst' | Emote;
 const EMOTE_KEYS: Record<string, Emote> = { Digit1: 'wave', Digit2: 'dance', Digit3: 'photo', Digit4: 'sit' };
 
 const MOVE_KEYS: Record<string, [number, number]> = { KeyW: [0, 1], KeyS: [0, -1], KeyA: [-1, 0], KeyD: [1, 0] };
-const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'KeyE', 'KeyF', 'KeyR', 'KeyX', 'KeyC', 'KeyV', 'KeyQ', 'KeyM', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
+const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'KeyE', 'KeyF', 'KeyR', 'KeyX', 'KeyC', 'KeyV', 'KeyQ', 'KeyZ', 'KeyM', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
 
 export class Input {
   enabled = false;
@@ -27,6 +29,7 @@ export class Input {
   private held = new Set<'sprint'>();
   private dragYaw = 0; private dragPitch = 0; private zoomAcc = 0;
   private drag: { id: number; x: number; y: number } | null = null;
+  private click: { id: number; t: number; d: number } | null = null;
   private stick: { id: number; x0: number; y0: number; x: number; y: number } | null = null;
   private padPrev: boolean[] = [];
   usingPad = false;
@@ -52,13 +55,15 @@ export class Input {
       if (e.repeat) return;
       this.keys.add(e.code);
       if (e.code === 'Space') this.edges.add('jump');
-      if (e.code === 'KeyE' || e.code === 'KeyF') this.edges.add('interact');
+      if (e.code === 'KeyF') this.edges.add('interact'); // 원신처럼 F = 상호작용
+      if (e.code === 'KeyE') this.edges.add('skill');
+      if (e.code === 'KeyQ') this.edges.add('burst');
       if (e.code === 'KeyX') this.edges.add('drop');
       if (e.code === 'KeyC') this.edges.add('crouch');
       if (e.code === 'KeyV') this.edges.add('roll');
       if (e.code === 'KeyR') this.edges.add('secondary');
       if (EMOTE_KEYS[e.code]) this.edges.add(EMOTE_KEYS[e.code]);
-      if (e.code === 'KeyQ') this.edges.add('recenter');
+      if (e.code === 'KeyZ') this.edges.add('recenter');
       if (e.code === 'KeyM') this.edges.add('map');
       this.usingPad = false;
     });
@@ -80,6 +85,7 @@ export class Input {
         }
       }
       if (!this.drag) this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      if (e.pointerType === 'mouse' && e.button === 0) this.click = { id: e.pointerId, t: performance.now(), d: 0 };
     });
     window.addEventListener('pointermove', (e) => {
       if (this.stick && e.pointerId === this.stick.id) {
@@ -88,6 +94,7 @@ export class Input {
         this.knob.style.transform = `translate(${dx * 46}px, ${-dy * 46}px)`;
         return;
       }
+      if (this.click && e.pointerId === this.click.id) this.click.d += Math.abs(e.movementX) + Math.abs(e.movementY);
       if (!this.drag || e.pointerId !== this.drag.id) return;
       const k = e.pointerType === 'touch' ? 0.32 : 0.24;
       this.dragYaw += (e.clientX - this.drag.x) * k;
@@ -97,6 +104,8 @@ export class Input {
     const up = (e: PointerEvent) => {
       if (this.stick && e.pointerId === this.stick.id) this.endStick();
       if (this.drag && e.pointerId === this.drag.id) this.drag = null;
+      // 끌지 않고 톡 누른 왼쪽 단추 = 공격(끌면 시점 돌리기)
+      if (this.click && e.pointerId === this.click.id) { if (this.enabled && this.click.d < 8 && performance.now() - this.click.t < 320) this.edges.add('attack'); this.click = null; }
     };
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
@@ -150,17 +159,18 @@ export class Input {
       if (b[0]) sprint = true;
       if (edge(1)) this.edges.add('interact');
       if (edge(3)) this.edges.add('jump');
-      if (edge(2)) this.edges.add('drop');
-      if (edge(6) || edge(10)) this.edges.add('recenter');
+      if (edge(2)) { this.edges.add('drop'); this.edges.add('attack'); } // 벽에선 놓기, 땅에선 공격
+      if (edge(10)) this.edges.add('recenter');
+      if (edge(6)) this.edges.add('skill');
       if (edge(8)) this.edges.add('map');
       if (edge(4)) this.edges.add('roll');
       if (edge(5)) this.edges.add('secondary');
       if (edge(11)) this.edges.add('crouch');
       if (edge(14)) this.edges.add('wave');
       if (edge(15)) this.edges.add('dance');
-      if (edge(7)) this.edges.add('photo');
+      if (edge(7)) this.edges.add('burst');
+      if (edge(12)) this.edges.add('photo');
       if (edge(9)) this.edges.add('sit');
-      if (b[12]) zoom -= 400 * dt;
       if (b[13]) zoom += 400 * dt;
       if (b.some(Boolean)) this.usingPad = true;
       this.padPrev = b;
@@ -169,11 +179,12 @@ export class Input {
       mx, my, camYaw, camPitch, zoom, sprint,
       jump: this.edges.has('jump'), drop: this.edges.has('drop'), interact: this.edges.has('interact'), recenter: this.edges.has('recenter'), map: this.edges.has('map'),
       crouch: this.edges.has('crouch'), roll: this.edges.has('roll'), secondary: this.edges.has('secondary'),
+      attack: this.edges.has('attack'), skill: this.edges.has('skill'), burst: this.edges.has('burst'),
       emote: (['wave', 'dance', 'photo', 'sit'] as Emote[]).find((k) => this.edges.has(k)) ?? null,
       pad: this.usingPad,
     };
     this.edges.clear();
-    if (!this.enabled) { f.mx = f.my = 0; f.jump = f.drop = f.interact = f.recenter = f.crouch = f.roll = f.secondary = false; f.emote = null; f.sprint = false; f.camYaw = f.camPitch = f.zoom = 0; }
+    if (!this.enabled) { f.mx = f.my = 0; f.jump = f.drop = f.interact = f.recenter = f.crouch = f.roll = f.secondary = f.attack = f.skill = f.burst = false; f.emote = null; f.sprint = false; f.camYaw = f.camPitch = f.zoom = 0; }
     return f;
   }
 

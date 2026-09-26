@@ -5,7 +5,7 @@ export const AR_MAX = 30;
 /** 이 등급에서 다음 등급까지 필요한 경험치 */
 export const arNeed = (ar: number) => Math.round(250 + ar * 90 + ar * ar * 6);
 
-export type CommissionKind = 'photo' | 'bonjour' | 'chest' | 'waypoint' | 'discover' | 'walk' | 'eat' | 'quest' | 'glide' | 'climb';
+export type CommissionKind = 'photo' | 'bonjour' | 'chest' | 'waypoint' | 'discover' | 'walk' | 'eat' | 'quest' | 'glide' | 'climb' | 'defeat';
 export interface Commission { kind: CommissionKind; goal: number; got: number; done: boolean }
 export const COMMISSION_TEXT: Record<CommissionKind, (n: number) => string> = {
   photo: (n) => `📷 사진 ${n}장 찍기`,
@@ -18,8 +18,9 @@ export const COMMISSION_TEXT: Record<CommissionKind, (n: number) => string> = {
   quest: (n) => `❗ 부탁(메인·서브·거리) ${n}개 해결`,
   glide: (n) => `🪂 글라이더·낙하산으로 ${n}초 날기`,
   climb: (n) => `🧗 벽을 ${n} m 오르기`,
+  defeat: (n) => `⚔️ 요괴 ${n}마리 물리치기`,
 };
-const POOL: [CommissionKind, number][] = [['photo', 3], ['bonjour', 5], ['chest', 3], ['waypoint', 1], ['discover', 4], ['walk', 800], ['eat', 2], ['quest', 1], ['glide', 40], ['climb', 30]];
+const POOL: [CommissionKind, number][] = [['photo', 3], ['bonjour', 5], ['chest', 3], ['waypoint', 1], ['discover', 4], ['walk', 800], ['eat', 2], ['quest', 1], ['glide', 40], ['climb', 30], ['defeat', 6]];
 
 interface Save {
   ar: number; xp: number; stars: number; plumes: number; offered: number;

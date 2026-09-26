@@ -7,12 +7,15 @@ import { angleDiff, bearingOf, dirOf } from './geo';
 
 export type Mode = 'ground' | 'air' | 'glide' | 'climb' | 'mantle' | 'swim' | 'down' | 'roll' | 'slide' | 'sit' | 'act' | 'stagger';
 export type BodyEvent = 'jump' | 'land' | 'hurt' | 'glide' | 'unglide' | 'grab' | 'mantle' | 'vault' | 'climbjump' | 'drop' | 'splash' | 'drown' | 'exhausted' | 'recovered' | 'stepL' | 'stepR' | 'stroke'
-  | 'roll' | 'rollLand' | 'slide' | 'crouch' | 'uncrouch' | 'sit' | 'stand' | 'shutter' | 'stagger' | 'actDone';
+  | 'roll' | 'rollLand' | 'slide' | 'crouch' | 'uncrouch' | 'sit' | 'stand' | 'shutter' | 'stagger' | 'actDone' | 'plunge';
 /** 제자리에서 하는 동작. dance·lie는 움직이면 끝나고, 나머지는 정해진 시간이 지나면 끝난다. */
-export type Act = 'dance' | 'photo' | 'drink' | 'eat' | 'clap' | 'lie' | 'push' | 'tip' | 'feed' | 'pet' | 'stretch' | 'think';
+export type Act = 'dance' | 'photo' | 'drink' | 'eat' | 'clap' | 'lie' | 'push' | 'tip' | 'feed' | 'pet' | 'stretch' | 'think' | CombatAct;
+/** 싸움 동작(원신처럼): 세 번 이어지는 우산 공격 · 원소 스킬 · 원소 폭발 */
+export type CombatAct = 'atk1' | 'atk2' | 'atk3' | 'skill' | 'burst';
+const COMBAT = new Set<Act>(['atk1', 'atk2', 'atk3', 'skill', 'burst']);
 /** 손에 든 것 */
 export type Carry = null | 'crepe' | 'baguette' | 'coffee' | 'balloon' | 'flowers' | 'book';
-const ACT_SECS: Record<Act, number> = { dance: Infinity, lie: Infinity, photo: 1.25, drink: 2.2, eat: 1.9, clap: 2.2, push: 0.7, tip: 1.1, feed: 2.4, pet: 2.2, stretch: 2.4, think: 1.8 };
+const ACT_SECS: Record<Act, number> = { dance: Infinity, lie: Infinity, photo: 1.25, drink: 2.2, eat: 1.9, clap: 2.2, push: 0.7, tip: 1.1, feed: 2.4, pet: 2.2, stretch: 2.4, think: 1.8, atk1: 0.38, atk2: 0.38, atk3: 0.55, skill: 0.6, burst: 1.0 };
 export interface Seat { x: number; y: number; z: number; facing: number }
 
 export interface Intent {
@@ -67,6 +70,8 @@ export class Body {
   crouch = false;
   act: { kind: Act; t: number; dur: number } | null = null;
   waveT = 0; // 걸으면서도 손을 흔든다(윗몸만)
+  /** 싸움 뒤 몇 초는 우산을 든 채(싸움 모듈이 켠다) */
+  drawn = 0;
   pointT = 0; // 방향을 가리킨다(윗몸만)
   carry: Carry = null;
   seatZ = 0;
@@ -130,6 +135,26 @@ export class Body {
     this.crouch = kind === 'pet' || kind === 'feed' ? this.crouch : false;
     return true;
   }
+  /** 싸움 동작: 땅에서, 또는 공격 중에 이어서(콤보). 몸은 잠깐 제자리에 선다 */
+  combat(kind: CombatAct): boolean {
+    const inCombat = this.mode === 'act' && !!this.act && COMBAT.has(this.act.kind);
+    if (inCombat && this.act!.t < 0.18 && kind.startsWith('atk')) return false; // 너무 빨리 누르면 무시
+    if (this.mode !== 'ground' && !inCombat) return false;
+    this.mode = 'act';
+    this.act = { kind, t: 0, dur: ACT_SECS[kind] };
+    this.speed = 0; this.vx = this.vy = 0;
+    this.crouch = false;
+    return true;
+  }
+  /** 내려찍기: 공중(글라이더 포함)에서 곧장 떨어져 땅을 친다 — 떨어져도 다치지 않는다 */
+  plunging = false;
+  plunge(): boolean {
+    if ((this.mode !== 'air' && this.mode !== 'glide') || this.freefall) return false;
+    this.mode = 'air'; this.parachute = false;
+    this.plunging = true;
+    this.vz = -28; this.vx *= 0.15; this.vy *= 0.15;
+    return true;
+  }
   /** 손을 흔든다(봉주르). 걸으면서도 된다. */
   wave() { if (this.mode === 'ground' || this.mode === 'sit' || this.mode === 'act') { this.waveT = 1.6; return true; } return false; }
   /** 어느 쪽을 가리킨다. */
@@ -180,10 +205,11 @@ export class Body {
       case 'roll': this.rolling(dt, w, it, m, ix, iy); break;
       case 'slide': this.sliding(dt, w, it, m, ix, iy); break;
       case 'sit': this.sitting(dt, it, m); break;
-      case 'act': this.acting(dt, w, it, m); break;
+      case 'act': this.acting(dt, w, it, m, ix, iy); break;
       case 'stagger': this.staggering(dt, w); break;
     }
     if (this.waveT > 0) this.waveT -= dt;
+    if (this.drawn > 0) this.drawn -= dt;
     if (this.staggerCool > 0) this.staggerCool -= dt;
     if (this.pointT > 0) this.pointT -= dt;
     this.idleT = (this.mode === 'ground' && this.speed < 0.1) ? this.idleT + dt : 0;
@@ -338,7 +364,7 @@ export class Body {
     if (this.act) { this.act.t += dt; if (this.act.kind === 'photo' && this.act.t - dt < 0.7 && this.act.t >= 0.7) this.events.push('shutter'); if (this.act.t >= this.act.dur) { this.act = null; this.events.push('actDone'); } }
     if (m > 0.35 || it.jump) { this.mode = 'ground'; this.act = null; this.events.push('stand'); }
   }
-  private acting(dt: number, w: World, it: Intent, m: number) {
+  private acting(dt: number, w: World, it: Intent, m: number, ix = 0, iy = 0) {
     const a = this.act;
     this.speed = 0;
     if (!a) { this.mode = 'ground'; return; }
@@ -346,12 +372,16 @@ export class Body {
     if (a.kind === 'photo' && a.t - dt < 0.7 && a.t >= 0.7) this.events.push('shutter');
     if (a.kind === 'lie') { this.restT = 1; this.stamina = Math.min(this.maxStamina, this.stamina + dt * 0.8); } else this.rest(dt);
     this.phase += dt * (a.kind === 'dance' ? 7 : 3);
-    const cancel = (m > 0.35 && (a.dur === Infinity || a.t > 0.3)) || it.jump;
+    const fight = COMBAT.has(a.kind);
+    // 공격은 앞으로 반 걸음 내딛는다
+    if (fight && a.t < 0.14 && a.kind !== 'burst') { const [fx, fy] = dirOf(this.facing); const p = { x: this.x + fx * 3.2 * dt, y: this.y + fy * 3.2 * dt }; w.collide(p, this.z, R, H, STEP); this.x = p.x; this.y = p.y; }
+    const cancel = (m > 0.35 && (a.dur === Infinity || a.t > (fight ? 0.22 : 0.3))) || it.jump || (fight && it.roll);
     if (a.t >= a.dur || cancel) {
       this.mode = 'ground';
       this.act = null;
       this.events.push('actDone');
       if (it.jump && this.z - w.ground(this.x, this.y, this.z, 0.1) < 0.1) { this.vz = JUMP_V; this.mode = 'air'; this.fallTopZ = this.z; this.events.push('jump'); }
+      else if (fight && it.roll && !this.exhausted) this.startRoll(m >= 0.08 ? bearingOf(ix, iy) : this.facing, false); // 공격 중 구르기로 피한다
     }
   }
   private staggering(dt: number, w: World) {
@@ -442,6 +472,7 @@ export class Body {
       if (floor < WATER_Z + 0.3 && w.water(this.x, this.y)) { this.enterWater(); return; }
       this.vz = 0;
       this.parachute = false; this.freefall = false;
+      if (this.plunging) { this.plunging = false; this.mode = 'ground'; this.speed = 0; this.events.push('plunge'); return; }
       const buffered = this.rollBuf > 0;
       this.rollBuf = 0;
       // 착지 직전에 구르면 충격을 흘려 보낸다(낙법)

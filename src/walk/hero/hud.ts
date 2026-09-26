@@ -74,7 +74,7 @@ export class HeroHud {
 
     this.help = document.createElement('div');
     this.help.className = 'hhelp';
-    this.help.innerHTML = `<b>걷기</b> WASD · <b>시점</b> 마우스 끌기/←→ · <b>달리기</b> Shift · <b>점프·글라이더</b> Space · <b>벽</b> 밀고 가면 오른다(X 놓기) · <b>웅크리기</b> C (달리다 누르면 슬라이딩) · <b>구르기</b> V (착지 직전 = 낙법) · <b>행동</b> E · <b>살펴보기</b> R · <b>몸짓</b> 1 인사 2 춤 3 사진 4 앉기 · <b>시점 정렬</b> Q · <b>지도</b> M`;
+    this.help.innerHTML = `<b>걷기</b> WASD · <b>시점</b> 마우스 끌기/←→ · <b>달리기</b> Shift · <b>점프·글라이더</b> Space · <b>벽</b> 밀고 가면 오른다(X 놓기) · <b>웅크리기</b> C (달리다 누르면 슬라이딩) · <b>구르기</b> V (착지 직전 = 낙법) · <b>공격</b> 마우스 톡 · <b>원소 스킬</b> E · <b>원소 폭발</b> Q · <b>행동</b> F · <b>살펴보기</b> R · <b>몸짓</b> 1 인사 2 춤 3 사진 4 앉기 · <b>시점 정렬</b> Z · <b>지도</b> M`;
     document.body.appendChild(this.help);
   }
 
@@ -122,7 +122,7 @@ export class HeroHud {
   setPrompt(p: { verb: string; what: string } | null) {
     if (this.override) p = this.override;
     if (!p) { this.prompt.classList.remove('on'); this.lastPrompt = ''; return; }
-    const key = this.input.touched ? '👆' : this.input.usingPad ? 'A' : 'E';
+    const key = this.input.touched ? '👆' : this.input.usingPad ? 'A' : 'F';
     const sig = `${key}|${p.verb}|${p.what}`;
     if (sig === this.lastPrompt) return;
     this.lastPrompt = sig;
