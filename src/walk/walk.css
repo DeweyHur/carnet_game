@@ -567,3 +567,5 @@ body:not(.map-mode) .wp-pin { display:none; }
 #wish .card.s5 .st { color:#ffd98a; }
 @keyframes wishIn { from { opacity:0; transform:translateY(14px) scale(.9); } to { opacity:1; transform:none; } }
 @media (max-width:1180px) { .hud-right .lbl { display:none; } }
+#resume { display:block; margin:12px auto 0; background:#6fe3ff; color:#0b2a36; }
+#resume[hidden] { display:none; }

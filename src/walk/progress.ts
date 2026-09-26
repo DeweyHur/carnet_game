@@ -26,6 +26,7 @@ interface Save {
   waypoints: string[]; chests: string[]; plumesGot: string[]; rings: string[];
   day: string; commissions: Commission[]; commissionBonus: boolean;
   pity4: number; pity5: number; wishes: number;
+  last?: string;
 }
 const KEY = 'carnet-progress-v1';
 const today = () => new Date().toISOString().slice(0, 10);
@@ -40,6 +41,8 @@ export class Progress {
   commissions: Commission[] = [];
   commissionBonus = false;
   pity4 = 0; pity5 = 0; wishes = 0;
+  /** 마지막으로 켜거나 순간이동한 포인트(이어서 하기) */
+  last = '';
   onXp?: (gain: number, why: string) => void;
   onRank?: (ar: number, reward: { stars: number; eur: number }) => void;
   onCommission?: (c: Commission, all: boolean) => void;
@@ -55,14 +58,14 @@ export class Progress {
         for (const x of d.plumesGot ?? []) this.plumesGot.add(x);
         for (const x of d.rings ?? []) this.rings.add(x);
         this.day = d.day ?? ''; this.commissions = d.commissions ?? []; this.commissionBonus = !!d.commissionBonus;
-        this.pity4 = d.pity4 ?? 0; this.pity5 = d.pity5 ?? 0; this.wishes = d.wishes ?? 0;
+        this.pity4 = d.pity4 ?? 0; this.pity5 = d.pity5 ?? 0; this.wishes = d.wishes ?? 0; this.last = d.last ?? '';
       }
     } catch { /* 처음부터 */ }
     this.rollDay();
   }
 
   save() {
-    const d: Save = { ar: this.ar, xp: this.xp, stars: this.stars, plumes: this.plumes, offered: this.offered, waypoints: [...this.waypoints], chests: [...this.chests], plumesGot: [...this.plumesGot], rings: [...this.rings], day: this.day, commissions: this.commissions, commissionBonus: this.commissionBonus, pity4: this.pity4, pity5: this.pity5, wishes: this.wishes };
+    const d: Save = { ar: this.ar, xp: this.xp, stars: this.stars, plumes: this.plumes, offered: this.offered, waypoints: [...this.waypoints], chests: [...this.chests], plumesGot: [...this.plumesGot], rings: [...this.rings], day: this.day, commissions: this.commissions, commissionBonus: this.commissionBonus, pity4: this.pity4, pity5: this.pity5, wishes: this.wishes, last: this.last };
     try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { /* 무시 */ }
     this.onChange?.();
   }

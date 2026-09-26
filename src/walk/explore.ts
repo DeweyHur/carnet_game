@@ -452,6 +452,7 @@ export class Explore {
   private activate(e: Ent) {
     const P = this.P, wp = e.wp!;
     P.waypoints.add(wp.id);
+    P.last = wp.id;
     this.paintWaypoint(e, true);
     sfx.spotBig();
     this.spawnBurst(e.x, e.y, e.z + 3.8, 0x6fe3ff);

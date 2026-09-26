@@ -1,0 +1,20 @@
+import { createRequire } from 'module';
+const require = createRequire(process.env.PW_MODULES ?? import.meta.url);
+const { chromium } = require('playwright');
+const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const ctx = await b.newContext({ viewport: { width: 900, height: 560 } });
+const p = await ctx.newPage();
+p.on('pageerror', (e) => console.log('pageerror', e.stack));
+// 지난 판: 노트르담 포인트까지 켜 두었다
+await p.addInitScript(() => { if (!localStorage.getItem('carnet-progress-v1')) localStorage.setItem('carnet-progress-v1', JSON.stringify({ ar: 4, xp: 10, stars: 300, waypoints: ['wp-champs', 'wp-notre-dame'], last: 'wp-notre-dame' })); });
+const t0 = Date.now();
+await p.goto('http://localhost:5173/?debug');
+await p.waitForSelector('#resume:not([hidden])', { timeout: 120000 });
+console.log('resume shown after', ((Date.now() - t0) / 1000).toFixed(1), 's:', await p.textContent('#resume'), '| go:', await p.textContent('#go'));
+await p.screenshot({ path: 'resume_intro.png', timeout: 60000 });
+await p.click('#resume', { timeout: 60000 });
+await p.waitForTimeout(15000);
+console.log(await p.evaluate(() => { const W = window.__walk, b = W.hero().body; const e = W.explore().list().find((q) => q.key === 'wp-notre-dame'); return { started: W.S.started, heli: !!W.heli(), d: e ? Math.hypot(e.x - b.x, e.y - b.y).toFixed(1) : null, mode: b.mode, ar: W.progress().ar }; }));
+console.log('total', ((Date.now() - t0) / 1000).toFixed(1), 's');
+await p.screenshot({ path: 'resume_in.png', timeout: 120000 });
+await b.close();

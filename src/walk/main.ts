@@ -174,6 +174,13 @@ async function boot() {
       street = makeStreet();
       setupGear();
       setupAdventure();
+      const last = WAYPOINTS.find((w) => w.id === progress.last);
+      if (last) {
+        const rb = $<HTMLButtonElement>('#resume');
+        rb.textContent = `🔷 이어서 — ${last.name}에서`;
+        rb.hidden = false;
+        rb.onclick = () => { rb.disabled = true; void start(last); };
+      }
       journal = new Journal(() => street?.story ?? null, () => progress);
       street.story.onChange = () => journal.refresh();
       setupMinimap();
@@ -760,6 +767,8 @@ async function teleport(wp: Waypoint) {
     S.pos = hero.lnglat; S.trail.push(S.pos); lastTrail = S.pos;
     S.clock += 5; // 눈 깜짝할 새지만 조금은 걸린다
     progress.bump('waypoint');
+    progress.last = wp.id;
+    progress.save();
     await wait(200);
     await street.ui.fade(false);
     toast(`🔷 ${wp.name}`);
@@ -1495,6 +1504,7 @@ async function prepare(fallback: boolean) {
     check();
   });
   town.budget = 5;
+  if (S.started) return; // 이어서 하기로 이미 시작했다
   S.pos = hero.lnglat;
   S.origin = S.pos;
   S.trail = [S.pos];
@@ -1504,10 +1514,11 @@ async function prepare(fallback: boolean) {
   go.textContent = '🚁 헬기 타기';
 }
 
-async function start() {
+async function start(resumeAt?: Waypoint) {
   const go = $<HTMLButtonElement>('#go');
-  if (go.disabled) return;
+  if (go.disabled && !resumeAt) return;
   go.disabled = true;
+  $<HTMLButtonElement>('#resume').hidden = true;
   sfx.unlock();
   sfx.startMusic();
   preparing = false;
@@ -1521,7 +1532,9 @@ async function start() {
   mapHandlers(false);
   avatar.getElement().classList.add('hidden');
   if (heli) heli.flying = true;
+  if (resumeAt && heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; }
   hud();
+  if (resumeAt) await teleport(resumeAt); // 원신처럼: 지난번 순간이동 포인트에서 바로
   const touch = hero.input.touched || matchMedia('(pointer: coarse)').matches;
   if (touch) document.body.classList.add('touch-play');
 }
@@ -1630,7 +1643,7 @@ function paintMetroBtn() {
     stayBtn.onclick = () => (here ? goRest() : chooseDestination());
   }
 }
-$('#go').addEventListener('click', start);
+$('#go').addEventListener('click', () => void start());
 const eyeBtn = $<HTMLButtonElement>('#eye');
 function paintEye() { eyeBtn.innerHTML = mapMode ? '🚶<span class="lbl"> 걷기</span>' : '🗺<span class="lbl"> 지도</span>'; eyeBtn.title = mapMode ? '다시 직접 걷는다 (M)' : '위에서 내려다보고 갈 곳을 찍는다 (M)'; }
 paintEye();
