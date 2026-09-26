@@ -45,6 +45,7 @@ import { Explore, WAYPOINTS } from './explore';
 import type { Waypoint } from './explore';
 import { Wish } from './wish';
 import { Combat } from './combat';
+import { Companion } from './companion';
 import { CHAPTERS } from './street/story';
 
 maplibregl.setWorkerUrl(workerUrl);
@@ -115,6 +116,7 @@ let progress: Progress;
 let explore: Explore;
 let wish: Wish;
 let combat: Combat;
+let companion: Companion;
 let guideTarget: Place | null = null; // 빛기둥으로 안내하는 곳(현지인이 알려 준 곳 등)
 let entering = false;
 let mapMode = false; // 🗺 지도 보기(위에서 내려다보며 목적지를 찍는다)
@@ -525,6 +527,7 @@ function heroFrame(dt: number) {
   }
   if (r.f.map && live && !modal && !talking) { setMapMode(!mapMode); return; } // 이번 프레임에 카메라를 잡으면 지도 보기 전환(easeTo)이 끊긴다
   const exploring = live && !modal && !mapMode && !openPlace && !entering && !talking && !heli?.riding && !sky?.riding;
+  companion?.update(dt, live && !mapMode && !modal);
   combat?.update(dt, r.f, exploring); // 먼저: 원점이 바뀌면 싸움이 먼저 비우고, 탐험이 야영지를 다시 세운다
   explore?.update(dt, r.f, exploring);
   hero.hud.override = exploring ? explore?.prompt() ?? null : null;
@@ -743,6 +746,15 @@ function setupAdventure() {
     },
   });
   hero.crowd.scene.add(combat.group);
+  companion = new Companion({
+    hero, progress,
+    explore: () => explore ?? null, combat: () => combat ?? null, story: () => street?.story ?? null,
+    say: (at, text, secs) => street?.ui.say(at, text, secs, 'lili'),
+    hunger: () => S.hunger,
+    night: () => hero.town.uniforms.uNight.value,
+    beacon: () => (miniBeacon ? [miniBeacon[0], miniBeacon[1]] : null),
+  });
+  hero.crowd.scene.add(companion.group);
   wish = new Wish(progress, wardrobe, addMoney);
   wish.onToggle = (on) => { if (!on) hud(); };
   // 지도 보기의 순간이동 포인트(누르면 순간이동)
@@ -1554,6 +1566,10 @@ async function start(resumeAt?: Waypoint) {
   if (resumeAt && heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; }
   hud();
   if (resumeAt) await teleport(resumeAt); // 원신처럼: 지난번 순간이동 포인트에서 바로
+  // 길잡이 리리의 첫인사(처음이면 자기소개)
+  let first = true;
+  try { first = !localStorage.getItem('carnet-lili'); localStorage.setItem('carnet-lili', '1'); } catch { /* 무시 */ }
+  setTimeout(() => companion?.greet(first), resumeAt ? 1500 : 6000);
   const touch = hero.input.touched || matchMedia('(pointer: coarse)').matches;
   if (touch) document.body.classList.add('touch-play');
 }
@@ -1676,6 +1692,7 @@ window.addEventListener('keydown', (e) => {
   if (closet.open) closet.toggle(false); else if (!modalOpen() && !mapMode && !openPlace && !metroOpen) closet.toggle(true);
 });
 window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyG' && companion && S.started && !S.finished && !e.repeat && !modalOpen() && !mapMode) { companion.ask(); return; }
   if (e.code !== 'KeyJ' || !journal || !S.started || S.finished || e.repeat) return;
   if (journal.open) journal.toggle(false); else if (!modalOpen() && !mapMode && !openPlace && !metroOpen) journal.toggle(true);
 });
@@ -1688,7 +1705,7 @@ window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (wish?.
 // 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
 // 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
 window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
-if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; if (heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; } $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map, heli: () => heli, sky: () => sky, wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal, progress: () => progress, explore: () => explore, wish: () => wish, combat: () => combat, teleport: (id: string) => { const wp = WAYPOINTS.find((w) => w.id === id); return wp ? teleport(wp) : null; } };
+if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; if (heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; } $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map, heli: () => heli, sky: () => sky, wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal, progress: () => progress, explore: () => explore, wish: () => wish, combat: () => combat, companion: () => companion, teleport: (id: string) => { const wp = WAYPOINTS.find((w) => w.id === id); return wp ? teleport(wp) : null; } };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();

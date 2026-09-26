@@ -613,3 +613,13 @@ body.map-mode .cbt-layer, body.closet-on .cbt-layer { display:none; }
 .cbt-boss b { color:#fff; font-size:13px; text-shadow:0 1px 2px #000; text-align:center; }
 .cbt-boss span { height:8px; border-radius:4px; background:#0009; overflow:hidden; }
 .cbt-boss i { display:block; height:100%; background:linear-gradient(90deg, #b3262c, #e0493a); transition:width .2s; }
+
+/* ───────── 길잡이 리리 ───────── */
+.bubble.lili { background:linear-gradient(135deg, #fff6fb, #eef2ff); color:#2b2f5a; border:2px solid #c9b8ff; white-space:normal; max-width:260px; text-align:center; line-height:1.45; font-size:13.5px; }
+.bubble.lili::after { border-top-color:#c9b8ff; }
+.lili-btn { position:fixed; right:18px; bottom:calc(214px + env(safe-area-inset-bottom)); width:46px; height:46px; border-radius:50%; padding:0; display:none; place-items:center; font-size:22px; background:#fff6fb; border:2px solid #c9b8ff; z-index:4; }
+.lili-btn.on { display:grid; }
+.lili-btn kbd { position:absolute; right:4px; bottom:0; font-size:10px; font-family:inherit; color:#6a5acd; }
+body:not(.hero-on) .lili-btn, body.map-mode .lili-btn, body.closet-on .lili-btn { display:none !important; }
+body.touch-play .lili-btn { right:auto; left:14px; bottom:calc(200px + env(safe-area-inset-bottom)); }
+body.touch-play .lili-btn kbd { display:none; }
