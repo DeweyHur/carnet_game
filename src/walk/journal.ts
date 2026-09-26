@@ -1,13 +1,17 @@
 // 파리 수첩(📖 / J): 메인 이벤트(랜드마크 도장)와 서브 이벤트. 하나를 골라 '안내'하면 빛기둥과 위쪽 한 줄이 그걸 따른다.
 import { CHAPTERS, type Story } from './street/story';
+import { arNeed, AR_MAX, COMMISSION_TEXT, type Progress } from './progress';
+import { WAYPOINTS } from './explore';
 
 export class Journal {
   private readonly el: HTMLElement;
   private story: () => Story | null;
+  private progress: () => Progress | null;
   onToggle?: (open: boolean) => void;
 
-  constructor(story: () => Story | null) {
+  constructor(story: () => Story | null, progress: () => Progress | null = () => null) {
     this.story = story;
+    this.progress = progress;
     this.el = document.createElement('section');
     this.el.id = 'journal';
     document.body.appendChild(this.el);
@@ -47,8 +51,24 @@ export class Journal {
       </div>`;
     };
     const known = subs.filter((c) => s.started.has(c.id) || s.done.has(c.id) || s.distTo(c) < 400);
+    const P = this.progress();
+    let adv = '';
+    if (P) {
+      P.rollDay();
+      const pct = P.ar >= AR_MAX ? 100 : Math.round((P.xp / arNeed(P.ar)) * 100);
+      const com = P.commissions.map((c) => `<li class="${c.done ? 'done' : ''}"><span>${esc(COMMISSION_TEXT[c.kind](c.goal))}</span><small>${c.kind === 'walk' ? Math.round(c.got) : c.got}/${c.goal}</small></li>`).join('');
+      adv = `<div class="adv">
+        <div class="rank"><b>모험 등급 ${P.ar}</b><span class="bar"><i style="width:${pct}%"></i></span><small>${P.ar >= AR_MAX ? '최고 등급' : `${P.xp} / ${arNeed(P.ar)}`}</small></div>
+        <div class="nums"><span>⭐ ${P.stars}<small>별조각(기원)</small></span><span>🪶 ${P.plumes}<small>바람 깃털 · 바친 것 ${P.offered}</small></span><span>💪 ${P.staminaLevel}단계<small>기력 소모 −${Math.round((1 - P.staminaCost) * 100)}%</small></span></div>
+        <h3>📜 오늘의 의뢰 <small>${P.commissions.filter((c) => c.done).length}/4 · 하나마다 ⭐10 · 넷 모두 ⭐60 더</small></h3>
+        <ul class="com">${com}</ul>
+        <h3>🧭 탐험 <small>순간이동 포인트 ${WAYPOINTS.filter((w) => P.waypoints.has(w.id)).length}/${WAYPOINTS.length} · 연 보물상자 ${P.chests.size} · 찾은 바람 깃털 ${P.plumesGot.size}</small></h3>
+      </div>`;
+    }
     this.el.innerHTML = `<div class="sheet">
-      <div class="top"><div><p class="eyebrow">파리 수첩</p><h2>메인 이벤트</h2><p class="sub">대표 랜드마크마다 하나 — 도장 ${got}/5 · 순서는 자유</p></div><button class="x" type="button" title="닫기 (J)">✕</button></div>
+      <div class="top"><div><p class="eyebrow">파리 수첩</p><h2>모험</h2><p class="sub">원신처럼 — 보물상자·순간이동 포인트·부탁·의뢰로 모험 등급이 오르고, 별조각으로 ✨ 기원을 한다</p></div><button class="x" type="button" title="닫기 (J)">✕</button></div>
+      ${adv}
+      <div class="top"><div><h2>메인 이벤트</h2><p class="sub">대표 랜드마크마다 하나 — 도장 ${got}/5 · 순서는 자유</p></div></div>
       <div class="stamps">${stamps}</div>
       <div class="list">${mains.map(card).join('')}</div>
       <h3>서브 이벤트 <small>${subDone}/${subs.length} · 랜드마크 둘레의 작은 부탁과 퀴즈</small></h3>

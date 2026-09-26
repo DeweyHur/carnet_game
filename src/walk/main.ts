@@ -40,6 +40,10 @@ import { Wardrobe, modsOf } from './gear';
 import { Closet } from './closet';
 import { Minimap } from './minimap';
 import { Journal } from './journal';
+import { Progress, arNeed, COMMISSION_TEXT } from './progress';
+import { Explore, WAYPOINTS } from './explore';
+import type { Waypoint } from './explore';
+import { Wish } from './wish';
 import { CHAPTERS } from './street/story';
 
 maplibregl.setWorkerUrl(workerUrl);
@@ -106,6 +110,9 @@ let wardrobe: Wardrobe;
 let closet: Closet;
 let minimap: Minimap;
 let journal: Journal;
+let progress: Progress;
+let explore: Explore;
+let wish: Wish;
 let guideTarget: Place | null = null; // 빛기둥으로 안내하는 곳(현지인이 알려 준 곳 등)
 let entering = false;
 let mapMode = false; // 🗺 지도 보기(위에서 내려다보며 목적지를 찍는다)
@@ -166,7 +173,8 @@ async function boot() {
       hero.hud.onPrompt2 = () => hero.input.press('secondary');
       street = makeStreet();
       setupGear();
-      journal = new Journal(() => street?.story ?? null);
+      setupAdventure();
+      journal = new Journal(() => street?.story ?? null, () => progress);
       street.story.onChange = () => journal.refresh();
       setupMinimap();
       transit = new Transit({ hero, toast, hint: (s2) => hint(s2), fine: (eur, why) => toast(`🎫 검표원(contrôleur)! ${why} 벌금 €${eur}`) });
@@ -321,7 +329,7 @@ let wasCamOn = false;
 let lastTrail: LngLat = START;
 let splashed = false;
 let climbT = 0;
-const MODALS = ['inside', 'dest', 'trip', 'metro', 'summary', 'closet', 'journal'];
+const MODALS = ['inside', 'dest', 'trip', 'metro', 'summary', 'closet', 'journal', 'wish'];
 const modalOpen = () => MODALS.some((id) => document.getElementById(id)?.classList.contains('on'));
 const HANDLERS = ['dragPan', 'dragRotate', 'scrollZoom', 'boxZoom', 'doubleClickZoom', 'keyboard', 'touchZoomRotate', 'touchPitch'] as const;
 /** 직접 걷는 동안에는 지도가 끌리거나 돌지 않게 한다(카메라는 사람이 잡는다) */
@@ -385,7 +393,7 @@ const Q_RADIUS = [300, 240, 190, 150];
 const Q_CROWD = [46, 34, 24, 14];
 const Q_GRASS = [30, 24, 16, 0];
 const Q_SHADOW = [2048, 2048, 1024, 0]; // 해 그림자 지도 크기(0 = 끔) // 풀이 나는 반경(m) — 가장 낮은 품질에선 풀 없이 결만
-let quality = COARSE ? 1 : 0;
+let quality = 1; // 처음엔 한 단계 낮게 시작해 여유가 있으면 올린다(시작이 버벅이지 않게)
 let slowT = 0, fastT = 0, frameEma = 16;
 function govern(dt: number) {
   if (!hero || !S.started || dt <= 0) return;
@@ -507,6 +515,9 @@ function heroFrame(dt: number) {
     }
   }
   if (r.f.map && live && !modal && !talking) { setMapMode(!mapMode); return; } // 이번 프레임에 카메라를 잡으면 지도 보기 전환(easeTo)이 끊긴다
+  const exploring = live && !modal && !mapMode && !openPlace && !entering && !talking && !heli?.riding && !sky?.riding;
+  explore?.update(dt, r.f, exploring);
+  hero.hud.override = exploring ? explore?.prompt() ?? null : null;
   street?.update(dt, r.f, live && !modal && !mapMode && !openPlace && !entering);
   if (heli?.riding || sky?.riding) { hero.hud.setPrompt(null); hero.hud.setPrompt2(null); } // 헬기에서는 '일어서기' 대신 뛰어내리기(점프)
   if (!live) { if (camOn) hero.drive(dt); return; }
@@ -514,6 +525,11 @@ function heroFrame(dt: number) {
   if (guideTarget && dist(S.pos, guideTarget.pos) < 18) { toast(`${guideTarget.emoji} ${guideTarget.name}에 왔다`); guideTarget = null; }
 
   const b = hero.body;
+  if (progress) {
+    b.mods.stamina = progress.staminaCost;
+    if (b.mode === 'glide') glideAcc += dt;
+    if (b.mode === 'climb') climbAcc += b.lift;
+  }
   S.pos = hero.lnglat;
   S.heading = hero.heading;
   if (b.moved > 0 || b.lift > 0) {
@@ -582,7 +598,7 @@ function onBodyEvent(e: BodyEvent) {
     case 'slide': sfx.slide(); break;
     case 'vault': sfx.vault(); break;
     case 'crouch': case 'uncrouch': sfx.crouch(); break;
-    case 'shutter': sfx.shutter(); street?.onShutter(); break;
+    case 'shutter': sfx.shutter(); street?.onShutter(); progress?.bump('photo'); break;
     case 'stagger': break;
   }
 }
@@ -669,6 +685,89 @@ function makeStreet(): Street {
     gear: (id) => wardrobe.unlock(id),
   });
 }
+// ───────── 모험(원신처럼): 경험치·별조각·순간이동·상자·의뢰·기원 ─────────
+let glideAcc = 0, climbAcc = 0;
+const adv: Partial<Record<'bonjour' | 'seen' | 'walked' | 'ate' | 'helped', number>> = {};
+const wpPins = new Map<string, HTMLElement>();
+const xpMul = () => (wardrobe?.has('tophat') ? 1.15 : 1);
+const addMoney = (eur: number) => { S.money = Math.round((S.money + eur) * 100) / 100; hud(); };
+
+function setupAdventure() {
+  progress = new Progress();
+  let xpT: ReturnType<typeof setTimeout> | null = null;
+  const xpEl = document.createElement('div');
+  xpEl.className = 'xpgain';
+  document.body.appendChild(xpEl);
+  progress.onXp = (n, why) => {
+    xpEl.textContent = `모험 경험치 +${n} · ${why}`;
+    xpEl.classList.add('on');
+    if (xpT) clearTimeout(xpT);
+    xpT = setTimeout(() => xpEl.classList.remove('on'), 1800);
+  };
+  progress.onRank = (ar, rw) => {
+    addMoney(rw.eur);
+    setTimeout(() => { sfx.fanfare(); toast(`🌟 모험 등급 ${ar}! 보상 ⭐${rw.stars} · €${rw.eur}${ar % 5 === 0 ? ' — 더 먼 곳의 상자가 반짝인다' : ''}`); }, 900);
+  };
+  progress.onCommission = (c, all) => {
+    setTimeout(() => { sfx.questDone(); toast(`📜 오늘의 의뢰 완료 · ${COMMISSION_TEXT[c.kind](c.goal)} — ⭐10 · 경험치 250${all ? ' · 넷 모두! 추가 ⭐60' : ''}`); }, 1500);
+  };
+  progress.onChange = () => { journal?.refresh(); hud(); };
+  explore = new Explore({
+    hero, progress, toast, hint: (s2) => hint(s2), money: addMoney, xpMul,
+    revealNear: (pos, r) => { let n = 0; for (const p of places) if (!p.known && !p.minor && dist(p.pos, pos) < r) { revealPlace(p, '순간이동 포인트에서 내려다봤다'); n++; } return n; },
+  });
+  hero.crowd.scene.add(explore.group);
+  wish = new Wish(progress, wardrobe, addMoney);
+  wish.onToggle = (on) => { if (!on) hud(); };
+  // 지도 보기의 순간이동 포인트(누르면 순간이동)
+  for (const wp of WAYPOINTS) {
+    const el = document.createElement('button');
+    el.className = `wp-pin${wp.statue ? ' statue' : ''}`;
+    el.innerHTML = `<span>${wp.statue ? '🗽' : '🔷'}</span><small></small>`;
+    el.querySelector('small')!.textContent = wp.name;
+    el.title = wp.name;
+    el.addEventListener('click', (ev) => { ev.stopPropagation(); void askTeleport(wp); });
+    pins.add(el, wp.pos, 'center');
+    wpPins.set(wp.id, el);
+  }
+  const street2 = street;
+  street2.c.xp = (xp, stars, why) => { progress.stars += stars; progress.addXp(Math.round(xp * xpMul()), why); };
+}
+
+async function askTeleport(wp: Waypoint) {
+  if (!progress.waypoints.has(wp.id)) { toast(`◇ ${wp.name} — 아직 켜지 않은 순간이동 포인트. 직접 가서 가까이 서면 켜진다`); return; }
+  if (heli?.riding || sky?.riding) { toast('하늘에서는 순간이동할 수 없다'); return; }
+  const i = await street.ui.talk('순간이동', '', `🔷 ${wp.name}(으)로 순간이동할까요?`, ['순간이동', '그만두기']);
+  if (i === 0) await teleport(wp);
+}
+
+/** 순간이동: 다른 동네면 그 동네를 읽고, 포인트 옆에 선다 */
+async function teleport(wp: Waypoint) {
+  if (entering || !S.started || S.finished) return;
+  entering = true;
+  try {
+    if (mapMode) setMapMode(false);
+    sfx.chime();
+    await street.ui.fade(true, '#dff4ff');
+    const inside = (d: District, p: LngLat, pad: number) => p[1] > d.bbox[0] - pad && p[1] < d.bbox[2] + pad && p[0] > d.bbox[1] - pad && p[0] < d.bbox[3] + pad;
+    const d = Object.values(DISTRICTS).find((x) => inside(x, wp.pos, 0.001));
+    if (d && d.id !== district.id) await enterDistrict(d, wp.pos);
+    const [x, y] = hero.frame.toLocal(wp.pos);
+    const b = hero.body;
+    b.place(x + 2.6, y, hero.world.ground(x + 2.6, y, hero.world.terrain(x + 2.6, y) + 20, 0));
+    b.mode = 'ground'; b.vx = b.vy = b.vz = 0;
+    hero.cam.snap(b);
+    S.pos = hero.lnglat; S.trail.push(S.pos); lastTrail = S.pos;
+    S.clock += 5; // 눈 깜짝할 새지만 조금은 걸린다
+    progress.bump('waypoint');
+    await wait(200);
+    await street.ui.fade(false);
+    toast(`🔷 ${wp.name}`);
+  } finally {
+    entering = false;
+  }
+}
+
 /** 가죽 서류가방: 가게·카페에서 10% 덜 낸다 */
 const disc = (eur: number) => (wardrobe?.has('satchel') ? Math.round(eur * 90) / 100 : eur);
 
@@ -705,6 +804,21 @@ function milestones() {
   if (S.walked >= 1000) wardrobe.unlock('hiking');
   if (S.seen.size >= 5) wardrobe.unlock('trench');
   if ((street?.stats.bonjour ?? 0) >= 10) wardrobe.unlock('leather');
+  // 의뢰·경험치: 늘어난 만큼
+  if (progress && street) {
+    const now = { bonjour: street.stats.bonjour, seen: S.seen.size, walked: S.walked, ate: S.ate, helped: street.stats.helped };
+    const d = (k: keyof typeof now) => now[k] - (adv[k] ?? now[k]);
+    if (adv.seen !== undefined) {
+      if (d('bonjour') > 0) progress.bump('bonjour', d('bonjour'));
+      if (d('seen') > 0) { progress.bump('discover', d('seen')); progress.addXp(Math.round(5 * d('seen') * xpMul()), '새 장소'); }
+      if (d('walked') >= 20) { progress.bump('walk', Math.round(d('walked'))); } else now.walked = adv.walked!;
+      if (d('ate') > 0) progress.bump('eat', d('ate'));
+      if (d('helped') > 0) progress.bump('quest', d('helped'));
+    }
+    Object.assign(adv, now);
+    if (glideAcc >= 1) { progress.bump('glide', Math.floor(glideAcc)); glideAcc -= Math.floor(glideAcc); }
+    if (climbAcc >= 1) { progress.bump('climb', Math.floor(climbAcc)); climbAcc -= Math.floor(climbAcc); }
+  }
   if (S.opened.size >= 3) wardrobe.unlock('satchel');
 }
 
@@ -752,6 +866,7 @@ function setupMinimap() {
     },
     heli: () => (heli ? { x: heli.x, y: heli.y, h: heli.heading } : null),
     sky: () => sky?.blips() ?? [],
+    extra: () => explore?.marks() ?? [],
     beacon: () => miniBeacon,
   }, () => { if (S.started && !S.finished && !modalOpen()) setMapMode(true); });
 }
@@ -1138,6 +1253,13 @@ function paintSky() {
 
 function hud() {
   paintSky();
+  if (progress) {
+    const ar = $('#ar');
+    ar.querySelector('b')!.textContent = `모험 ${progress.ar}`;
+    (ar.querySelector('i') as HTMLElement).style.setProperty('--p', `${Math.round((progress.xp / arNeed(progress.ar)) * 100)}%`);
+    $('#stars').textContent = `⭐${progress.stars}`;
+    for (const [id, el] of wpPins) el.classList.toggle('on', progress.waypoints.has(id));
+  }
   $('#clock').textContent = fmtClock(S.clock);
   paintBody();
   $('#money').textContent = `€${Number.isInteger(S.money) ? S.money : S.money.toFixed(2)}`;
@@ -1515,6 +1637,7 @@ paintEye();
 eyeBtn.addEventListener('click', () => { eyeBtn.blur(); setMapMode(!mapMode); });
 $('#end').addEventListener('click', finish);
 $('#gear-go').addEventListener('click', (e) => { (e.currentTarget as HTMLElement).blur(); if (S.started && !S.finished) { journal.toggle(false); closet.toggle(); } });
+$('#wish-go').addEventListener('click', (e) => { (e.currentTarget as HTMLElement).blur(); if (S.started && !S.finished) { closet.toggle(false); journal.toggle(false); wish.toggle(); } });
 $('#journal-go').addEventListener('click', (e) => { (e.currentTarget as HTMLElement).blur(); if (S.started && !S.finished) { closet.toggle(false); journal.toggle(); } });
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'KeyI' || !closet || !S.started || S.finished || e.repeat) return;
@@ -1529,11 +1652,11 @@ const paintMute = () => { muteBtn.textContent = sfx.isMuted() ? '🔇' : '🔊';
 paintMute();
 muteBtn.addEventListener('click', () => { muteBtn.blur(); sfx.unlock(); sfx.setMuted(!sfx.isMuted()); paintMute(); });
 $('#again').addEventListener('click', () => location.reload());
-window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (closet?.open) { closet.toggle(false); return; } if (journal?.open) { journal.toggle(false); return; } if (openPlace) closeCard('pass'); else if (mapMode) setMapMode(false); } });
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (wish?.open) { wish.toggle(false); return; } if (closet?.open) { closet.toggle(false); return; } if (journal?.open) { journal.toggle(false); return; } if (openPlace) closeCard('pass'); else if (mapMode) setMapMode(false); } });
 // 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
 // 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
 window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
-if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; if (heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; } $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map, heli: () => heli, sky: () => sky, wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal };
+if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; if (heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; } $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map, heli: () => heli, sky: () => sky, wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal, progress: () => progress, explore: () => explore, wish: () => wish, teleport: (id: string) => { const wp = WAYPOINTS.find((w) => w.id === id); return wp ? teleport(wp) : null; } };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();

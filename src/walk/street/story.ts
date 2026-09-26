@@ -452,6 +452,7 @@ export class Story {
     if (ch.main) this.save();
     if (ch.reward.eur) this.h.c.S.money = Math.round((this.h.c.S.money + ch.reward.eur) * 100) / 100;
     this.h.helped(ch.reward.note);
+    this.h.c.xp?.(ch.main ? 300 : 80, ch.main ? 60 : 20, ch.title);
     if (r.npc && ch.outro.fr) { this.h.ui.say(this.npcAt(r.npc), ch.outro.fr, 3, '', r.npc.id); this.hero.crowd.gesture(r.npc, 'clap', 2.5); }
     sfx.questDone();
     if (ch.main) {

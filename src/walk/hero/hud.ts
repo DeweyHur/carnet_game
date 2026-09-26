@@ -117,7 +117,10 @@ export class HeroHud {
   }
 
   /** 행동 안내. null이면 숨긴다. */
+  /** 이것이 있으면 거리의 안내 대신 보인다(보물상자·성상 등) */
+  override: { verb: string; what: string } | null = null;
   setPrompt(p: { verb: string; what: string } | null) {
+    if (this.override) p = this.override;
     if (!p) { this.prompt.classList.remove('on'); this.lastPrompt = ''; return; }
     const key = this.input.touched ? '👆' : this.input.usingPad ? 'A' : 'E';
     const sig = `${key}|${p.verb}|${p.what}`;

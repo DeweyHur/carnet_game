@@ -33,13 +33,13 @@ const H = 1.75;
 const STEP = 0.45;
 const G = 21;
 const JUMP_V = 7.4;
-const WALK = 1.7, RUN = 4.6, SPRINT = 7.2, TIRED = 1.4, SNEAK = 1.25;
+const WALK = 2.0, RUN = 5.6, SPRINT = 8.6, TIRED = 1.6, SNEAK = 1.4; // 원신처럼 시원하게(예전 4.6·7.2는 답답했다)
 const ROLL_SECS = 0.62, ROLL_V = 5.4;
 const SLIDE_SECS = 0.95;
 const SAFE_ROLL = 16; // m — 착지 직전에 구르면 이 높이까지는 다치지 않는다
-const SWIM = 1.9, SWIM_FAST = 3.6;
-const CLIMB_UP = 1.4, CLIMB_SIDE = 1.25;
-const GLIDE_FWD = 6.4, GLIDE_SINK = 1.9;
+const SWIM = 2.4, SWIM_FAST = 4.5;
+const CLIMB_UP = 2.2, CLIMB_SIDE = 1.8; // 기력 한 바퀴로 약 40 m
+const GLIDE_FWD = 9, GLIDE_SINK = 1.5;
 const PARA_FWD = 20, PARA_DIVE = 30; // 낙하산 순항·급강하 앞으로 속도(m/s)
 const HURT_FALL = 7; // m — 이보다 높이서 그냥 떨어지면 주저앉는다
 
@@ -96,7 +96,7 @@ export class Body {
   /** 숨은 보상: 에펠탑 꼭대기에 내려앉으면 글라이더가 금빛 낙하산이 된다(빠르고 기력을 안 쓴다) */
   golden = false;
   /** 입은 장비가 몸에 주는 것(곱) — gear.ts의 modsOf */
-  mods = { run: 1, climb: 1, glide: 1, hurt: 1, swim: 1, steady: false };
+  mods: { run: number; climb: number; glide: number; hurt: number; swim: number; steady: boolean; stamina?: number; gcost?: number; scost?: number } = { run: 1, climb: 1, glide: 1, hurt: 1, swim: 1, steady: false };
   skydive(x: number, y: number, z: number, facing: number) {
     this.place(x, y, z);
     this.facing = facing;
@@ -197,7 +197,7 @@ export class Body {
   // ───────── 기력 ─────────
   private spend(amount: number) {
     this.restT = 0;
-    this.stamina = Math.max(0, this.stamina - amount);
+    this.stamina = Math.max(0, this.stamina - amount * (this.mods.stamina ?? 1)); // 성상에 깃털을 바칠수록 덜 든다
     if (this.stamina <= 0 && !this.exhausted) { this.exhausted = true; this.events.push('exhausted'); }
   }
   private rest(dt: number) {
@@ -264,7 +264,7 @@ export class Body {
       if (!thin && rise > 1.4 && this.pushT > (running ? 0.18 : so.kind === 'prop' ? 0.5 : 0.35) && this.canExert) { this.grab(hit); return; }
     } else this.pushT = 0;
     this.x = p.x; this.y = p.y;
-    if (sprinting && this.speed > RUN) this.spend(dt * 0.17); else this.rest(dt);
+    if (sprinting && this.speed > RUN) this.spend(dt * 0.17 * (this.mods.scost ?? 1)); else this.rest(dt);
     this.stride(dt, this.speed > RUN + 0.5 ? 2.1 : 1.5);
 
     const g = w.ground(this.x, this.y, this.z, STEP + 0.1);
@@ -395,7 +395,7 @@ export class Body {
       const s = Math.hypot(this.vx, this.vy);
       const ns = approach(s, want, dt * (chute ? 9 : 5));
       this.vx = fx * ns; this.vy = fy * ns;
-      if (!chute) this.spend(dt * 0.025); // 한 바퀴로 40초쯤 — 70 m 탑(노트르담) 꼭대기에서 바로 펴도 내려온다
+      if (!chute) this.spend(dt * 0.025 * (this.mods.gcost ?? 1)); // 한 바퀴로 40초쯤 — 70 m 탑(노트르담) 꼭대기에서 바로 펴도 내려온다
       if (this.exhausted && !chute) { this.mode = 'air'; this.fallTopZ = this.z; this.events.push('unglide'); }
       this.fallTopZ = this.z;
     } else if (this.freefall) {

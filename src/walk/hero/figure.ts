@@ -196,6 +196,14 @@ export class Figure {
     this.part(new THREE.CylinderGeometry(0.175, 0.175, 0.045, 18).rotateX(Math.PI / 2), 0x7a5a36, trench, 0, 0, 0.02).scale.set(1.12, 0.86, 1); // 허리띠
     this.part(new THREE.BoxGeometry(0.06, 0.02, 0.05), 0xd9c28a, trench, 0, 0.15, 0.02, false);
     this.group(this.spine, this.tops, 'mariniere'); // 줄무늬는 재질(텍스처)로
+    const nap = this.group(this.spine, this.tops, 'napoleon');
+    for (const sx of [-1, 1]) {
+      this.part(new THREE.BoxGeometry(0.12, 0.1, 0.03), 0xe0b44a, nap, sx * 0.2, 0, 0.5); // 금 견장
+      for (let k = 0; k < 5; k++) this.part(new THREE.CylinderGeometry(0.01, 0.01, 0.04, 4).rotateX(Math.PI / 2), 0xe0b44a, nap, sx * (0.16 + (k - 2) * 0.018), 0, 0.46, false);
+      for (const z of [0.36, 0.26, 0.16, 0.06]) this.part(new THREE.SphereGeometry(0.014, 8, 6), 0xe0b44a, nap, sx * 0.07, 0.137, z, false);
+      this.part(new THREE.BoxGeometry(0.08, 0.02, 0.28).rotateY(sx * 0.3), 0xf2eee4, nap, sx * 0.045, 0.13, 0.3, false); // 흰 조끼 깃
+    }
+    this.part(new THREE.CylinderGeometry(0.176, 0.176, 0.05, 18).rotateX(Math.PI / 2), 0xb3262c, nap, 0, 0, 0.02).scale.set(1.12, 0.86, 1); // 붉은 띠
     const lea = this.group(this.spine, this.tops, 'leather');
     for (const sx of [-1, 1]) this.part(new THREE.BoxGeometry(0.1, 0.025, 0.14).rotateY(sx * 0.35).rotateX(-0.3), 0x121212, lea, sx * 0.08, 0.12, 0.45, false); // 선 칼라
     this.part(new THREE.BoxGeometry(0.012, 0.02, 0.4).rotateY(0.12), 0xc9ccd0, lea, 0.02, 0.137, 0.24, false); // 지퍼
@@ -280,6 +288,10 @@ export class Figure {
     this.part(new THREE.CylinderGeometry(0.15, 0.14, 0.09, 22).rotateX(Math.PI / 2), 0xf6f4ee, marin, 0, -0.01, 0.31);
     this.part(new THREE.CylinderGeometry(0.143, 0.143, 0.035, 22).rotateX(Math.PI / 2), 0x1d2c55, marin, 0, -0.01, 0.275, false);
     this.part(new THREE.SphereGeometry(0.035, 10, 8), 0xd6303a, marin, 0, -0.01, 0.37); // 빨간 방울(프랑스 수병)
+    const top = this.group(this.head, this.hats, 'tophat');
+    this.part(new THREE.CylinderGeometry(0.24, 0.24, 0.014, 28).rotateX(Math.PI / 2), 0x16161a, top, 0, -0.005, 0.275);
+    this.part(new THREE.CylinderGeometry(0.135, 0.14, 0.3, 22).rotateX(Math.PI / 2), 0x16161a, top, 0, -0.005, 0.43);
+    this.part(new THREE.CylinderGeometry(0.142, 0.142, 0.045, 22).rotateX(Math.PI / 2), 0xb3262c, top, 0, -0.005, 0.31, false);
     this.group(this.head, this.hats, 'none');
 
     // 팔: 소매(옷 색) + 커프스 + 손
@@ -382,12 +394,13 @@ export class Figure {
     pick(this.tops, l.top);
     pick(this.packs, l.back);
     for (const s of this.shoes) pick(s, l.feet);
-    pick(this.skirts, l.top === 'trench' ? 'long' : l.top === 'jacket' ? 'short' : ''); // 마리니에르·가죽은 허리까지
+    pick(this.skirts, l.top === 'trench' || l.top === 'napoleon' ? 'long' : l.top === 'jacket' ? 'short' : ''); // 마리니에르·가죽은 허리까지
     const TOP: Record<string, [number, number, number]> = {
       jacket: [0x2f6db5, 0x24558f, 0xe9dcc0],
       trench: [0xc9a878, 0xb08f60, 0x4a3b30],
       mariniere: [0xffffff, 0x1d2c55, 0x2b3550],
       leather: [0x2a2624, 0x1a1716, 0x34425e],
+      napoleon: [0x1d2c55, 0x14203f, 0xf0ece0],
     };
     const [c, d, p] = TOP[l.top] ?? TOP.jacket;
     this.topM.color.setHex(c);
@@ -423,6 +436,7 @@ export class Figure {
       let col = i % 2 ? 0xc8412f : 0xf4ead2, em = 0x000000;
       if (id === 'azure') col = i % 2 ? 0x4fa8e0 : 0xf2f8ff;
       else if (id === 'flag') col = [0x2a4fa0, 0xf4f4f4, 0xd8323a][Math.min(2, Math.floor((i / n) * 3))];
+      else if (id === 'butterfly') { col = [0x3b6fd8, 0xf29a2e, 0x1b1b22, 0xf29a2e, 0x3b6fd8, 0xf29a2e, 0x1b1b22][i % 7]; em = i % 2 ? 0x2a1400 : 0x06163a; }
       else if (id === 'golden') { col = i % 2 ? 0xe0a82e : 0xfff0b5; em = i % 2 ? 0x3a2600 : 0x2a2210; }
       m.color.setHex(col);
       m.emissive.setHex(em);
@@ -435,8 +449,8 @@ export class Figure {
     const t = this.t;
     const ph = b.phase;
     const want: Pose = { ...ZERO };
-    const run = Math.min(1, b.speed / 4.6);
-    const sprint = Math.max(0, Math.min(1, (b.speed - 4.8) / 2.2));
+    const run = Math.min(1, b.speed / 5.6);
+    const sprint = Math.max(0, Math.min(1, (b.speed - 5.9) / 2.7));
     const breath = Math.sin(t * (b.exhausted ? 7 : 2.2)) * (b.exhausted ? 0.05 : 0.012);
     const act = b.act?.kind;
     const walkPose = (A: number, crouch: boolean) => {

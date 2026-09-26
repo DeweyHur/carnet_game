@@ -40,6 +40,8 @@ export interface StreetCtx {
   charm?: () => boolean;
   /** 장비를 얻었다 */
   gear?: (id: string) => void;
+  /** 모험 경험치·별조각(원신처럼) */
+  xp?: (xp: number, stars: number, why: string) => void;
 }
 
 type Target =
@@ -758,6 +760,7 @@ export class Street {
     this.stats.helped++;
     this.stats.quests.push(what);
     sfx.questDone();
+    this.c.xp?.(50, 10, what);
     this.c.rest(4);
     // 보답: 현지인만 아는 곳 하나
     const p = this.unseenNear(600);

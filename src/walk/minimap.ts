@@ -11,6 +11,8 @@ export interface MiniSrc {
   /** 걷는 길(로컬 선분 x0,y0,x1,y1…) — 원점이 바뀌면 새 배열 */
   lanes(): Float64Array;
   marks(): MiniMark[];
+  /** 그 밖에 찍을 것(순간이동 포인트 등) */
+  extra?(): MiniMark[];
   dots(): { x: number; y: number }[];
   route(): [number, number][] | null;
   heli(): { x: number; y: number; h: number } | null;
@@ -123,7 +125,7 @@ export class Minimap {
     // 장소·역
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.font = `${Math.round(12 * d)}px sans-serif`;
-    for (const m of this.src.marks()) {
+    for (const m of [...this.src.marks(), ...(this.src.extra?.() ?? [])]) {
       if (Math.abs(m.x - b.x) > R * 1.05 || Math.abs(m.y - b.y) > R * 1.05) continue;
       const [sx, sy] = scr(m.x, m.y);
       g.globalAlpha = m.dim ? 0.55 : 1;

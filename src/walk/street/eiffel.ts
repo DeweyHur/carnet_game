@@ -287,6 +287,7 @@ export class EiffelQuests {
     if (g.npc) { this.h.ui.say(this.at(g.npc), fr, 3, '', g.npc.id); this.hero.crowd.gesture(g.npc, 'clap', 2.5); }
     if (eur) this.h.c.S.money = Math.round((this.h.c.S.money + eur) * 100) / 100;
     this.h.helped(what);
+    this.h.c.xp?.(100, 20, what);
     this.h.c.gear?.(({ hat: 'panama', race: 'aviator', photo: 'camera', picnic: 'mariniere' } as const)[id]);
     sfx.questDone();
     this.h.c.toast(`✨ ${what}${eur ? ` · 고맙다며 €${eur}` : ''}`);

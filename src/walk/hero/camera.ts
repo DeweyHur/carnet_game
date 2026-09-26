@@ -44,7 +44,7 @@ export class OrbitCam {
       this.pitch += (14 - this.pitch) * Math.min(1, dt * 10);
     } else if (this.idle > 0.6) {
       // 옆으로 달리면 카메라가 뒤로 돌아 들어온다. 카메라 쪽으로 달려올 때는 돌지 않는다.
-      const moving = b.mode === 'climb' ? b.climbMove * 1.5 : Math.min(1, b.speed / 4.6);
+      const moving = b.mode === 'climb' ? b.climbMove * 1.5 : Math.min(1, b.speed / 5.6);
       if (moving > 0.05) {
         const d = angleDiff(this.yaw, b.facing);
         const rate = b.mode === 'glide' ? 70 : b.mode === 'climb' ? 50 : 45;
