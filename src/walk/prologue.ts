@@ -222,6 +222,7 @@ export class Prologue {
   }
 
   update(dt: number, live: boolean) {
+    if (this.active && this.c.mapOpen()) this.sawMap = true; // 지도를 여는 동안엔 아래가 돌지 않는다
     this.el.classList.toggle('on', this.active && live);
     if (!this.active || !live) return;
     const s = STEPS[this.step];
