@@ -17,7 +17,6 @@ export interface CompanionCtx {
   combat: () => Combat | null;
   story: () => Story | null;
   say(at: () => { x: number; y: number; z: number }, text: string, secs: number): void;
-  hunger(): number;
   night(): number;
   /** 지금 따라가는 곳(빛기둥, 로컬) */
   beacon(): [number, number] | null;
@@ -41,7 +40,6 @@ export class Companion {
   private lastAr = 0;
   private lastHp = 1;
   private placed = false;
-  private readonly btn: HTMLButtonElement;
   enabled = true;
   onAsk?: () => void;
 
@@ -92,14 +90,6 @@ export class Companion {
     glow.scale.setScalar(0.9); glow.position.z = 0.26;
     B.add(glow);
     this.body.scale.setScalar(1.25);
-    // 🧚 단추(누르면 물어본다)
-    this.btn = document.createElement('button');
-    this.btn.className = 'lili-btn';
-    this.btn.type = 'button';
-    this.btn.title = '리리에게 묻기 (G) — 다음에 뭐 하지?';
-    this.btn.innerHTML = '🧚<kbd>G</kbd>';
-    this.btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); this.ask(); });
-    document.body.appendChild(this.btn);
   }
 
   private get hero() { return this.c.hero; }
@@ -121,7 +111,6 @@ export class Companion {
     const b = this.hero.body;
     const show = live && this.enabled;
     this.group.visible = show;
-    this.btn.classList.toggle('on', show);
     if (!show) return;
     // 어깨 오른쪽 위(카메라 기준)에 떠 있다. 가리키는 중이면 그쪽으로 날아간다
     const yaw = (this.hero.cam.yaw * Math.PI) / 180;
@@ -194,18 +183,16 @@ export class Companion {
         if (st.distTo(ch) < 180 && this.speak(`main:${id}`, `${st.landmarkName(ch)}이다! ⭐ 표시가 붙은 사람이 도움을 구하고 있어!`, 9999)) return;
       }
     }
-    // 몸 상태
-    if (this.c.hunger() > 70 && this.speak('hungry', pick(['배고파… 크레프 먹자, 크레프! 리리는 비상식량 아니야!', '꼬르륵… 저기 빵집 없나?']), 150)) return;
     if (this.c.night() > 0.6 && this.speak('night', '밤이 됐어… 가고일들이 날아다니니까 조심해!', 400)) return;
     // 한참 조용하면: 요령 하나
     this.quietT -= 0.8;
     if (this.quietT <= 0) {
       const tips = [
-        'G를 누르면 리리가 다음에 할 일을 알려 줄게!',
+        'G를 누르거나 오른쪽 위 🧚를 누르면 리리가 다음에 할 일을 알려 줄게!',
         'J를 누르면 파리 수첩! 오늘의 의뢰도 거기 있어.',
         '높은 데서 뛰어내리다 공격하면 내려찍기! 엄청 세!',
         '별조각이 모이면 ✨ 기원! 5★ 나비 글라이더 갖고 싶다…',
-        '지도(M)에서 🔷를 누르면 순간이동! 걷기 귀찮을 땐 그거야.',
+        '미니맵을 누르거나 M으로 지도를 열고 🔷를 누르면 순간이동!',
         '벽을 오를 땐 턱에서 쉬어 가야 해. 기력 바퀴를 잘 봐!',
         '공원이나 광장에 가면 요괴 야영지가 있을지도 몰라.',
       ];

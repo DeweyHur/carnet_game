@@ -20,7 +20,8 @@ export const COMMISSION_TEXT: Record<CommissionKind, (n: number) => string> = {
   climb: (n) => `🧗 벽을 ${n} m 오르기`,
   defeat: (n) => `⚔️ 요괴 ${n}마리 물리치기`,
 };
-const POOL: [CommissionKind, number][] = [['photo', 3], ['bonjour', 5], ['chest', 3], ['waypoint', 1], ['discover', 4], ['walk', 800], ['eat', 2], ['quest', 1], ['glide', 40], ['climb', 30], ['defeat', 6]];
+// 'eat'(먹기)은 허기가 없어져 뽑지 않는다(예전 저장에 있으면 새로 뽑는다)
+const POOL: [CommissionKind, number][] = [['photo', 3], ['bonjour', 5], ['chest', 3], ['waypoint', 1], ['discover', 4], ['walk', 800], ['quest', 1], ['glide', 40], ['climb', 30], ['defeat', 6]];
 
 interface Save {
   ar: number; xp: number; stars: number; plumes: number; offered: number;
@@ -62,6 +63,7 @@ export class Progress {
         this.pity4 = d.pity4 ?? 0; this.pity5 = d.pity5 ?? 0; this.wishes = d.wishes ?? 0; this.last = d.last ?? '';
       }
     } catch { /* 처음부터 */ }
+    if (this.commissions.some((c) => c.kind === 'eat')) this.commissions = [];
     this.rollDay();
   }
 

@@ -8,9 +8,6 @@ button:disabled { opacity:.5; cursor:default; }
 
 #hud { position:absolute; top:12px; left:12px; right:12px; display:flex; justify-content:space-between; align-items:flex-start; gap:8px; opacity:0; transition:opacity .8s; pointer-events:none; }
 #hud.on { opacity:1; } #hud > * { pointer-events:auto; }
-.chips { display:flex; flex-wrap:wrap; gap:6px; }
-.chips > * { background:var(--paper); padding:7px 12px; border-radius:999px; box-shadow:0 1px 4px #0003; font-size:14px; font-variant-numeric:tabular-nums; }
-.chips b { background:var(--ink); color:#fff; }
 
 #toast { position:absolute; top:64px; left:50%; translate:-50% -10px; background:var(--ink); color:#fff; padding:9px 16px; border-radius:999px; font-size:15px; opacity:0; transition:.25s; pointer-events:none; white-space:nowrap; max-width:92vw; overflow:hidden; text-overflow:ellipsis; }
 #toast.on { opacity:1; translate:-50% 0; }
@@ -18,8 +15,6 @@ button:disabled { opacity:.5; cursor:default; }
 #hint.on { opacity:1; }
 
 .me { width:26px; height:26px; border-radius:50%; background:var(--blue); border:4px solid #fff; box-shadow:0 0 0 6px #2d6cdf33, 0 2px 6px #0006; }
-.me.hidden { display:none; }
-.me i { position:absolute; inset:-10px; border-radius:50%; border:2px solid #2d6cdf66; animation:pulse 1.8s infinite; }
 @keyframes pulse { from { transform:scale(.6); opacity:1; } to { transform:scale(1.5); opacity:0; } }
 
 .pl { display:flex; align-items:center; gap:6px; padding:3px; border-radius:999px; background:#fff; box-shadow:0 2px 6px #0005; transform-origin:bottom center; }
@@ -31,17 +26,9 @@ button:disabled { opacity:.5; cursor:default; }
 .pl.known:not(.found) { outline:2px dashed var(--blue); opacity:.9; }
 .pl.pop { animation:pop .5s cubic-bezier(.2,1.6,.4,1); }
 .pl.off { opacity:0; pointer-events:none; transition:opacity .35s; }
-.pl.visited { filter:grayscale(.2); outline:2px solid #3a9d5d; }
 .pl.saved::after { content:'♥'; color:var(--accent); font-size:13px; margin:0 4px 0 -2px; }
 @keyframes pop { from { transform:scale(0) translateY(10px); } to { transform:scale(1); } }
 
-#card { position:absolute; left:50%; bottom:0; translate:-50% 110%; width:min(100vw,480px); background:var(--paper); border-radius:20px 20px 0 0; padding:18px 18px calc(18px + env(safe-area-inset-bottom)); box-shadow:0 -6px 30px #0005; transition:translate .3s cubic-bezier(.2,.9,.3,1); z-index:5; }
-#card.on { translate:-50% 0; }
-#card .head { display:flex; gap:12px; align-items:center; }
-#card-emoji { font-size:40px; width:60px; height:60px; display:grid; place-items:center; background:#fff; border-radius:16px; box-shadow:inset 0 0 0 1px #0001; }
-#card h2 { margin:0; font-size:19px; } #card-cat { margin:2px 0 0; font-size:13px; color:#7a6f60; }
-#card-blurb { font-size:15px; line-height:1.6; margin:12px 0 6px; }
-#card-meta { font-size:13px; color:#7a6f60; margin:0 0 14px; }
 .acts { display:flex; gap:8px; flex-wrap:wrap; } .acts .primary { flex:1 1 180px; }
 
 #intro { position:absolute; inset:0; background:#0b0a09; color:#f3ead9; display:grid; place-items:center; z-index:10; transition:opacity 1.6s ease .9s, background 2.4s; }
@@ -54,23 +41,15 @@ button:disabled { opacity:.5; cursor:default; }
 .tunnel button { background:#ffd166; font-weight:700; padding:13px 26px; font-size:16px; }
 #status { min-height:1.4em; font-size:13px; color:#c9bfae; margin-top:14px; }
 
-#summary { position:absolute; inset:0 0 0 auto; width:min(100vw,440px); translate:100% 0; transition:translate .5s; z-index:8; overflow:auto; background:var(--paper); box-shadow:-8px 0 30px #0004; }
-#summary.on { translate:0 0; }
 .sheet { padding:26px 22px 40px; }
 .eyebrow { color:var(--accent); font-weight:700; font-size:13px; letter-spacing:.08em; margin:0; }
 .sheet h2 { margin:4px 0 8px; font-size:26px; } .sheet h3 { font-size:14px; color:#7a6f60; margin:22px 0 8px; }
-#sum-stats { font-size:14px; color:#5b5246; font-variant-numeric:tabular-nums; }
-#sum-lines, #sum-stops { margin:0; padding-left:20px; line-height:1.7; font-size:15px; }
-#sum-maps { display:inline-block; margin:22px 0 10px; color:var(--blue); font-weight:700; }
 #again { display:block; } .fine { font-size:12px; color:#9a8f80; margin-top:22px; }
-@media (max-width:700px) { #summary { inset:auto 0 0 0; width:100vw; max-height:62vh; translate:0 100%; border-radius:20px 20px 0 0; } }
 
 .classic { margin-top:26px; font-size:12px; } .classic a { color:#8d8373; }
 
 /* ───────── 장소 안: 관람 · 메뉴 ───────── */
-#inside { position:absolute; inset:0; z-index:7; opacity:0; pointer-events:none; transition:opacity .4s; background:#0b0a09; }
-#inside.on { opacity:1; pointer-events:auto; }
-.visit, .menu, .serve { position:absolute; inset:0; }
+.menu, .serve { position:absolute; inset:0; }
 .pano { position:absolute; inset:0; overflow:hidden; cursor:grab; touch-action:none; background:radial-gradient(circle at 50% 38%, #3a3226, #0b0a09 75%); }
 .pano:active { cursor:grabbing; }
 .pano-img { position:absolute; left:0; top:0; max-width:none; user-select:none; -webkit-user-drag:none; animation:fadein .9s; }
@@ -80,26 +59,15 @@ button:disabled { opacity:.5; cursor:default; }
 .pano.has-photo .pano-fallback { display:none; }
 .pano::after { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(#0008, #0000 22%, #0000 50%, #000c 100%); }
 @keyframes fadein { from { opacity:0; } }
-.visit-top { position:absolute; top:0; left:0; right:0; padding:16px 18px; color:#fff; display:flex; justify-content:space-between; gap:12px; align-items:baseline; pointer-events:none; text-shadow:0 1px 4px #000a; }
-.visit-top b { font-size:17px; } .credit { font-size:11px; color:#fffb; pointer-events:auto; text-align:right; max-width:55%; }
-.visit-dock { position:absolute; left:50%; bottom:0; translate:-50% 0; width:min(100vw,560px); padding:18px 18px calc(22px + env(safe-area-inset-bottom)); color:#fff; }
 .dots { display:flex; gap:6px; margin-bottom:12px; } .dots i { width:22px; height:3px; border-radius:2px; background:#fff4; } .dots i.on { background:#ffd166; }
 .caption { font-size:18px; line-height:1.65; margin:0 0 18px; min-height:3.3em; text-shadow:0 1px 6px #000c; opacity:0; }
 .caption.in { animation:rise .7s forwards; } @keyframes rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-.visit .acts .primary { flex:1 1 160px; } .cam { font-size:18px; padding:8px 14px; }
 .flash { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; } .flash.go { animation:flash .45s; } @keyframes flash { 0% { opacity:.9; } 100% { opacity:0; } }
 
 .menu { background:#2a2119; overflow:auto; display:grid; place-items:start center; padding:24px 12px; }
 .menu-sheet { width:min(100%,520px); background:#fbf6e9; border-radius:6px; padding:26px 22px 0; box-shadow:0 12px 50px #000a; background-image:repeating-linear-gradient(#0000 0 31px, #0000000a 31px 32px); }
 .menu-eyebrow { margin:0; text-align:center; font-family:Georgia,'Times New Roman',serif; font-style:italic; color:#a0522d; letter-spacing:.1em; }
 .menu-sheet h2 { margin:4px 0 6px; text-align:center; font-size:22px; } .menu-note { margin:0 0 14px; text-align:center; font-size:12px; color:#8a7d6a; }
-.dishes { display:flex; flex-direction:column; }
-.dish { display:flex; gap:12px; align-items:center; text-align:left; background:none; box-shadow:none; border-radius:12px; padding:10px 8px; border-bottom:1px dashed #0002; border-radius:0; }
-.dish.picked { background:#ffe9b8; border-radius:12px; border-bottom-color:#0000; }
-.dish-pic { flex:0 0 56px; height:56px; border-radius:50%; display:grid; place-items:center; font-size:28px; background:#fff center/cover; box-shadow:inset 0 0 0 1px #0001; }
-.dish-mid { flex:1; display:flex; flex-direction:column; gap:1px; min-width:0; } .dish-mid b { font-size:15px; } .dish-mid i { font-family:Georgia,serif; font-size:12px; color:#a0522d; } .dish-mid small { font-size:12.5px; color:#6b6153; line-height:1.45; }
-.dish-price { font-variant-numeric:tabular-nums; font-weight:700; }
-.dish.picked .dish-price::before { content:'✓ '; color:var(--accent); }
 .menu-foot { position:sticky; bottom:0; display:flex; gap:8px; align-items:center; padding:14px 0 18px; background:linear-gradient(#fbf6e900, #fbf6e9 30%); } .menu-foot .total { flex:1; font-weight:700; }
 
 .serve { background:radial-gradient(circle at 50% 40%, #5a4632, #1d1610 80%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding:24px; color:#fff; text-align:center; }
@@ -108,21 +76,15 @@ button:disabled { opacity:.5; cursor:default; }
 .plate-pic { width:min(38vw,170px); aspect-ratio:1; border-radius:50%; background:#fff center/cover; display:grid; place-items:center; font-size:64px; box-shadow:0 0 0 10px #fff, 0 0 0 11px #0002, 0 14px 30px #0008; margin:10px; }
 .serve-line { max-width:420px; line-height:1.6; color:#eadfce; margin:0; }
 
-#sum-shots { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; } .shot { aspect-ratio:3/4; border-radius:6px; background:#ddd center/cover; background-size:auto 100%; box-shadow:0 0 0 3px #fff, 0 1px 5px #0004; }
 
 /* ───────── 지하철 ───────── */
 /* safe center: 내용이 화면보다 길면 위가 잘리지 않고 스크롤된다(휴대폰 출구 목록) */
-#metro { position:absolute; inset:0; z-index:9; display:flex; flex-direction:column; align-items:center; justify-content:safe center; overflow-y:auto; overscroll-behavior:contain;
-  padding:24px 20px calc(28px + env(safe-area-inset-bottom)); opacity:0; pointer-events:none; transition:opacity .45s;
-  background:radial-gradient(ellipse at 50% 120%, #2a2720 0%, #0b0a09 70%); }
-#metro.on { opacity:1; pointer-events:auto; }
 .metro-sheet { width:min(100%,480px); flex:0 0 auto; color:#f3ead9; animation:rise .5s; }
 .metro-eyebrow { margin:0; letter-spacing:.14em; font-size:13px; color:#ffd166; text-transform:uppercase; }
 .metro-sheet h2 { margin:8px 0 6px; font-size:27px; line-height:1.25; }
 .metro-sub { margin:0; color:#bcb2a1; line-height:1.6; font-size:14.5px; }
 .metro-run { margin:10px 0 0; font-size:12.5px; color:#8d8373; font-variant-numeric:tabular-nums; min-height:1.2em; }
 .metro-line { display:flex; align-items:center; gap:10px; margin:16px 0 4px; font-size:14px; color:#d9cfbd; }
-.mline { width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-style:normal; font-weight:800; font-size:14px; flex:0 0 26px; }
 .ticket { display:flex; align-items:baseline; gap:10px; margin:18px 0; padding:12px 16px; border-radius:10px; background:#f3ead9; color:#1f1b16; box-shadow:0 6px 24px #0007; }
 .ticket b { font-family:Georgia,serif; letter-spacing:.06em; } .ticket span { font-size:13px; color:#6b6153; }
 .dirs, .exits { display:flex; flex-direction:column; gap:10px; margin-top:16px; }
@@ -134,8 +96,6 @@ button:disabled { opacity:.5; cursor:default; }
 .dir.bad { background:#4a2320; box-shadow:inset 0 0 0 1px #e4572e; opacity:.75; }
 .metro-wrong { margin:14px 0 0; color:#ffa08a; font-size:14px; line-height:1.6; }
 .metro-ride { margin:16px 0 0; color:#d9cfbd; font-size:15px; line-height:1.7; animation:rise .6s; }
-#metro .acts { margin-top:20px; }
-#metro-go { font-size:15px; }
 
 /* 지하철: 사진 · 노선도 */
 .metro-photo { display:none; }
@@ -166,14 +126,8 @@ button:disabled { opacity:.5; cursor:default; }
 .route .tag.off { background:#e4572e; color:#fff; font-weight:700; }
 
 /* 지하철: 지도를 뒤로 보여 주는 모드 */
-#metro.mapmode { justify-content:flex-end; pointer-events:none; background:linear-gradient(#0b0a0900 0 34%, #0b0a09b3 58%, #0b0a09 84%); }
-#metro.mapmode .metro-sheet { pointer-events:auto; background:#141210f2; backdrop-filter:blur(10px); border-radius:18px; padding:16px 16px 18px; box-shadow:0 -12px 44px #000a, inset 0 0 0 1px #ffffff14; }
-#metro.mapmode .metro-photo { display:none; }
 
 .metro-sheet.riding .ride-head { display:flex; align-items:center; gap:10px; font-size:16px; }
-.ride-chips { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 10px; }
-.ride-chips .chip { font-size:13px; padding:5px 11px; border-radius:999px; background:#ffffff14; color:#8d8373; transition:.3s; }
-.ride-chips .chip.on { background:#f3ead9; color:#1f1b16; font-weight:700; }
 .ride-say { margin:0; font-size:15px; line-height:1.6; color:#d9cfbd; min-height:1.6em; }
 
 .exit { flex-direction:row !important; align-items:center !important; gap:12px; }
@@ -181,31 +135,10 @@ button:disabled { opacity:.5; cursor:default; }
 .exit-mid { display:flex; flex-direction:column; gap:2px; min-width:0; text-align:left; }
 
 /* 지도 위: 역 입구 · 전동차 · 지나는 역 · 출구 */
-.mstation { display:flex; align-items:center; gap:6px; padding:4px 12px 4px 5px; border-radius:999px; background:#1c1a16; color:#f3ead9; box-shadow:0 2px 8px #0007, inset 0 0 0 1px #ffffff2b; cursor:pointer; }
-.mstation .m { width:24px; height:24px; border-radius:50%; background:#ffd166; color:#1f1b16; display:grid; place-items:center; font-size:15px; font-weight:800; }
-.mstation .nm { font-size:13px; font-weight:700; white-space:nowrap; }
-.train { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; font-size:19px; background:#fff; box-shadow:0 3px 12px #0007, 0 0 0 5px #ffffff4d; }
-.stpin { display:flex; align-items:center; gap:7px; margin-left:-7px; }
-.stpin i { width:14px; height:14px; border-radius:50%; background:#fff; box-shadow:inset 0 0 0 4px var(--c), 0 1px 4px #0007; flex:0 0 14px; }
-.stpin .nm { font-size:12px; font-weight:700; color:#1f1b16; background:#fffffff0; padding:2px 8px; border-radius:999px; white-space:nowrap; box-shadow:0 1px 4px #0005; }
-.stpin.from .nm, .stpin.to .nm { background:#1c1a16; color:#f3ead9; }
-.exitpin { display:flex; align-items:center; gap:6px; padding:4px 11px 4px 4px; border-radius:999px; background:#fbf7ef; color:#1f1b16; box-shadow:0 3px 10px #0006; cursor:pointer; transition:.2s; }
-.exitpin b { width:24px; height:24px; border-radius:50%; background:#ffd166; display:grid; place-items:center; font-size:14px; }
-.exitpin .nm { font-size:12.5px; font-weight:700; white-space:nowrap; }
-.exitpin:hover { translate:0 -2px; }
-.exitpin.picked { background:#e4572e; color:#fff; } .exitpin.picked b { background:#fff; }
 /* 지하철을 타는 동안은 걷기용 표시를 치운다 */
-body.metro-mode .pl, body.metro-mode .mstation, body.metro-mode .me { opacity:0 !important; pointer-events:none; transition:opacity .4s; }
-body.metro-mode .hud-right { opacity:0; pointer-events:none; transition:opacity .3s; }
 /* 버스는 지하로 사라지지 않는다 — 거리가 계속 보이고 가게 핀도 흐릿하게 남는다 */
-body.bus-mode .pl { opacity:.5 !important; }
-body.bus-mode #metro.mapmode { background:linear-gradient(#0b0a0900 0 46%, #0b0a0999 68%, #0b0a09e8 88%); }
 
 /* ───────── 어디 갈까 ───────── */
-#dest { position:absolute; inset:0; z-index:9; display:flex; flex-direction:column; align-items:center; justify-content:safe center; overflow-y:auto; overscroll-behavior:contain;
-  padding:24px 20px calc(28px + env(safe-area-inset-bottom)); opacity:0; pointer-events:none; transition:opacity .35s;
-  background:radial-gradient(ellipse at 50% 120%, #2a2720 0%, #0b0a09 70%); }
-#dest.on { opacity:1; pointer-events:auto; }
 .dest-sheet { width:min(100%,560px); flex:0 0 auto; color:#f3ead9; animation:rise .45s; }
 .dest-sheet h2 { margin:8px 0 6px; font-size:27px; }
 .dcard { margin:16px 0 0; border-radius:16px; background:#141210; box-shadow:inset 0 0 0 1px #ffffff14; overflow:hidden; }
@@ -220,12 +153,10 @@ body.bus-mode #metro.mapmode { background:linear-gradient(#0b0a0900 0 46%, #0b0a
 .dplace { display:flex; align-items:center; gap:6px; padding:7px 12px 7px 9px; border-radius:999px; background:#ffffff12; color:#e6dccb; box-shadow:none; font-size:13.5px; }
 .dplace:hover { background:#ffd166; color:#1f1b16; }
 .dp-emoji { font-size:15px; }
-#dest .acts { margin-top:18px; justify-content:center; }
 .pick-tag { font-style:normal; font-size:11px; font-weight:700; margin-left:8px; padding:2px 8px; border-radius:999px; background:#ffd166; color:#1f1b16; vertical-align:middle; }
 .exit.best { box-shadow:inset 0 0 0 2px #ffd166; }
 
 /* 어디 갈까 — 2단계(어디 / 어떻게) */
-.mline.bus { border-radius:6px; width:auto; min-width:26px; padding:0 5px; font-size:12px; }
 .dlines { display:inline-flex; align-items:center; gap:5px; }
 .dways { display:flex; flex-direction:column; gap:10px; margin:18px 0 0; }
 .dway { display:flex; flex-direction:column; align-items:flex-start; gap:5px; width:100%; text-align:left; border-radius:14px; padding:14px 16px; background:#1c1a16; color:#f3ead9; box-shadow:inset 0 0 0 1px #ffffff1f; }
@@ -248,16 +179,8 @@ body.bus-mode #metro.mapmode { background:linear-gradient(#0b0a0900 0 46%, #0b0a
 .bar[data-level="bad"] i { background:#e4572e; }
 
 /* 숙소 */
-.mstay { display:flex; align-items:center; gap:6px; padding:4px 12px 4px 5px; border-radius:999px; background:#fbf7ef; color:#1f1b16; box-shadow:0 2px 10px #0006, inset 0 0 0 2px #e4b23a; cursor:pointer; }
-.mstay .m { width:24px; height:24px; border-radius:50%; background:#e4b23a; display:grid; place-items:center; font-size:14px; }
-.mstay .nm { font-size:13px; font-weight:700; white-space:nowrap; }
-body.metro-mode .mstay { opacity:0; pointer-events:none; }
 
 /* 여행 준비 화면 */
-#trip { position:absolute; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:safe center; overflow-y:auto; overscroll-behavior:contain;
-  padding:24px 20px calc(28px + env(safe-area-inset-bottom)); opacity:0; pointer-events:none; transition:opacity .35s;
-  background:radial-gradient(ellipse at 50% 120%, #2a2720 0%, #0b0a09 70%); }
-#trip.on { opacity:1; pointer-events:auto; }
 .dhead.static { cursor:default; }
 .stays { display:flex; flex-direction:column; gap:8px; padding:0 14px 14px; }
 .stay { display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-align:left; border-radius:12px; padding:12px 14px; background:#ffffff0d; color:#f3ead9; box-shadow:none; }
@@ -269,12 +192,8 @@ body.metro-mode .mstay { opacity:0; pointer-events:none; }
 .stay-price { margin-left:auto; font-weight:800; font-variant-numeric:tabular-nums; }
 .stay-bf { font-size:12px; color:#a89e8d; }
 .stay-note { font-size:12.5px; color:#8d8373; line-height:1.55; }
-#stay-go { font-size:15px; }
-body.metro-mode #stay-go { opacity:0; pointer-events:none; }
 
 /* 숙소 고르는 동안의 지도 핀 */
-#trip.mapmode { justify-content:flex-end; pointer-events:none; background:linear-gradient(#0b0a0900 0 30%, #0b0a09b3 54%, #0b0a09 82%); }
-#trip.mapmode .dest-sheet { pointer-events:auto; background:#141210f2; backdrop-filter:blur(10px); border-radius:18px; padding:16px 16px 18px; box-shadow:0 -12px 44px #000a, inset 0 0 0 1px #ffffff14; max-height:58vh; overflow-y:auto; }
 .areapin, .staypin, .sightpin { display:flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; cursor:pointer; box-shadow:0 3px 12px #0007; white-space:nowrap; font-size:13px; transition:.18s; }
 .areapin { background:#1c1a16; color:#f3ead9; font-size:14px; box-shadow:0 3px 12px #0007, inset 0 0 0 2px #e4b23a; }
 .staypin { background:#fbf7ef; color:#1f1b16; font-weight:700; }
@@ -288,11 +207,7 @@ body.metro-mode #stay-go { opacity:0; pointer-events:none; }
 /* 사진 박스는 배경 이미지뿐이라 내용 너비가 0이다 —
    .dway/.stay 처럼 align-items:flex-start 인 플렉스 안에서는 반드시 폭을 펴 줘야 한다. */
 .metro-photo.on { width:100%; align-self:stretch; box-sizing:border-box; }
-#trip .metro-photo.on { height:130px; margin:10px 0 0; }
-#trip .dway .metro-photo.on { height:100px; margin:9px 0 2px; }
 /* 캡션과 출처가 같은 줄에서 겹치지 않도록 캡션을 한 줄 위로 올린다. */
-.photo-cap { position:absolute; left:10px; bottom:19px; right:10px; z-index:1; font-size:11.5px; color:#fff; text-shadow:0 1px 4px #000c;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .metro-photo.on:has(.photo-cap)::after { background:linear-gradient(#0000 35%, #000c); }
 .metro-photo.on:has(.photo-cap) > .metro-credit { left:10px; right:auto; bottom:5px; max-width:calc(100% - 20px); }
 .metro-credit { pointer-events:none; }
@@ -329,7 +244,6 @@ body.touch-play.hero-on .hpad { display:grid; }
 .hpad button { width:62px; height:62px; padding:0; border-radius:50%; font-size:14px; font-weight:700; background:#fffe; touch-action:none; user-select:none; -webkit-user-select:none; }
 .hpad .jump { width:78px; height:78px; background:#2d6cdf; color:#fff; }
 .hpad .run.held { background:#ffd166; }
-.hpad .map { grid-column:1 / 3; justify-self:end; width:48px; height:48px; font-size:20px; }
 .hpad .drop { background:#e4572e; color:#fff; }
 .hpad .drop[hidden] { display:none; }
 body.touch-play .hprompt { bottom:auto; top:118px; }
@@ -346,10 +260,8 @@ body.touch-play.hero-on #hint { top:170px; }
 #view::after { content:''; position:absolute; inset:0; background:var(--daylight, #fff); mix-blend-mode:multiply; pointer-events:none; transition:background 2s; }
 #view .pins { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
 #view .pins > * { pointer-events:auto; position:absolute; left:0; top:0; transform-origin:50% 100%; }
-body.map-mode #view, body.metro-mode #view { visibility:hidden; }
+body.map-mode #view { visibility:hidden; }
 /* 지하철·버스 장면도 같은 캔버스에 그린다 — 거리 핀·낮빛은 숨긴다 */
-body.transit-on #view { visibility:visible; }
-body.transit-on #view .pins, body.transit-on #view::after { display:none; }
 
 /* ───────── 거리에서 주고받기: 말풍선·이름표·가게 안내판·대화·사진 ───────── */
 .street-layer { position:fixed; inset:0; pointer-events:none; z-index:3; overflow:hidden; }
@@ -370,12 +282,8 @@ body:not(.hero-on) .street-layer { display:none; }
 .wcard { width:min(300px, 80vw); background:var(--paper); border-radius:14px; padding:12px 14px; box-shadow:0 6px 24px #0006; opacity:0; pointer-events:none; font-size:14px; }
 .wcard.on { opacity:1; pointer-events:auto; }
 .wcard::after { content:''; position:absolute; left:50%; bottom:-8px; margin-left:-8px; border:8px solid transparent; border-top-color:var(--paper); border-bottom:0; }
-.wc-head { display:flex; gap:10px; align-items:center; }
-.wc-head .em { font-size:28px; width:42px; height:42px; display:grid; place-items:center; background:#fff; border-radius:12px; box-shadow:inset 0 0 0 1px #0001; }
-.wc-head b { display:block; font-size:16px; } .wc-head small { color:#7a6f60; font-size:12px; }
 .wcard p { margin:8px 0 0; line-height:1.55; } .wcard .meta { color:#7a6f60; font-size:12px; }
-.wc-acts { display:flex; gap:6px; margin-top:10px; } .wc-acts button { padding:8px 12px; font-size:13px; } .wc-acts .primary { flex:1; }
-.wc-acts kbd, .talk kbd { display:inline-grid; place-items:center; min-width:18px; height:18px; margin-right:6px; border-radius:5px; background:#fff3; font:700 11px/1 inherit; }
+.talk kbd { display:inline-grid; place-items:center; min-width:18px; height:18px; margin-right:6px; border-radius:5px; background:#fff3; font:700 11px/1 inherit; }
 .talk { position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); translate:-50% 20px; width:min(560px, 94vw); background:#1f1b16f0; color:#fff; border-radius:18px; padding:14px 18px 16px; z-index:6; opacity:0; pointer-events:none; transition:.25s; box-shadow:0 8px 30px #0007; }
 .talk.on { opacity:1; translate:-50% 0; pointer-events:auto; }
 .talk .who { margin:0 0 4px; font-size:12px; color:#ffd166; font-weight:700; letter-spacing:.04em; }
@@ -406,22 +314,11 @@ body.hero-on .pl.curated { padding:3px; }
 .pl.revealed { outline:2px solid #e4b23a; }
 /* 터치: 구르기·웅크리기·몸짓 */
 body.talking .hhelp, body.talking .hprompt, body.talking .hpad { opacity:0 !important; pointer-events:none !important; }
-body.hero-on .mstation .nm { display:none; }
-body.hero-on .mstation { opacity:.85; }
 
 /* ───────── 지하철·버스 안(따로 그린 장면) ───────── */
 .under-fade { position:fixed; inset:0; background:#0b0a09; opacity:0; pointer-events:none; transition:opacity .45s; z-index:6; }
 .under-fade.on { opacity:1; }
-.transit-hud { position:fixed; left:50%; top:62px; translate:-50% -8px; width:min(620px, 94vw); background:#152a52ee; color:#fff; border-radius:14px; padding:10px 14px; z-index:4; opacity:0; pointer-events:none; transition:.3s; box-shadow:0 4px 18px #0006; }
-.transit-hud.on { opacity:1; translate:-50% 0; }
-.transit-hud .th-head { display:flex; align-items:center; gap:8px; font-size:15px; }
-.transit-hud .mline { display:inline-grid; place-items:center; min-width:26px; height:26px; border-radius:50%; font-style:normal; font-weight:800; font-size:14px; padding:0 4px; }
-.transit-hud p { margin:6px 0 0; font-size:13px; color:#d6e0f4; line-height:1.5; }
-.transit-hud .ride-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
-.transit-hud .chip { font-size:12px; padding:3px 8px; border-radius:999px; background:#ffffff1f; color:#c9d6ee; }
-.transit-hud .chip.on { background:#ffd166; color:#1f1b16; font-weight:700; }
-.transit-hud .chip.past { opacity:.5; }
-body.underground .hud-right, body.underground .pl, body.underground .mstation, body.underground .mstay, body.underground .questline, body.underground .street-layer { opacity:0 !important; pointer-events:none !important; }
+body.underground .hud-right, body.underground .pl, body.underground .questline, body.underground .street-layer { opacity:0 !important; pointer-events:none !important; }
 body.underground #hint { top:160px; }
 
 /* ───────── 터치: 원신식 최소 버튼 ───────── */
@@ -429,25 +326,15 @@ body.underground #hint { top:160px; }
 .hpad .jump { grid-column:2; grid-row:1 / 3; align-self:end; width:84px; height:84px; font-size:16px; box-shadow:0 3px 12px #0005; }
 .hpad .run { grid-column:1; grid-row:2; width:64px; height:64px; display:grid; place-items:center; align-content:center; line-height:1.1; background:#fffe; }
 .hpad .run b { font-size:13px; } .hpad .run small { font-size:9px; color:#7a6f60; font-weight:500; }
-.hpad .face { grid-column:1; grid-row:1; justify-self:center; width:44px; height:44px; font-size:20px; background:#ffffffcc; }
 .hpad .drop { position:absolute; right:100px; bottom:96px; width:58px; height:58px; }
-.hpad .emotes { position:absolute; right:0; bottom:calc(100% + 10px); display:none; gap:6px; background:#1f1b16cc; padding:6px; border-radius:18px; }
-.hpad .emotes.on { display:flex; }
-.hpad .emotes button { width:50px; height:54px; font-size:22px; display:grid; place-items:center; align-content:center; line-height:1; padding:0; }
-.hpad .emotes small { font-size:10px; margin-top:2px; }
-.hpad .emo.held { background:#ffd166; }
-.hpad.crouched .face { outline:3px solid #ffd166; }
 /* 좁은 화면: HUD를 줄인다 — 글자 없는 아이콘 버튼, 걸은 거리·발견 수는 숨김 */
 @media (max-width:640px) {
   #hud { top:8px; left:8px; right:8px; }
-  .chips { gap:4px; } .chips > * { padding:5px 9px; font-size:12px; }
   #walked, #found { display:none; }
-  .chips .bar em { display:none; }
   .hud-right { display:flex; gap:4px; }
   .hud-right button { padding:8px 10px; }
   .hud-right .lbl { display:none; }
   .questline { top:46px; font-size:12px; }
-  .transit-hud { top:50px; }
   body.touch-play .hprompt { top:auto; bottom:calc(128px + env(safe-area-inset-bottom)); left:auto; right:12px; translate:0 8px; max-width:62vw; }
   body.touch-play .hprompt.on { translate:0 0; }
   body.touch-play .hprompt.second { bottom:calc(178px + env(safe-area-inset-bottom)); top:auto; }
@@ -666,3 +553,97 @@ body:not(.domain-on) .dom-hud { display:none; }
 body.domain-on .pro, body.domain-on .asc-btn, body.domain-on .hhelp { display:none !important; }
 body.domain-on #view .pins { display:none; }
 @media (max-width: 560px) { .dom-hud { top:54px; font-size:12px; gap:8px; padding:6px 10px; } .dom-hud > small { display:none; } }
+
+/* ═════════ 원신 배치 ═════════
+   왼쪽 위: 미니맵(누르면 지도) · 그 아래 할 일(첫걸음·부탁)
+   오른쪽 위: ✨ 기원 · 📖 수첩 · 🎒 옷장 · 🧚 리리 메뉴 — 넷만
+   오른쪽 아래: 원소 스킬(E) · 원소 폭발(Q), 쓸 수 있을 때만 ⤒ 상승(T)
+   F 행동 안내는 화면 가운데 오른쪽, 피는 아래 가운데
+   휴대폰: 왼쪽 아래 조이스틱, 오른쪽 아래 공격·점프·달리기·스킬·폭발 한 무리 */
+html, body { width:100%; overflow:hidden; overscroll-behavior:none; }
+body { position:fixed; inset:0; }
+#hud { left:auto; right:14px; top:14px; justify-content:flex-end; }
+.hud-right { display:flex; gap:8px; }
+.hud-right button { width:44px; height:44px; padding:0; display:grid; place-items:center; font-size:20px; border-radius:50%; background:#1f1b16b3; color:#fff; box-shadow:0 2px 8px #0005; border:2px solid #ffffff33; }
+.hud-right button:hover { border-color:#ffe7a8; }
+#menu-go { background:#fff6fb; border-color:#c9b8ff; }
+body.map-mode #hud .hud-right button:not(#menu-go) { display:none; }
+.minimap { left:14px; right:auto; top:14px; }
+.pro, .questline { left:14px; top:186px; width:min(300px, calc(100vw - 28px)); max-width:none; }
+.questline { width:auto; max-width:300px; }
+body.touch-play .pro, body.touch-play .questline { top:132px; left:10px; width:min(260px, 36vw); }
+.pro .t { font-size:13.5px; }
+#toast { top:16px; z-index:7; }
+#hint { bottom:64px; z-index:5; }
+.xpgain { bottom:calc(84px + env(safe-area-inset-bottom)); }
+/* 걷는 동안엔 장소 표시를 띄우지 않는다(지도에서만) */
+body:not(.map-mode) #view .pins .pl { display:none; }
+/* F 행동 안내: 가운데 오른쪽 */
+.hprompt { left:calc(50% + 70px); bottom:auto; top:54%; translate:0 6px; max-width:min(420px, 44vw); }
+.hprompt.on { translate:0 0; }
+.hprompt.second { top:calc(54% + 50px); bottom:auto; }
+/* 스킬·폭발: 오른쪽 아래 가로로 */
+.cbt .skill { right:112px; bottom:calc(26px + env(safe-area-inset-bottom)); width:56px; height:56px; }
+.cbt .burst { right:30px; bottom:calc(20px + env(safe-area-inset-bottom)); width:68px; height:68px; }
+/* 상승: 쓸 수 있을 때만(원신의 도구 칸처럼) */
+.asc-btn { right:196px; bottom:calc(30px + env(safe-area-inset-bottom)); display:none !important; }
+.asc-btn.on.ready { display:grid !important; }
+/* 지난 것들 */
+.lili-btn, .hhelp { display:none !important; }
+
+/* ── 휴대폰(터치) ── */
+body.touch-play #hud { top:8px; right:8px; }
+body.touch-play .hud-right { gap:6px; }
+body.touch-play .hud-right button { width:40px; height:40px; font-size:18px; }
+body.touch-play .minimap { left:10px; top:10px; }
+body.touch-play #toast { top:10px; max-width:46vw; font-size:13px; }
+body.touch-play.hero-on #hint { top:54px; bottom:auto; left:50%; translate:-50% 0; max-width:44vw; font-size:12.5px; text-align:center; }
+body.touch-play .hpad { display:none; }
+body.touch-play.hero-on .hpad { display:block; position:fixed; inset:auto 0 0 auto; width:0; height:0; }
+body.touch-play .hpad button { position:fixed; padding:0; border-radius:50%; display:grid; place-items:center; touch-action:none; box-shadow:0 3px 10px #0005; border:2px solid #ffffff55; }
+body.touch-play .hpad .jump { right:16px; bottom:calc(18px + env(safe-area-inset-bottom)); width:66px; height:66px; background:#2d6cdfe6; color:#fff; font-size:14px; grid-column:auto; grid-row:auto; }
+body.touch-play .hpad .run { right:22px; bottom:calc(96px + env(safe-area-inset-bottom)); width:56px; height:56px; background:#fffe; font-size:12px; }
+body.touch-play .hpad .run.held { background:#ffd166; }
+body.touch-play .hpad .drop { right:98px; bottom:calc(20px + env(safe-area-inset-bottom)); width:76px; height:76px; background:#e4572e; color:#fff; font-size:15px; }
+body.touch-play .cbt .atk { display:grid; right:98px; bottom:calc(20px + env(safe-area-inset-bottom)); width:76px; height:76px; font-size:30px; background:#fffe; color:#1f1b16; }
+body.touch-play .cbt .skill { right:190px; bottom:calc(24px + env(safe-area-inset-bottom)); width:60px; height:60px; }
+body.touch-play .cbt .burst { right:172px; bottom:calc(100px + env(safe-area-inset-bottom)); width:64px; height:64px; }
+body.touch-play .asc-btn { right:100px; bottom:calc(112px + env(safe-area-inset-bottom)); width:54px; height:54px; }
+body.touch-play.climbing .cbt .atk, body.touch-play.climbing .cbt .skill, body.touch-play.climbing .cbt .burst { display:none; }
+body.touch-play .cbt .hp { bottom:calc(8px + env(safe-area-inset-bottom)); width:min(30vw, 240px); }
+body.touch-play .hprompt { top:40%; bottom:auto; left:auto; right:120px; translate:0 6px; max-width:40vw; }
+body.touch-play .hprompt.on { translate:0 0; }
+body.touch-play .xpgain { bottom:calc(36px + env(safe-area-inset-bottom)); }
+body.touch-play .dom-hud { top:54px; }
+
+/* ── 🧚 리리의 메뉴 ── */
+#menu { position:fixed; inset:0; z-index:20; display:none; place-items:center; background:#0b0a09a6; backdrop-filter:blur(3px); }
+#menu.on { display:grid; }
+#menu .sheet { width:min(560px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; background:var(--paper); border-radius:22px; padding:16px 18px 18px; box-shadow:0 12px 40px #0008; }
+#menu .mhead { display:flex; align-items:center; gap:12px; }
+#menu .fairy { font-size:34px; }
+#menu .mhead div { flex:1; display:flex; flex-direction:column; }
+#menu .mhead b { font-size:18px; }
+#menu .mhead small { color:#7a6f60; font-size:12.5px; }
+#menu .x { width:38px; height:38px; padding:0; }
+#menu .mstats { display:flex; align-items:center; gap:10px; margin:12px 0; flex-wrap:wrap; }
+#menu .mstats .ar { flex:1; min-width:180px; display:grid; grid-template-columns:auto 1fr; align-items:center; gap:2px 10px; }
+#menu .mstats .ar span { height:8px; border-radius:4px; background:#e6dccb; overflow:hidden; }
+#menu .mstats .ar span i { display:block; height:100%; background:linear-gradient(90deg,#e4b23a,#ffd166); }
+#menu .mstats .ar small { grid-column:2; font-size:11px; color:#7a6f60; }
+#menu .mstats > span { background:#fff; border-radius:999px; padding:6px 12px; font-weight:700; box-shadow:0 1px 3px #0002; }
+#menu .mgrid { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; }
+#menu .mgrid button { position:relative; display:flex; flex-direction:column; align-items:center; gap:4px; padding:12px 6px 10px; border-radius:16px; font-size:13px; font-weight:600; }
+#menu .mgrid em { font-style:normal; font-size:26px; }
+#menu .mgrid kbd { position:absolute; top:6px; right:8px; font:600 10px/1 inherit; color:#a0927c; }
+body.touch-play #menu .mgrid kbd { display:none; }
+#menu .mkeys { margin-top:12px; background:#fff; border-radius:14px; padding:8px 12px; font-size:12.5px; line-height:1.6; }
+#menu .mkeys p { margin:4px 0; }
+#menu .mkeys b { color:#b5651d; }
+@media (max-height:460px) { #menu .mgrid { grid-template-columns:repeat(8, 1fr); } #menu .mgrid button { padding:8px 2px; font-size:11px; } #menu .mgrid em { font-size:22px; } }
+body:not(.hero-on) .asc-btn.on.ready, body.closet-on .asc-btn.on.ready, body.map-mode .asc-btn.on.ready, body.domain-on .asc-btn.on.ready { display:none !important; }
+.cbt .skill, .cbt .burst { overflow:visible; }
+.cbt button i { border-radius:50%; }
+.cbt .skill kbd, .cbt .burst kbd { bottom:auto; top:calc(100% + 3px); right:auto; left:50%; translate:-50% 0; background:#1f1b16cc; color:#ffe7a8; padding:1px 7px; border-radius:6px; font-size:11px; }
+.cbt .skill { bottom:calc(36px + env(safe-area-inset-bottom)); }
+.cbt .burst { bottom:calc(30px + env(safe-area-inset-bottom)); }

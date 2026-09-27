@@ -4,35 +4,43 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="description" content="가기 전에 파리를 미리 걸어 보세요. 파리 다섯 동네의 실제 골목을 걷고 지하철로 건너다니다 보면, 하루가 끝났을 때 그 동선이 그대로 여행 계획이 됩니다." />
-    <meta property="og:title" content="Carnet — 걸어서 짜는 파리 여행" />
-    <meta property="og:description" content="질문 대신 발걸음으로. 마레·생제르맹·몽마르트르·벨빌·샹젤리제를 걸으며 나만의 파리를 발견하세요." />
+    <meta name="description" content="파리를 원신처럼 — 실제 골목을 걷고 지붕을 타고 글라이더로 날며, 요괴와 싸우고 랜드마크의 부탁을 들어준다." />
+    <meta property="og:title" content="Carnet — 파리 모험" />
+    <meta property="og:description" content="에펠탑 아래에서 첫걸음. 순간이동 포인트·보물상자·비경·기원, 그리고 요정 리리와 함께." />
     <meta name="theme-color" content="#0b0a09" />
-    <title>Carnet — 걸어서 짜는 파리 여행</title>
+    <title>Carnet — 파리 모험</title>
   </head>
   <body>
     <div id="map"></div>
 
     <div id="hud">
-      <div class="chips"><b id="clock">07:40</b><span id="money">€320</span><span id="ar" title="모험 등급 — 상자·순간이동 포인트·부탁·의뢰로 오른다"><b>모험 1</b><i></i></span><span id="stars" title="별조각 — ✨ 기원에 쓴다">⭐160</span><span id="walked" hidden>0 m</span><span id="found" hidden>0곳 발견</span>
-        <span class="bar" id="hunger" data-level="ok" title="허기"><em>허기</em><i></i></span>
-        <span class="bar" id="tired" data-level="ok" title="지침"><em>지침</em><i></i></span></div>
-      <div class="hud-right"><button id="metro-go">🚇</button><button id="stay-go" hidden>🛏</button><button id="wish-go" title="기원">✨</button><button id="journal-go" title="파리 수첩 (J)">📖</button><button id="gear-go" title="옷장 (I)">🎒</button><button id="mute" title="소리">🔊</button><button id="eye">🗺 지도</button><button id="end" title="하루 마치기">🏁<span class="lbl"> 하루 마치기</span></button></div>
+      <div class="hud-right"><button id="wish-go" title="기원">✨</button><button id="journal-go" title="파리 수첩 (J)">📖</button><button id="gear-go" title="옷장 (I)">🎒</button><button id="menu-go" title="리리 메뉴 (Esc)">🧚</button></div>
     </div>
     <div id="toast"></div>
     <div id="hint"></div>
 
-    <section id="card">
-      <div class="head"><div id="card-emoji"></div><div><h2 id="card-name"></h2><p id="card-cat"></p></div></div>
-      <p id="card-blurb"></p>
-      <p id="card-meta"></p>
-      <div class="acts"><button id="card-go" class="primary"></button><button id="card-save"></button><button id="card-pass">지나친다</button></div>
+    <section id="menu">
+      <div class="sheet">
+        <div class="mhead"><span class="fairy">🧚</span><div><b>리리의 메뉴</b><small id="m-time"></small></div><button class="x" id="menu-x" type="button" title="닫기 (Esc)">✕</button></div>
+        <div class="mstats"><div class="ar"><b id="m-ar">모험 등급 1</b><span><i id="m-xp"></i></span><small id="m-xpt"></small></div><span id="m-stars">⭐0</span><span id="m-money">€0</span></div>
+        <div class="mgrid">
+          <button data-m="ask" type="button"><em>💬</em>리리에게 묻기<kbd>G</kbd></button>
+          <button data-m="map" type="button"><em>🗺</em>지도<kbd>M</kbd></button>
+          <button data-m="journal" type="button"><em>📖</em>파리 수첩<kbd>J</kbd></button>
+          <button data-m="gear" type="button"><em>🎒</em>옷장<kbd>I</kbd></button>
+          <button data-m="wish" type="button"><em>✨</em>기원</button>
+          <button data-m="photo" type="button"><em>📷</em>사진 찍기<kbd>3</kbd></button>
+          <button data-m="sound" type="button"><em id="m-sound">🔊</em>소리</button>
+          <button data-m="keys" type="button"><em>⌨️</em>조작 안내</button>
+        </div>
+        <div class="mkeys" hidden>
+          <p><b>이동</b> WASD · <b>시점</b> 마우스 끌기 · <b>달리기</b> Shift · <b>점프·글라이더</b> Space · <b>구르기</b> V · <b>웅크리기</b> C</p>
+          <p><b>벽</b> 밀고 가면 오른다 · X 놓기 · <b>상승</b> T (지붕 아래·벽 앞)</p>
+          <p><b>공격</b> 마우스 톡 · <b>원소 스킬</b> E · <b>원소 폭발</b> Q · 공중에서 공격 = 내려찍기</p>
+          <p><b>행동</b> F · <b>리리</b> G · <b>지도</b> M · <b>수첩</b> J · <b>옷장</b> I · <b>메뉴</b> Esc · <b>몸짓</b> 1 인사 2 춤 3 사진 4 앉기</p>
+        </div>
+      </div>
     </section>
-
-    <section id="inside"></section>
-    <section id="metro"></section>
-    <section id="dest"></section>
-    <section id="trip"></section>
 
     <section id="intro">
       <div class="tunnel">
@@ -45,21 +53,6 @@
       </div>
     </section>
 
-    <section id="summary">
-      <div class="sheet">
-        <p class="eyebrow">오늘의 기록</p>
-        <h2>파리에서의 하루</h2>
-        <p id="sum-stats"></p>
-        <h3>걷는 걸 지켜보니</h3>
-        <ul id="sum-lines"></ul>
-        <div id="sum-shots-wrap" hidden><h3>오늘 찍은 사진</h3><div id="sum-shots"></div></div>
-        <h3>들른 곳 · 찜한 곳</h3>
-        <ol id="sum-stops"></ol>
-        <a id="sum-maps" target="_blank" rel="noopener">이 동선을 구글 지도로 열기 ↗</a>
-        <button id="again">다시 걷기</button>
-        <p class="fine">가격·소요 시간은 프로토타입용 대략값입니다. 지도 © OpenStreetMap contributors. 사진은 위키미디어 공용의 자유 라이선스 사진이며 작가·라이선스는 각 사진에 표시됩니다.</p>
-      </div>
-    </section>
     <script type="module" src="/src/walk/main.ts"></script>
   </body>
 </html>

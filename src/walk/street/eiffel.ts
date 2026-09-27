@@ -1,6 +1,6 @@
 // 에펠탑 둘레에서만 생기는 일들. 게임이 탑 위에서 시작하니, 내려앉자마자 할 거리가 있어야 한다.
 //  🎩 1층으로 날아간 모자   🏃 2층까지 3분 도전   📸 트로카데로에서 탑 전체 한 장
-//  🧺 샹드마르스 소풍(잃어버린 와인 따개)   ⛴️ 센 강 유람선   🎠 회전목마   🗼 기념품 장수
+//  🧺 샹드마르스 소풍(잃어버린 와인 따개)
 //  ✨ 밤마다 정시 5분 반짝이는 탑   🟡 (숨은 것) 꼭대기에 바로 내려앉으면 금빛 낙하산
 import * as THREE from 'three';
 import type { Npc } from '../town/crowd';
@@ -17,7 +17,7 @@ export interface EiffelHost {
 }
 
 type QuestId = 'hat' | 'race' | 'photo' | 'picnic';
-type GiverId = QuestId | 'boat' | 'carrousel' | 'hawker1' | 'hawker2';
+type GiverId = QuestId;
 
 interface Giver { id: GiverId; name: string; role: Npc['role']; at: [number, number]; facing: number; sit?: boolean; npc: Npc | null; called: boolean }
 
@@ -37,10 +37,6 @@ export class EiffelQuests {
     { id: 'race', name: '야니스 (파쿠르)', role: 'jogger', at: [-88, 58], facing: AXIS, npc: null, called: false },
     { id: 'photo', name: '클레르 (사진가)', role: 'tourist', at: [-640, 26], facing: AXIS, npc: null, called: false },
     { id: 'picnic', name: '루이즈 (소풍)', role: 'sitter', at: [452, 48], facing: AXIS + 90, sit: true, npc: null, called: false },
-    { id: 'boat', name: '선착장 매표원', role: 'passer', at: [-140, 128], facing: AXIS + 180, npc: null, called: false },
-    { id: 'carrousel', name: '회전목마 주인', role: 'passer', at: [-121, -48], facing: AXIS, npc: null, called: false },
-    { id: 'hawker1', name: '기념품 장수', role: 'passer', at: [-92, -24], facing: AXIS, npc: null, called: false },
-    { id: 'hawker2', name: '기념품 장수', role: 'passer', at: [104, 40], facing: AXIS + 180, npc: null, called: false },
   ];
   private friends: Npc[] = []; // 소풍 친구들
   readonly done = new Set<QuestId>();
@@ -48,14 +44,11 @@ export class EiffelQuests {
   private raceT = 0;
   private item: { kind: 'hat' | 'cork'; x: number; y: number; z: number; mesh: THREE.Object3D; held: boolean } | null = null;
   private blanket: THREE.Object3D | null = null;
-  private ride: { t: number; a: number } | null = null;
   private sparkle: THREE.Points | null = null;
   private sparkleMat: THREE.ShaderMaterial | null = null;
   sawSparkle = false;
   /** 지금 반짝이는 중 */
   sparkling = false;
-  souvenirs = 0;
-  boated = false;
   goldenFound = false;
   private highGlide = 0;
   private burst: { pts: THREE.Points; t: number } | null = null;
@@ -88,15 +81,12 @@ export class EiffelQuests {
   label(n: Npc): [string, string, string] | null {
     const g = this.giverOf(n);
     if (!g) return null;
-    const q = (g.id === 'hat' || g.id === 'race' || g.id === 'photo' || g.id === 'picnic') && !this.done.has(g.id) ? '❗' : g.id === 'boat' ? '⛴️' : g.id === 'carrousel' ? '🎠' : g.id.startsWith('hawker') ? '🗼' : '🙂';
-    return [q, g.name, this.done.has(g.id as QuestId) ? '고마워함' : ''];
+    const q = !this.done.has(g.id) ? '❗' : '🙂';
+    return [q, g.name, this.done.has(g.id) ? '고마워함' : ''];
   }
   verb(n: Npc): string | null {
     const g = this.giverOf(n);
     if (!g) return null;
-    if (g.id === 'boat') return '유람선 타기 €17';
-    if (g.id === 'carrousel') return '회전목마 타기 €3';
-    if (g.id.startsWith('hawker')) return '기념품 보기';
     if (this.active === g.id && this.item?.held) return '돌려주기';
     return '말 걸기';
   }
@@ -121,7 +111,6 @@ export class EiffelQuests {
     const want: typeof h.crowd.walkerRoles = dTower < 700 ? [['tourist', 45], ['passer', 30], ['jogger', 10], ['kid', 8], ['dogwalker', 4], ['cyclist', 3]] : [['passer', 50], ['tourist', 18], ['jogger', 8], ['dogwalker', 8], ['cyclist', 8], ['kid', 8]];
     if (h.crowd.walkerRoles[0][0] !== want[0][0]) h.crowd.walkerRoles = want;
     this.placeGivers();
-    if (this.ride) this.stepRide(dt);
     this.stepItem();
     if (this.active === 'race') {
       this.raceT -= dt;
@@ -195,7 +184,7 @@ export class EiffelQuests {
   async talk(n: Npc) {
     const g = this.giverOf(n);
     if (!g) { this.h.ui.say(this.at(n), 'On pique-nique ! Santé !', 2.2, '', n.id); return; }
-    const h = this.hero, b = h.body, ui = this.h.ui, c = this.h.c;
+    const h = this.hero, b = h.body, ui = this.h.ui;
     b.facing = bearingOf(n.x - b.x, n.y - b.y);
     n.greeted = true;
     switch (g.id) {
@@ -243,29 +232,6 @@ export class EiffelQuests {
         h.crowd.gesture(n, 'point', 3);
         n.facing = bearingOf(x - n.x, y - n.y);
         this.line('🧺 샹드마르스 잔디밭에서 반짝이는 와인 따개를 찾자 (에콜 밀리테르 쪽)');
-        return;
-      }
-      case 'boat': {
-        const i = await ui.talk(g.name, 'Une heure sur la Seine, jusqu’à Notre-Dame. Dix-sept euros.', '센 강 한 시간 — 노트르담까지 갔다 돌아와요. 17유로. 해 질 녘이 제일 좋아요.', ['타요 (€17)', '다음에요']);
-        if (i !== 0 || !c.pay(17, '센 강 유람선')) return;
-        await this.cruise();
-        c.gear?.('marin');
-        return;
-      }
-      case 'carrousel': {
-        const i = await ui.talk(g.name, 'Un tour ? Trois euros. Les grands aussi !', '한 바퀴 3유로. 어른도 타요!', ['타요 (€3)', '괜찮아요']);
-        if (i !== 0 || !c.pay(3, '회전목마')) return;
-        this.startRide();
-        return;
-      }
-      case 'hawker1': case 'hawker2': {
-        const i = await ui.talk(g.name, 'Tour Eiffel ! Cinq pour deux euros ! Très jolie !', '미니 에펠탑 다섯 개 2유로! (허가 없이 파는 장수다. 경찰이 오면 순식간에 사라진다.)', ['하나 살게요 (€2)', '괜찮아요']);
-        if (i !== 0 || !c.pay(2, '미니 에펠탑')) return;
-        this.souvenirs++;
-        c.gear?.('flag');
-        sfx.coin();
-        ui.say(this.at(n), 'Merci ! Bonne journée !', 2, '', n.id);
-        c.toast('🗼 미니 에펠탑 다섯 개를 샀다 — 공식 기념품점보다 싸지만, 파리 사람들은 잘 안 산다');
         return;
       }
     }
@@ -337,52 +303,12 @@ export class EiffelQuests {
     sfx.sit();
     await wait(800);
     this.h.ui.say(this.at(n), 'Un peu de fromage ? Du pain ?', 2.5, '', n.id);
-    c.eat(22);
-    c.rest(14);
-    c.passTime(25);
     b.carry = 'baguette';
     setTimeout(() => { if (b.carry === 'baguette') b.carry = null; }, 20000);
-    c.toast('🧺 잔디에 앉아 치즈와 바게트를 나눠 먹었다 (허기 −22 · 지침 −14 · 25분)');
+    c.toast('🧺 잔디에 앉아 치즈와 바게트를 나눠 먹었다');
   }
 
-  // ───────── 유람선 ─────────
-  private async cruise() {
-    const c = this.h.c, ui = this.h.ui, h = this.hero;
-    sfx.chime();
-    await ui.fade(true, '#1d3550');
-    this.hero.body.sit(null);
-    c.passTime(60);
-    c.rest(18);
-    this.boated = true;
-    // 배에서 돌아오며 강 위에서 본 탑 — 카메라를 강 쪽으로 돌려 한 장
-    h.cam.yaw = bearingOf(this.tower[0] - h.body.x, this.tower[1] - h.body.y);
-    h.cam.pitch = 6;
-    await ui.fade(false);
-    await wait(500);
-    c.shot('센 강 유람선에서 본 에펠탑');
-    c.toast('⛴️ 한 시간 동안 센 강을 따라 노트르담까지 갔다 왔다 (지침 −18)');
-  }
 
-  // ───────── 회전목마 ─────────
-  private startRide() {
-    const b = this.hero.body;
-    const [cx, cy] = this.hero.frame.toLocal([2.29268, 48.85871]);
-    const a = Math.atan2(b.y - cy, b.x - cx);
-    if (!b.sit({ x: cx + Math.cos(a) * 4.2, y: cy + Math.sin(a) * 4.2, z: 0.9, facing: 0 })) return;
-    this.ride = { t: 0, a };
-    sfx.sit();
-    sfx.music(1);
-  }
-  private stepRide(dt: number) {
-    const r = this.ride!, b = this.hero.body;
-    if (b.mode !== 'sit' || r.t > 18) { this.ride = null; sfx.music(0); if (r.t > 18) { this.h.c.rest(3); this.h.c.toast('🎠 한 바퀴… 아니 열 바퀴 돌았다'); } return; }
-    r.t += dt;
-    r.a += dt * 0.7; // 지붕과 같은 빠르기
-    const [cx, cy] = this.hero.frame.toLocal([2.29268, 48.85871]);
-    b.x = cx + Math.cos(r.a) * 4.2; b.y = cy + Math.sin(r.a) * 4.2;
-    b.z = 0.9 + Math.sin(r.t * 2.2) * 0.25; // 말이 오르내린다
-    b.facing = (bearingOf(-Math.sin(r.a), Math.cos(r.a)) + 360) % 360;
-  }
 
   // ───────── 숨은 것: 꼭대기에 바로 내려앉기 ─────────
   private secret(dt: number, dTower: number) {
@@ -469,15 +395,6 @@ export class EiffelQuests {
     this.h.items.add(this.sparkle);
   }
 
-  summary(): string[] {
-    const out: string[] = [];
-    const names: Record<QuestId, string> = { hat: '1층의 모자', race: '2층 3분 도전', photo: '트로카데로 사진', picnic: '샹드마르스 소풍' };
-    if (this.done.size) out.push(`에펠탑 둘레에서 한 일: ${[...this.done].map((d) => names[d]).join(', ')}.`);
-    if (this.boated) out.push('센 강 유람선을 탔어요.');
-    if (this.souvenirs) out.push(`미니 에펠탑을 ${this.souvenirs * 5}개 샀어요. (파리 사람들은 웃을지도)`);
-    if (this.sawSparkle) out.push('밤에 반짝이는 에펠탑을 봤어요.');
-    return out;
-  }
 }
 
 function hatMesh() {

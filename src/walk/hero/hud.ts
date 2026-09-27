@@ -1,6 +1,6 @@
 // 화면 위의 것들: 머리 옆 기력 바퀴, "E 들어가기" 같은 행동 안내, 터치 버튼, 조작 안내.
 import type { Body } from './body';
-import type { Emote, Input } from './input';
+import type { Input } from './input';
 
 const RING = 2 * Math.PI * 17;
 
@@ -12,9 +12,7 @@ export class HeroHud {
   private readonly cap: SVGCircleElement;
   private readonly prompt: HTMLButtonElement;
   private readonly pad: HTMLElement;
-  private readonly help: HTMLElement;
   private readonly dropBtn: HTMLButtonElement;
-  private crouchBtn!: HTMLButtonElement;
   private readonly prompt2: HTMLButtonElement;
   onPrompt2?: () => void;
   private fullT = 0;
@@ -46,17 +44,12 @@ export class HeroHud {
 
     this.pad = document.createElement('div');
     this.pad.className = 'hpad';
-    // 원신처럼: 오른쪽 아래 큰 점프 하나 + 달리기(누르고 있기)/구르기(톡) 하나. 놓기는 벽에 붙었을 때만.
-    // 몸짓·웅크리기는 😊 안에. 지도는 위쪽 HUD에.
-    this.pad.innerHTML = `<div class="emotes"><button class="emo" data-e="wave" type="button">👋<small>인사</small></button><button class="emo" data-e="photo" type="button">📷<small>사진</small></button><button class="emo" data-e="sit" type="button">🪑<small>앉기</small></button><button class="emo" data-e="dance" type="button">💃<small>춤</small></button><button class="emo" data-e="crouch" type="button">🐾<small>살금</small></button></div>`
-      + `<button class="face" type="button">😊</button><button class="drop" type="button">놓기</button><button class="run" type="button"><b>달리기</b><small>톡 = 구르기</small></button><button class="jump" type="button">점프</button>`;
+    // 원신(모바일)처럼 오른쪽 아래: 점프(맨 오른쪽 아래) · 달리기(그 위, 톡 = 구르기) · 놓기(벽에 붙었을 때만, 공격 자리).
+    // 공격·스킬·폭발은 싸움(Combat)이, 상승은 Ascend가 같은 무리에 붙인다. 몸짓·사진은 🧚 메뉴에.
+    this.pad.innerHTML = `<button class="drop" type="button">놓기</button><button class="run" type="button"><b>달리기</b></button><button class="jump" type="button">점프</button>`;
     const btn = (c: string) => this.pad.querySelector(`.${c}`) as HTMLButtonElement;
     const tap = (b: HTMLButtonElement, f: () => void) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); f(); });
     tap(btn('jump'), () => input.press('jump'));
-    const emotes = this.pad.querySelector('.emotes') as HTMLElement;
-    tap(btn('face'), () => emotes.classList.toggle('on'));
-    for (const b of this.pad.querySelectorAll<HTMLButtonElement>('.emo')) tap(b, () => { const e = b.dataset.e!; if (e === 'crouch') input.press('crouch'); else input.press(e as Emote); emotes.classList.remove('on'); });
-    this.crouchBtn = this.pad.querySelector('.emo[data-e="crouch"]') as HTMLButtonElement;
     void onMap;
     this.dropBtn = btn('drop');
     tap(this.dropBtn, () => input.press('drop'));
@@ -71,11 +64,6 @@ export class HeroHud {
     run.addEventListener('pointercancel', () => { input.hold(false); run.classList.remove('held'); });
     document.body.appendChild(this.pad);
     input.onTouchMode = () => document.body.classList.add('touch-play');
-
-    this.help = document.createElement('div');
-    this.help.className = 'hhelp';
-    this.help.innerHTML = `<b>걷기</b> WASD · <b>시점</b> 마우스 끌기/←→ · <b>달리기</b> Shift · <b>점프·글라이더</b> Space · <b>벽</b> 밀고 가면 오른다(X 놓기) · <b>웅크리기</b> C (달리다 누르면 슬라이딩) · <b>구르기</b> V (착지 직전 = 낙법) · <b>공격</b> 마우스 톡 · <b>원소 스킬</b> E · <b>원소 폭발</b> Q · <b>상승</b> T (지붕 아래·벽 앞) · <b>행동</b> F · <b>살펴보기</b> R · <b>몸짓</b> 1 인사 2 춤 3 사진 4 앉기 · <b>시점 정렬</b> Z · <b>지도</b> M`;
-    document.body.appendChild(this.help);
   }
 
   /** 레이어가 그린 머리 위치(화면 좌표) */
@@ -98,8 +86,6 @@ export class HeroHud {
     this.cap.style.opacity = tired ? '1' : '0';
     this.dropBtn.hidden = b.mode !== 'climb';
     this.pad.querySelector('.jump')!.textContent = this.jumpLabel ?? (b.freefall ? '낙하산' : b.mode === 'air' ? '글라이더' : b.mode === 'glide' ? '접기' : b.mode === 'climb' ? '도약' : b.mode === 'sit' ? '일어서기' : '점프');
-    this.crouchBtn.classList.toggle('held', b.crouch);
-    this.pad.classList.toggle('crouched', b.crouch);
   }
 
   private lastPrompt2 = '';
@@ -133,6 +119,6 @@ export class HeroHud {
     this.prompt.classList.add('on');
   }
 
-  /** 처음 몇 걸음 동안만 조작 안내를 띄운다 */
-  moved() { if (!this.help.classList.contains('seen')) setTimeout(() => this.help.classList.add('seen'), 9000); this.help.dataset.moved = '1'; }
+  /** 움직이기 시작했다(예전엔 조작 안내를 거뒀다 — 이제 안내는 🧚 메뉴에) */
+  moved() { /* 없음 */ }
 }

@@ -25,21 +25,21 @@ export interface Gear {
 
 export const GEAR: Gear[] = [
   { id: 'beret', slot: 'head', name: '빨간 베레모', emoji: '🔴', perk: '파리 사람 분위기(능력 없음)' },
-  { id: 'panama', slot: 'head', name: '파나마 모자', emoji: '👒', perk: '햇볕 아래 지침이 15% 덜 쌓인다', unlock: '에펠탑 1층에 걸린 모자를 찾아 주기' , star: 4 },
+  { id: 'panama', slot: 'head', name: '파나마 모자', emoji: '👒', perk: '달리기가 5% 빠르다', unlock: '에펠탑 1층에 걸린 모자를 찾아 주기' , star: 4 },
   { id: 'aviator', slot: 'head', name: '비행 모자·고글', emoji: '🥽', perk: '높은 데서 떨어져도 1.6배까지 다치지 않는다', unlock: '에펠탑 2층 3분 도전' , star: 4 },
-  { id: 'marin', slot: 'head', name: '선원 모자', emoji: '⚓', perk: '헤엄칠 때 기력이 40% 덜 든다', unlock: '센 강 유람선 타기' , star: 4 },
+  { id: 'marin', slot: 'head', name: '선원 모자', emoji: '⚓', perk: '헤엄칠 때 기력이 40% 덜 든다', unlock: '센 강에 뛰어들기' , star: 4 },
   { id: 'tophat', slot: 'head', name: '오페라 실크해트', emoji: '🎩', perk: '모험 경험치 +15%', unlock: '기원(5★)', star: 5 },
   { id: 'none', slot: 'head', name: '맨머리', emoji: '💇', perk: '머리카락이 바람에 날린다' },
 
   { id: 'jacket', slot: 'top', name: '파랑 재킷', emoji: '🧥', perk: '기본 여행복(능력 없음)' },
   { id: 'trench', slot: 'top', name: '트렌치코트', emoji: '🧥', perk: '글라이더가 15% 덜 가라앉는다', unlock: '랜드마크 5곳 보기' , star: 4 },
-  { id: 'mariniere', slot: 'top', name: '마리니에르', emoji: '👕', perk: '인사하면 사람들이 더 반기고 더 많이 알려 준다', unlock: '샹드마르스 소풍 도와주기' , star: 4 },
+  { id: 'mariniere', slot: 'top', name: '마리니에르', emoji: '👕', perk: '인사하면 사람들이 더 반기고 더 오래 이야기한다', unlock: '샹드마르스 소풍 도와주기' , star: 4 },
   { id: 'napoleon', slot: 'top', name: '나폴레옹 코트', emoji: '🎖', perk: '전력 질주 기력 −30%', unlock: '기원(5★)', star: 5 },
   { id: 'leather', slot: 'top', name: '가죽 재킷', emoji: '🖤', perk: '사람과 세게 부딪혀도 휘청이지 않는다', unlock: '"봉주르" 10번' , star: 4 },
 
   { id: 'backpack', slot: 'back', name: '배낭', emoji: '🎒', perk: '기력 바퀴가 12% 크다' },
   { id: 'camera', slot: 'back', name: '카메라 가방', emoji: '📷', perk: '사진을 찍으면 엽서로 팔린다(+€2)', unlock: '트로카데로에서 탑 사진 찍어 주기' , star: 4 },
-  { id: 'satchel', slot: 'back', name: '가죽 서류가방', emoji: '💼', perk: '가게·카페에서 10% 덜 낸다', unlock: '가게 3곳 들어가기' , star: 4 },
+  { id: 'satchel', slot: 'back', name: '가죽 서류가방', emoji: '💼', perk: '보물상자에서 얻는 € +50%', unlock: '보물상자 5개 열기' , star: 4 },
 
   { id: 'boots', slot: 'feet', name: '갈색 부츠', emoji: '🥾', perk: '기본(능력 없음)' },
   { id: 'sneakers', slot: 'feet', name: '운동화', emoji: '👟', perk: '달리기가 8% 빠르다' },
@@ -47,7 +47,7 @@ export const GEAR: Gear[] = [
 
   { id: 'tricolore', slot: 'glider', name: '크림·빨강 글라이더', emoji: '🪂', perk: '기본' },
   { id: 'azure', slot: 'glider', name: '하늘색 글라이더', emoji: '🩵', perk: '겉모습만' },
-  { id: 'flag', slot: 'glider', name: '삼색기 글라이더', emoji: '🇫🇷', perk: '겉모습만', unlock: '미니 에펠탑 사기' , star: 4 },
+  { id: 'flag', slot: 'glider', name: '삼색기 글라이더', emoji: '🇫🇷', perk: '겉모습만', unlock: '비경 한 곳 깨기' , star: 4 },
   { id: 'butterfly', slot: 'glider', name: '나비 글라이더', emoji: '🦋', perk: '글라이더 기력 −40%', unlock: '기원(5★)', star: 5 },
   { id: 'golden', slot: 'glider', name: '금빛 낙하산', emoji: '🟡', perk: '빠르고 기력을 쓰지 않는다', unlock: '???' },
 ];
@@ -60,7 +60,7 @@ const STARTER = new Set(GEAR.filter((g) => !g.unlock).map((g) => g.id));
 export interface Mods { run: number; climb: number; glide: number; hurt: number; swim: number; steady: boolean; gcost: number; scost: number }
 export function modsOf(l: Loadout): Mods {
   return {
-    run: l.feet === 'sneakers' ? 1.08 : 1,
+    run: (l.feet === 'sneakers' ? 1.08 : 1) * (l.head === 'panama' ? 1.05 : 1),
     climb: l.feet === 'hiking' ? 0.8 : 1,
     glide: l.top === 'trench' ? 0.85 : 1,
     hurt: l.head === 'aviator' ? 1.6 : 1,

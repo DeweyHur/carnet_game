@@ -1,4 +1,4 @@
-// 미니맵: 오른쪽 위 동그란 지도. 보는 쪽이 늘 위(카메라를 따라 돈다), 높이 오를수록 넓게 보인다.
+// 미니맵: 왼쪽 위 동그란 지도(원신처럼, 누르면 큰 지도). 보는 쪽이 늘 위(카메라를 따라 돈다), 높이 오를수록 넓게 보인다.
 // 바탕(강·공원·건물·길)은 가끔 한 장으로 그려 두고, 매번은 돌려 붙인 뒤 움직이는 것(사람·헬기·열기구·빛기둥)만 찍는다.
 import type { World } from './hero/world';
 
@@ -56,7 +56,7 @@ export class Minimap {
   }
 
   private resize() {
-    const css = innerWidth < 700 ? CSS.small : CSS.big;
+    const css = innerWidth < 700 || innerHeight < 500 ? CSS.small : CSS.big;
     this.dpr = Math.min(2, devicePixelRatio || 1);
     this.px = Math.round((css / 2) * this.dpr);
     this.cv.width = this.cv.height = this.px * 2;

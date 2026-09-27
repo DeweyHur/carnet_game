@@ -175,6 +175,8 @@ export class Domain {
     const lv = this.levelFor(this.c.progress.ar);
     return { verb: '비경 들어가기', what: `${g.def.emoji} ${g.def.name} · 난도 ${ROMAN[lv]} · 오늘 보상 ${Math.max(0, this.rewardsLeft)}/${DAILY}` };
   }
+  /** 한 곳이라도 깬 적이 있나 */
+  get clearedAny() { return Object.keys(this.clears.best).length > 0; }
   /** 미니맵 표시 */
   marks() { return this.gates.map((g) => ({ x: g.x, y: g.y, icon: '🌀' })); }
 

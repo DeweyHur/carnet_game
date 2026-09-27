@@ -549,12 +549,4 @@ export class Story {
     return null;
   }
 
-  summary(): string[] {
-    const mains = CHAPTERS.filter((c) => c.main && this.done.has(c.id));
-    const subs = CHAPTERS.filter((c) => !c.main && this.done.has(c.id));
-    const out: string[] = [];
-    if (mains.length) out.push(`메인 이벤트 ${mains.length}개: ${mains.map((c) => `${c.emoji} ${c.title}`).join(', ')}.`);
-    if (subs.length) out.push(`랜드마크 둘레의 작은 일 ${subs.length}개를 해결했어요.`);
-    return out;
-  }
 }
