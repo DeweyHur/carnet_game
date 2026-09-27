@@ -145,7 +145,7 @@ export class Companion {
     const flap = Math.sin(this.t * 22) * 0.6;
     this.wingsL.rotation.y = 0.5 + flap; this.wingsR.rotation.y = -0.5 - flap;
     this.lookT -= dt;
-    if (this.lookT <= 0) { this.lookT = 0.8; this.observe(); }
+    if (this.lookT <= 0 && !this.hush) { this.lookT = 0.8; this.observe(); }
   }
 
   /** 둘레를 보고 먼저 말한다 */
@@ -214,6 +214,16 @@ export class Companion {
       this.speak(`tip:${Math.floor(this.t / 30)}`, pick(tips), 0, 4);
     }
   }
+
+  /** 바로 말한다(프롤로그 안내) — 쿨타임 없이, 그쪽을 가리키며 */
+  line(text: string, secs = 4.5, at?: [number, number]) {
+    this.c.say(this.at, text, secs);
+    sfx.pop();
+    this.quietT = 20;
+    if (at) this.flyTo(at[0], at[1], 3);
+  }
+  /** 프롤로그 동안엔 알아서 떠들지 않는다 */
+  hush = false;
 
   private flyTo(x: number, y: number, secs: number) { this.point = { x, y, t: secs }; }
 

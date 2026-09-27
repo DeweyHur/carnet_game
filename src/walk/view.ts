@@ -124,6 +124,8 @@ export class View {
   /** 다른 장면(지하철·버스)을 같은 렌더러·캔버스로 그린다 — WebGL 문맥을 하나만 쓴다 */
   renderWith(cam: THREE.PerspectiveCamera, scenes: THREE.Object3D[], figure: ViewParts['figure'] | undefined, clear: THREE.ColorRepresentation) {
     if (!this.fit(cam)) return;
+    cam.updateMatrixWorld();
+    this.viewProj.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); // 화면 위 글자(데미지 숫자 등)도 이 카메라로
     const R = this.renderer;
     R.setClearColor(clear);
     R.clear();

@@ -126,7 +126,7 @@ export const CHAPTERS: Chapter[] = [
   // ───────── 서브 ─────────
   {
     id: 's-eiffel-quiz', main: false, landmark: 'eiffel', title: '탑은 몇 년짜리였을까', emoji: '❓',
-    giver: { name: '가이드 쥘리', role: 'tourist', at: [60, 70], facing: 180, call: 'Petite question ?' },
+    giver: { name: '가이드 쥘리', role: 'tourist', at: [40, -104], facing: 180, call: 'Petite question ?' },
     intro: { fr: '', ko: '' }, beats: [],
     quiz: { q: '에펠탑은 1889년 만국박람회 때 세우면서, 처음엔 몇 년만 두기로 했을까?', choices: ['20년', '100년', '영원히'], answer: 0, fact: '처음 허가는 20년. 무선 전신 안테나로 쓸모가 생겨 허물지 않았다.' },
     outro: { fr: 'Bravo !', ko: '정답!' }, reward: { eur: 5, note: '에펠탑 퀴즈' },
@@ -310,6 +310,8 @@ export class Story {
   }
 
   // ───────── 매 프레임 ─────────
+  /** 프롤로그 동안: 발견 알림을 미룬다 */
+  quiet = false;
   update(dt: number, showLine: boolean) {
     this.refresh();
     const h = this.hero, b = h.body;
@@ -320,7 +322,7 @@ export class Story {
       if (!L) continue;
       const dL = Math.hypot(L.x - b.x, L.y - b.y);
       // 처음 가까이 오면 알린다(메인만)
-      if (ch.main && dL < 320 && !this.seenLm.has(ch.id) && !this.done.has(ch.id) && ch.giver) {
+      if (ch.main && !this.quiet && dL < 320 && !this.seenLm.has(ch.id) && !this.done.has(ch.id) && ch.giver) {
         this.seenLm.add(ch.id);
         this.h.c.toast(`📖 메인 이벤트 · ${ch.emoji} ${ch.title} — ${this.landmarkName(ch)}의 ${josa(ch.giver.name, '을', '를')} 찾아보자`);
         if (!this.tracked || this.done.has(this.tracked)) this.tracked = ch.id;

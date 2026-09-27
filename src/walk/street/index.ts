@@ -93,6 +93,8 @@ export class Street {
   readonly c: StreetCtx;
   readonly eiffel: EiffelQuests;
   readonly story: Story;
+  /** 프롤로그가 위쪽 한 줄을 쓰는 동안 */
+  suppressLine = false;
   district = '';
 
   constructor(c: StreetCtx) {
@@ -142,7 +144,7 @@ export class Street {
     this.stepItems(dt);
     this.stepQuest(dt);
     this.eiffel.update(dt);
-    this.story.update(dt, !this.quest && !this.eiffel.active);
+    this.story.update(dt, !this.quest && !this.eiffel.active && !this.suppressLine);
     this.landmarkT -= dt;
     if (this.landmarkT < 0) { this.landmarkT = 1; this.spotLandmarks(); }
     this.ambient(dt);

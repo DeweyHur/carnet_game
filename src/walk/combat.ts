@@ -114,6 +114,8 @@ export class Combat {
   }
 
   private get hero() { return this.c.hero; }
+  /** 지금 몸이 선 세계(비경 안이면 비경) */
+  private get W() { return this.hero.sceneWorld ?? this.hero.world; }
   private get ar() { return this.c.progress.ar; }
   /** 모험 등급에 따라 */
   private get atk() { return 16 + this.ar * 3; }
@@ -126,16 +128,16 @@ export class Combat {
 
   // ───────── 적 만들기 ─────────
   /** 야영지(보물상자 지키기): 탐험(칸)에서 부른다 */
-  spawnCamp(key: string, x: number, y: number, z: number, seed: number) {
+  spawnCamp(key: string, x: number, y: number, z: number, seed: number, only?: Kind[]) {
     if (this.camps.has(key)) return;
     const night = this.c.night() > 0.5;
     const r = seed;
-    const kinds: Kind[] = night && r < 0.5 ? ['gargoyle', 'gargoyle', 'slime'] : r < 0.4 ? ['slime', 'slime', 'slime'] : r < 0.75 ? ['rat', 'rat', 'slime'] : ['rat', 'gargoyle', 'slime'];
+    const kinds: Kind[] = only ? only : night && r < 0.5 ? ['gargoyle', 'gargoyle', 'slime'] : r < 0.4 ? ['slime', 'slime', 'slime'] : r < 0.75 ? ['rat', 'rat', 'slime'] : ['rat', 'gargoyle', 'slime'];
     const camp: Camp = { key, x, y, z, foes: [], done: false };
     kinds.forEach((k, i) => {
       const a = (i / kinds.length) * TAU + seed * 5, d = 4 + i;
       const fx = x + Math.cos(a) * d, fy = y + Math.sin(a) * d;
-      const fz = this.hero.world.ground(fx, fy, z + 2, 2.5);
+      const fz = this.W.ground(fx, fy, z + 2, 2.5);
       camp.foes.push(this.spawn(k, fx, fy, fz, camp));
     });
     this.camps.set(key, camp);
@@ -417,7 +419,7 @@ export class Combat {
 
   // ───────── 적의 움직임 ─────────
   private stepFoe(f: Foe, dt: number) {
-    const b = this.hero.body, w = this.hero.world, S = STATS[f.kind];
+    const b = this.hero.body, w = this.W, S = STATS[f.kind];
     f.t += dt;
     if (f.seen > 0) f.seen -= dt;
     const body = f.obj.userData.body as THREE.Object3D;
@@ -499,7 +501,7 @@ export class Combat {
   /** 우두머리 내려치기: 빨간 원으로 미리 보여 준다 */
   private telegraph(f: Foe, x: number, y: number) {
     const m = new THREE.Mesh(new THREE.CircleGeometry(4.5, 40), new THREE.MeshBasicMaterial({ color: 0xff3b2f, transparent: true, opacity: 0.3, depthWrite: false }));
-    m.position.set(x, y, this.hero.world.ground(x, y, this.hero.body.z + 1, 2) + 0.06);
+    m.position.set(x, y, this.W.ground(x, y, this.hero.body.z + 1, 2) + 0.06);
     this.group.add(m);
     f.slam = m;
     f.dash = [x, y];
@@ -510,7 +512,7 @@ export class Combat {
     if (f.kind === 'boss' && f.slam) {
       const [x, y] = f.dash!;
       this.group.remove(f.slam); f.slam = undefined;
-      this.ring(x, y, this.hero.world.ground(x, y, b.z + 1, 2) + 0.2, 0xff7a50, 4.5);
+      this.ring(x, y, this.W.ground(x, y, b.z + 1, 2) + 0.2, 0xff7a50, 4.5);
       sfx.land();
       if (Math.hypot(b.x - x, b.y - y) < 4.5 && b.z - f.z < 4) this.hurt(S.dmg * 1.4 * (1 + 0.2 * (f.lv - 1)), f);
       return;
@@ -527,7 +529,7 @@ export class Combat {
     this.float(b.x, b.y, b.z + 2.2, `-${d}`, 'hurt');
     this.vignette.classList.remove('go'); void this.vignette.offsetWidth; this.vignette.classList.add('go');
     sfx.hurt();
-    if (from) { const dx = b.x - from.x, dy = b.y - from.y, L = Math.hypot(dx, dy) || 1; b.shove((dx / L) * 0.8, (dy / L) * 0.8, this.hero.world); }
+    if (from) { const dx = b.x - from.x, dy = b.y - from.y, L = Math.hypot(dx, dy) || 1; b.shove((dx / L) * 0.8, (dy / L) * 0.8, this.W); }
     if (this.hp <= 0) void this.down();
   }
   /** 높은 데서 떨어져 다쳤다 */
@@ -585,7 +587,7 @@ export class Combat {
     if (!T) return;
     T.t += dt; T.tick -= dt;
     T.x += T.dx * 3.5 * dt; T.y += T.dy * 3.5 * dt;
-    T.obj.position.set(T.x, T.y, this.hero.world.ground(T.x, T.y, this.hero.body.z + 3, 6));
+    T.obj.position.set(T.x, T.y, this.W.ground(T.x, T.y, this.hero.body.z + 3, 6));
     T.obj.children.forEach((c, i) => { c.rotation.z = T.t * (6 + i * 2); });
     T.obj.scale.setScalar(Math.min(1, T.t * 3) * (T.t > 5.6 ? Math.max(0, (6 - T.t) / 0.4) : 1));
     for (const f of this.foes) {

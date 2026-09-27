@@ -22,7 +22,7 @@ export interface ExploreCtx {
   /** XP 배율(실크해트 등) */
   xpMul(): number;
   /** 요괴 야영지를 세운다(싸움) */
-  camp?(key: string, x: number, y: number, z: number, seed: number): void;
+  camp?(key: string, x: number, y: number, z: number, seed: number, only?: ('slime' | 'rat' | 'gargoyle')[]): void;
 }
 
 const TAU = Math.PI * 2;
@@ -134,12 +134,29 @@ export class Explore {
   }
 
   /** 원점이 바뀌면(동네 이동) 모두 다시 세운다 */
+  /** 고정해 둔 것(프롤로그의 상자·야영지) — 원점이 바뀌어도 다시 세운다 */
+  private fixed: { key: string; pos: LngLat; kind: 'chest' | 'camp'; tier: Tier }[] = [];
+  addFixed(key: string, pos: LngLat, kind: 'chest' | 'camp', tier: Tier = 'common') {
+    if (this.fixed.some((f) => f.key === key)) return;
+    this.fixed.push({ key, pos, kind, tier });
+    this.frameRef = null; // 다음 프레임에 다시 세운다
+  }
+  private placeFixed() {
+    for (const f of this.fixed) {
+      if (this.P.chests.has(f.key)) continue;
+      const [x, y, z] = this.at(f.pos);
+      const e = this.add({ key: f.key, kind: 'chest', tier: f.tier, x, y, z, obj: this.chestModel(f.tier), locked: f.kind === 'camp' });
+      if (f.kind === 'camp') { this.seal(e, true); this.c.camp?.(f.key, x, y, z, 0.1, ['slime', 'slime']); }
+    }
+  }
+
   private rebuild() {
     for (const e of this.ents) this.group.remove(e.obj);
     this.ents = [];
     this.cells.clear();
     this.challenge = null;
     const P = this.P;
+    this.placeFixed();
     for (const wp of WAYPOINTS) {
       const [x, y, z] = this.at(wp.pos);
       if (Math.hypot(x, y) > 9000) continue;
