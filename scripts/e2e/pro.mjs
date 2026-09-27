@@ -28,7 +28,11 @@ export default async (p, shot) => {
   const f = await fight(p, async (st) => st.n === 0 && (await E(p, () => window.__walk.explore().isLocked('pro:camp'))) === false, 90000, true);
   console.log('fight', JSON.stringify(f));
   await shot('pro_4_camp');
-  await E(p, async ([x, y]) => { await window.__bot.walkTo(x, y, 1.6, 30000); await window.__bot.sleep(300); await window.__bot.press('KeyF'); }, (await info()).beacon);
+  for (let k = 0; k < 3; k++) {
+    const r = await E(p, async ([x, y]) => { const W = window.__walk, ex = W.explore(); await window.__bot.walkTo(x, y, 1.4, 30000); await window.__bot.sleep(300); const before = { near: ex.near?.key, prompt: ex.prompt(), holding: !!W.street().holding, mode: W.hero().body.mode, talk: !!document.querySelector('.talk.on') }; await window.__bot.press('KeyF'); await window.__bot.sleep(700); return { ...before, opened: W.progress().chests.has('pro:camp') }; }, (await info()).beacon);
+    console.log('camp chest F', JSON.stringify(r));
+    if (r.opened) break;
+  }
   s = await wait('camp'); lap(s);
   // 5) 상승
   await E(p, async ([x, y]) => window.__bot.walkTo(x, y, 2.5, 60000), s.beacon);

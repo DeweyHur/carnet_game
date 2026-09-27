@@ -23,6 +23,8 @@ export interface ExploreCtx {
   xpMul(): number;
   /** 요괴 야영지를 세운다(싸움) */
   camp?(key: string, x: number, y: number, z: number, seed: number, only?: ('slime' | 'rat' | 'gargoyle')[]): void;
+  /** 여기엔 요괴 야영지를 세우지 않는다(첫걸음 동안 에펠탑 둘레 — 튜토리얼 야영지 하나에만 집중하게) */
+  calm?(x: number, y: number): boolean;
 }
 
 const TAU = Math.PI * 2;
@@ -225,6 +227,7 @@ export class Explore {
       }
       return false;
     }
+    if (kind === 'camp' && this.c.calm?.(cx, cy)) return false; // 5초마다 다시 본다 — 첫걸음을 마치면 세운다
     const campSpot = kind === 'camp' ? this.groundSpot(cx, cy, ix, iy, 85, true) : null;
     const spot = campSpot ?? this.groundSpot(cx, cy, ix, iy, 70);
     if (!spot) return false;

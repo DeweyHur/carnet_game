@@ -737,6 +737,7 @@ function setupAdventure() {
   explore = new Explore({
     hero, progress, toast, hint: (s2) => hint(s2), money: addMoney, xpMul,
     camp: (key, x, y, z, seed, only) => combat?.spawnCamp(key, x, y, z, seed, only),
+    calm: (x, y) => !!prologue && !prologue.done && (() => { const [tx, ty] = hero.frame.toLocal(TOWER); return Math.hypot(x - tx, y - ty) < 450; })(),
     revealNear: (pos, r) => { let n = 0; for (const p of places) if (!p.known && !p.minor && dist(p.pos, pos) < r) { revealPlace(p, '순간이동 포인트에서 내려다봤다'); n++; } return n; },
   });
   hero.crowd.scene.add(explore.group);
