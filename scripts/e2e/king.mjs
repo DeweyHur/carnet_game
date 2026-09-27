@@ -34,6 +34,8 @@ export default async (p, shot) => {
     return { secs: Math.round((performance.now() - t0) / 1000), downed: C.downs > downs0, hp0: Math.round(hp0), hits: log, ar: W.progress().ar };
   });
   console.log('low AR', JSON.stringify(t));
-  await p.waitForTimeout(4000);
+  await p.waitForTimeout(6000);
+  console.log('respawn', JSON.stringify(await E(p, () => { const W = window.__walk, h = W.hero(), b = h.body; const [wx, wy] = h.frame.toLocal(W.S ? [0,0] : [0,0]); const K = W.combat().kingInfo(); return { body: window.__bot.body(), dKing: K ? Math.round(Math.hypot(K.x - b.x, K.y - b.y)) : null, hp: Math.round(W.combat().hp), last: W.progress().last }; })));
   await shot('king_1_after');
 };
+export const after = 1;
