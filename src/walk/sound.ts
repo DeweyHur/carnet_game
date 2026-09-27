@@ -509,3 +509,9 @@ export function say(text: string, who = 0, interrupt = true) {
   if (interrupt) window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
 }
+
+// 상승(지붕 뚫고 솟아오르기)
+export const ascendCharge = () => { sweep(180, 620, 0, 0.5, 0.045, 'triangle'); hiss(0.5, 0.22, 300, 2600, 'bandpass'); };
+export const ascendRise = () => { hiss(1.2, 0.45, 250, 3600); tone(784, 0, 0.35, 0.04, 'triangle'); tone(1175, 0.12, 0.45, 0.035, 'triangle'); tone(1568, 0.26, 0.6, 0.03); };
+export const ascendPop = () => { tone(1046, 0, 0.3, 0.05, 'triangle'); tone(1568, 0.08, 0.6, 0.045); tone(2093, 0.18, 0.7, 0.03); hiss(0.35, 0.45, 2400, 500); };
+export const ascendNo = () => { tone(330, 0, 0.12, 0.05, 'triangle'); tone(247, 0.1, 0.18, 0.05, 'triangle'); };

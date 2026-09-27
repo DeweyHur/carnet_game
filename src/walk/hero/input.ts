@@ -10,16 +10,18 @@ export interface Frame {
   crouch: boolean; roll: boolean; secondary: boolean;
   /** 싸움(원신처럼): 공격(마우스 톡) · 원소 스킬(E) · 원소 폭발(Q) */
   attack: boolean; skill: boolean; burst: boolean;
+  /** 상승(T): 머리 위 지붕을 뚫고, 또는 벽을 타고 꼭대기로 */
+  ascend: boolean;
   emote: Emote | null; // 이번 프레임에 누른 몸짓
   pad: boolean; // 게임패드를 쓰는 중
 }
 
 export type Emote = 'wave' | 'dance' | 'photo' | 'sit';
-type Edge = 'jump' | 'drop' | 'interact' | 'recenter' | 'map' | 'crouch' | 'roll' | 'secondary' | 'attack' | 'skill' | 'burst' | Emote;
+type Edge = 'jump' | 'drop' | 'interact' | 'recenter' | 'map' | 'crouch' | 'roll' | 'secondary' | 'attack' | 'skill' | 'burst' | 'ascend' | Emote;
 const EMOTE_KEYS: Record<string, Emote> = { Digit1: 'wave', Digit2: 'dance', Digit3: 'photo', Digit4: 'sit' };
 
 const MOVE_KEYS: Record<string, [number, number]> = { KeyW: [0, 1], KeyS: [0, -1], KeyA: [-1, 0], KeyD: [1, 0] };
-const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'KeyE', 'KeyF', 'KeyR', 'KeyX', 'KeyC', 'KeyV', 'KeyQ', 'KeyZ', 'KeyM', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
+const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'KeyE', 'KeyF', 'KeyR', 'KeyX', 'KeyC', 'KeyV', 'KeyQ', 'KeyT', 'KeyZ', 'KeyM', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
 
 export class Input {
   enabled = false;
@@ -58,6 +60,7 @@ export class Input {
       if (e.code === 'KeyF') this.edges.add('interact'); // 원신처럼 F = 상호작용
       if (e.code === 'KeyE') this.edges.add('skill');
       if (e.code === 'KeyQ') this.edges.add('burst');
+      if (e.code === 'KeyT') this.edges.add('ascend');
       if (e.code === 'KeyX') this.edges.add('drop');
       if (e.code === 'KeyC') this.edges.add('crouch');
       if (e.code === 'KeyV') this.edges.add('roll');
@@ -179,12 +182,12 @@ export class Input {
       mx, my, camYaw, camPitch, zoom, sprint,
       jump: this.edges.has('jump'), drop: this.edges.has('drop'), interact: this.edges.has('interact'), recenter: this.edges.has('recenter'), map: this.edges.has('map'),
       crouch: this.edges.has('crouch'), roll: this.edges.has('roll'), secondary: this.edges.has('secondary'),
-      attack: this.edges.has('attack'), skill: this.edges.has('skill'), burst: this.edges.has('burst'),
+      attack: this.edges.has('attack'), skill: this.edges.has('skill'), burst: this.edges.has('burst'), ascend: this.edges.has('ascend'),
       emote: (['wave', 'dance', 'photo', 'sit'] as Emote[]).find((k) => this.edges.has(k)) ?? null,
       pad: this.usingPad,
     };
     this.edges.clear();
-    if (!this.enabled) { f.mx = f.my = 0; f.jump = f.drop = f.interact = f.recenter = f.crouch = f.roll = f.secondary = f.attack = f.skill = f.burst = false; f.emote = null; f.sprint = false; f.camYaw = f.camPitch = f.zoom = 0; }
+    if (!this.enabled) { f.mx = f.my = 0; f.jump = f.drop = f.interact = f.recenter = f.crouch = f.roll = f.secondary = f.attack = f.skill = f.burst = f.ascend = false; f.emote = null; f.sprint = false; f.camYaw = f.camPitch = f.zoom = 0; }
     return f;
   }
 

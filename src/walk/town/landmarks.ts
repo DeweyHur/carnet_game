@@ -161,9 +161,16 @@ function eiffel(b: LB) {
     b.geo(geo, b.M(Math.cos(a) * 46, Math.sin(a) * 46, 4, a + Math.PI / 2), dark, glow);
   }
   b.box(0, 0, 52, 76, 76, 6, dark, 0, glow);
-  b.box(0, 0, 58, 72, 72, 1.6, col, 0, glow); // 난간
+  // 난간: 바닥 가장자리만(가운데를 덮으면 전망대에 선 사람의 다리가 묻힌다)
+  const rail = (z: number, w: number, h: number) => {
+    for (const s of [-1, 1]) {
+      b.box(0, s * (w / 2 - 0.3), z, w, 0.6, h, col, 0, glow);
+      b.box(s * (w / 2 - 0.3), 0, z, 0.6, w, h, col, 0, glow);
+    }
+  };
+  rail(58, 72, 1.6);
   b.box(0, 0, 110, 42, 42, 5, dark, 0, glow);
-  b.box(0, 0, 115, 40, 40, 1.4, col, 0, glow);
+  rail(115, 40, 1.4);
   // 꼭대기로 가늘어지는 몸통(네모 단면을 45° 돌려 모서리가 다리 쪽)
   b.geo(new THREE.CylinderGeometry(4.5, 19, 160, 4, 1, true).rotateY(Math.PI / 4).rotateX(Math.PI / 2).translate(0, 0, 80), b.M(0, 0, 115), col, glow);
   for (let z = 125; z < 270; z += 18) { const r = 19 - ((z - 115) / 160) * 14.5; b.box(0, 0, z, r * 1.45, r * 1.45, 1.2, dark, 0, glow); }

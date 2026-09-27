@@ -25,6 +25,9 @@ export class OrbitCam {
   }
 
   recenter() { this.recenterT = 0.35; }
+  /** 잠시 이 각도로 내려다본다(상승 뒤 꼭대기 풍경) */
+  private tilt: { pitch: number; t: number } | null = null;
+  tiltTo(pitch: number, secs: number) { this.tilt = { pitch, t: secs }; }
   /** 좌표 원점이 옮겨졌다 */
   shift(dx: number, dy: number) { this.fx += dx; this.fy += dy; }
 
@@ -52,13 +55,18 @@ export class OrbitCam {
       }
       // 떨어지거나 활공할 때는 조금 내려다본다
       // 헤엄칠 때는 둑(2 m) 너머로 보이게 높이서 내려다본다
-      const wantPitch = b.parachute || b.golden && b.mode === 'glide' ? 36 : b.freefall ? 40 : b.mode === 'glide' ? 22 : b.mode === 'climb' ? 8 : b.mode === 'swim' ? 42 : null;
+      const wantPitch = b.mode === 'ascend' ? -8 : b.parachute || b.golden && b.mode === 'glide' ? 36 : b.freefall ? 40 : b.mode === 'glide' ? 22 : b.mode === 'climb' ? 8 : b.mode === 'swim' ? 42 : null;
       if (wantPitch !== null) this.pitch += (wantPitch - this.pitch) * Math.min(1, dt * 1.2);
     }
 
+    if (this.tilt) {
+      this.tilt.t -= dt;
+      if (this.tilt.t <= 0 || dPitch) this.tilt = null;
+      else this.pitch += (this.tilt.pitch - this.pitch) * Math.min(1, dt * 2.2);
+    }
     // 헤엄칠 땐(움직이는 중에도) 둑 너머로 보이게 높이서
     if (b.mode === 'swim' && this.pitch < 42) this.pitch += (42 - this.pitch) * Math.min(1, dt * 3);
-    const kh = 1 - Math.exp(-dt * 11), kv = 1 - Math.exp(-dt * (b.mode === 'ground' || b.mode === 'swim' ? 7 : 4.5));
+    const kh = 1 - Math.exp(-dt * 11), kv = 1 - Math.exp(-dt * (b.mode === 'ascend' ? 14 : b.mode === 'ground' || b.mode === 'swim' ? 7 : 4.5));
     let tx = b.x, ty = b.y, focusZ = b.z + (b.mode === 'swim' ? 0.55 : b.mode === 'glide' ? 1.9 : 1.45);
     if (this.portrait) {
       // 옷장 판에 가리지 않게 사람을 화면 옆(위)으로 비켜 세운다
@@ -77,7 +85,7 @@ export class OrbitCam {
     // 올려다볼수록 카메라가 사람 가까이 내려온다(땅에 박히지 않고 하늘이 보이게)
     const want = this.portrait ? this.portraitShift[2] : this.pitch < 0 ? this.wantDist * Math.max(0.4, 1 + this.pitch / 50) : this.wantDist;
     let free = want;
-    for (let d = 0.6; d <= want; d += 0.35) {
+    for (let d = 0.6; d <= want && b.mode !== 'ascend'; d += 0.35) { // 상승 중엔 벽 속을 지나니 당기지 않는다
       if (w.solidAt(this.fx + bx * d, this.fy + by * d, this.fz + bz * d)) { free = Math.max(1.1, d - 0.45); break; }
     }
     this.dist = free < this.dist ? free : this.dist + (free - this.dist) * Math.min(1, dt * 2.5);

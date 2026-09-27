@@ -5,9 +5,9 @@ import { World } from './world';
 import type { Solid } from './world';
 import { angleDiff, bearingOf, dirOf } from './geo';
 
-export type Mode = 'ground' | 'air' | 'glide' | 'climb' | 'mantle' | 'swim' | 'down' | 'roll' | 'slide' | 'sit' | 'act' | 'stagger';
+export type Mode = 'ground' | 'air' | 'glide' | 'climb' | 'mantle' | 'swim' | 'down' | 'roll' | 'slide' | 'sit' | 'act' | 'stagger' | 'ascend';
 export type BodyEvent = 'jump' | 'land' | 'hurt' | 'glide' | 'unglide' | 'grab' | 'mantle' | 'vault' | 'climbjump' | 'drop' | 'splash' | 'drown' | 'exhausted' | 'recovered' | 'stepL' | 'stepR' | 'stroke'
-  | 'roll' | 'rollLand' | 'slide' | 'crouch' | 'uncrouch' | 'sit' | 'stand' | 'shutter' | 'stagger' | 'actDone' | 'plunge';
+  | 'roll' | 'rollLand' | 'slide' | 'crouch' | 'uncrouch' | 'sit' | 'stand' | 'shutter' | 'stagger' | 'actDone' | 'plunge' | 'ascendStart' | 'ascendRise' | 'ascendEnd';
 /** 제자리에서 하는 동작. dance·lie는 움직이면 끝나고, 나머지는 정해진 시간이 지나면 끝난다. */
 export type Act = 'dance' | 'photo' | 'drink' | 'eat' | 'clap' | 'lie' | 'push' | 'tip' | 'feed' | 'pet' | 'stretch' | 'think' | CombatAct;
 /** 싸움 동작(원신처럼): 세 번 이어지는 우산 공격 · 원소 스킬 · 원소 폭발 */
@@ -155,6 +155,41 @@ export class Body {
     this.vz = -28; this.vx *= 0.15; this.vy *= 0.15;
     return true;
   }
+  /** 상승(젤다 왕국의 눈물처럼): 머리 위 지붕·천장을 뚫고, 또는 앞의 벽을 타고 z1(그 꼭대기) 위로 솟아오른다 */
+  asc: { z1: number; t: number; rising: boolean; z0: number; x0: number; y0: number; tx: number; ty: number } | null = null;
+  /** tx·ty: 벽을 타고 오를 때 꼭대기에서 내려앉을 곳(지붕 안쪽) */
+  startAscend(z1: number, tx = this.x, ty = this.y): boolean {
+    if (this.mode !== 'ground' && this.mode !== 'sit' && this.mode !== 'act' && this.mode !== 'climb') return false;
+    this.mode = 'ascend';
+    this.act = null;
+    this.asc = { z1, t: 0, rising: false, z0: this.z, x0: this.x, y0: this.y, tx, ty };
+    this.speed = 0; this.vx = this.vy = this.vz = 0;
+    this.crouch = false;
+    this.events.push('ascendStart');
+    return true;
+  }
+  private ascending(dt: number) {
+    const a = this.asc;
+    if (!a) { this.mode = 'ground'; return; }
+    a.t += dt;
+    if (a.t < 0.5) return; // 웅크려 힘을 모은다
+    if (!a.rising) { a.rising = true; this.events.push('ascendRise'); }
+    const v = Math.min(36, 5 + (a.t - 0.5) * 30); // 점점 빨라진다
+    this.z += v * dt;
+    // 마지막 몇 미터에서 내려앉을 곳 쪽으로 몸을 옮긴다(벽 타기)
+    const k = Math.max(0, Math.min(1, 1 - (a.z1 - this.z) / Math.min(4, a.z1 - a.z0)));
+    this.x = a.x0 + (a.tx - a.x0) * k; this.y = a.y0 + (a.ty - a.y0) * k;
+    if (this.z >= a.z1) {
+      this.x = a.tx; this.y = a.ty;
+      // 꼭대기로 튀어나와 살짝 떠올랐다 내려앉는다(다치지 않는다)
+      this.z = a.z1 + 0.05;
+      this.mode = 'air';
+      this.vz = 6;
+      this.fallTopZ = this.z;
+      this.asc = null;
+      this.events.push('ascendEnd');
+    }
+  }
   /** 손을 흔든다(봉주르). 걸으면서도 된다. */
   wave() { if (this.mode === 'ground' || this.mode === 'sit' || this.mode === 'act') { this.waveT = 1.6; return true; } return false; }
   /** 어느 쪽을 가리킨다. */
@@ -207,6 +242,7 @@ export class Body {
       case 'sit': this.sitting(dt, it, m); break;
       case 'act': this.acting(dt, w, it, m, ix, iy); break;
       case 'stagger': this.staggering(dt, w); break;
+      case 'ascend': this.ascending(dt); break;
     }
     if (this.waveT > 0) this.waveT -= dt;
     if (this.drawn > 0) this.drawn -= dt;
@@ -454,7 +490,8 @@ export class Body {
     const nz = this.z + this.vz * dt;
     // 강으로 떨어지면 물낯에서 헤엄친다(바닥은 그 아래)
     if (this.vz <= 0 && nz <= WATER_Z && this.z >= WATER_Z - 0.6 && w.water(p.x, p.y)) { this.x = p.x; this.y = p.y; this.enterWater(); return; }
-    const hit = w.collide(p, Math.max(nz, this.z - 0.2), R, H, 0.05);
+    // 발밑 바닥보다 낮게 재지 않는다: 프레임이 길면(느린 기기) 한 번에 바닥 속까지 내려가 그 바닥이 '벽'이 되어 가장자리로 튕겨 나갔다
+    const hit = w.collide(p, Math.max(nz, this.z - 0.2, Math.min(this.z, floor)), R, H, 0.05);
     if (hit) {
       const rise = hit.top - nz;
       const toward = -((m >= 0.08 ? ix : this.vx) * hit.nx + (m >= 0.08 ? iy : this.vy) * hit.ny) > 0;

@@ -220,7 +220,7 @@ export class Hero {
   pushAgainst(crowd: Crowd, W: World) {
     const b = this.body;
     this.bumped = null;
-    if (b.mode === 'climb' || b.mode === 'swim') return;
+    if (b.mode === 'climb' || b.mode === 'swim' || b.mode === 'ascend') return;
     for (const n of crowd.npcs) {
       if (n.hidden || n.bike || Math.abs(n.z - b.z) > 1.2) continue;
       const dx = b.x - n.x, dy = b.y - n.y;

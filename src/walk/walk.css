@@ -623,3 +623,14 @@ body.map-mode .cbt-layer, body.closet-on .cbt-layer { display:none; }
 body:not(.hero-on) .lili-btn, body.map-mode .lili-btn, body.closet-on .lili-btn { display:none !important; }
 body.touch-play .lili-btn { right:auto; left:14px; bottom:calc(200px + env(safe-area-inset-bottom)); }
 body.touch-play .lili-btn kbd { display:none; }
+
+/* 상승(T) */
+.asc-btn { position:fixed; right:22px; bottom:calc(210px + env(safe-area-inset-bottom)); width:44px; height:44px; border-radius:50%; padding:0; display:none; place-items:center; background:#1f1b16aa; color:#cfeee4; box-shadow:0 2px 8px #0006; z-index:4; opacity:.45; transition:opacity .25s, box-shadow .25s, transform .25s; }
+.asc-btn.on { display:grid; }
+.asc-btn em { font-style:normal; font-size:22px; font-weight:800; line-height:1; }
+.asc-btn kbd { position:absolute; bottom:1px; right:5px; font-size:10px; font-family:inherit; color:#ffe7a8; }
+.asc-btn.ready { opacity:1; color:#fff; background:#15463bdd; box-shadow:0 0 0 3px #7ff5d0, 0 0 20px #7ff5d0; transform:scale(1.08); animation:asc-pulse 1.1s ease-in-out infinite; }
+@keyframes asc-pulse { 50% { box-shadow:0 0 0 5px #7ff5d0aa, 0 0 28px #7ff5d0; } }
+body:not(.hero-on) .asc-btn, body.closet-on .asc-btn, body.map-mode .asc-btn { display:none; }
+body.touch-play .asc-btn { right:250px; bottom:calc(40px + env(safe-area-inset-bottom)); width:54px; height:54px; }
+body.touch-play .asc-btn kbd { display:none; }

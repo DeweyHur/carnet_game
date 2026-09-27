@@ -114,7 +114,20 @@ export class Figure {
     this.beacon.add(beam, core);
     this.beacon.visible = false;
     this.flip.add(this.beacon);
+    // 상승: 몸을 감싸는 옥빛 기운 + 위로 흐르는 빛줄기
+    const auraMat = new THREE.MeshBasicMaterial({ color: 0x7fffd4, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    this.aura.add(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.45, 2.3, 20, 1, true).rotateX(Math.PI / 2).translate(0, 0, 1.0), auraMat));
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 1.6).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xd8fff2, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+      s.position.set(Math.cos(a) * 0.62, Math.sin(a) * 0.62, 0);
+      s.userData.ph = Math.random() * 3;
+      this.aura.add(s);
+    }
+    this.aura.visible = false;
+    this.flip.add(this.aura);
   }
+  private readonly aura = new THREE.Group();
 
   private mat(color: number) { return new THREE.MeshToonMaterial({ color, gradientMap: this.ramp }); }
 
@@ -580,6 +593,12 @@ export class Figure {
       case 'down':
         Object.assign(want, { tL: 1.45, kL: -2.3, tR: 0.15, kR: -1.95, sLx: 0.7, sRx: 0.3, eL: 0.6, eR: 0.4, lean: 0.6, headX: 0.35, bob: -0.42 });
         break;
+      case 'ascend': {
+        const at2 = b.asc?.t ?? 0;
+        if (at2 < 0.5) { const k2 = at2 / 0.5; Object.assign(want, { tL: 0.9 * k2, tR: 0.8 * k2, kL: -1.6 * k2, kR: -1.5 * k2, lean: 0.35 * k2, bob: -0.35 * k2, sLx: 0.4, sRx: 0.4, sLy: 0.6, sRy: -0.6, eL: 0.6, eR: 0.6, headX: -0.2, scarf: 0.6 }); }
+        else Object.assign(want, { sLx: 2.95, sRx: 2.95, sLy: 0.12, sRy: -0.12, eL: 0.05, eR: 0.05, tL: 0.05, tR: -0.02, kL: -0.12, kR: -0.08, lean: -0.05, headX: -0.35, bob: 0, scarf: 2.4 });
+        break;
+      }
       case 'swim': {
         const s = Math.sin(ph);
         Object.assign(want, { pitch: b.speed > 0.4 ? 0.95 : 0.3, bob: b.speed > 0.4 ? -0.92 : -1.12, sLx: b.speed > 0.4 ? 1.6 + 1.5 * s : 0.9 + 0.4 * s, sRx: b.speed > 0.4 ? 1.6 - 1.5 * s : 0.9 - 0.4 * s, sLy: 0.5, sRy: -0.5, eL: 0.3, eR: 0.3, tL: 0.25 * Math.sin(ph * 3), tR: -0.25 * Math.sin(ph * 3), headX: b.speed > 0.4 ? -1.0 : -0.3 }); // 고개는 물 밖으로
@@ -616,7 +635,15 @@ export class Figure {
     const p = this.pose;
     for (const key of Object.keys(p) as (keyof Pose)[]) p[key] += (want[key] - p[key]) * k;
     this.root.position.set(0, 0, p.bob);
-    this.root.rotation.z = (-b.facing * Math.PI) / 180 - (act === 'skill' ? (b.act?.t ?? 0) * 17 : 0); // 스킬: 제자리에서 두 바퀴 반
+    this.root.rotation.z = (-b.facing * Math.PI) / 180 - (act === 'skill' ? (b.act?.t ?? 0) * 17 : 0) - (b.mode === 'ascend' && b.asc ? Math.max(0, b.asc.t - 0.5) * 5 : 0); // 스킬: 제자리 두 바퀴 반 · 상승: 천천히 돈다
+    // 상승 기운
+    this.aura.visible = b.mode === 'ascend';
+    if (this.aura.visible) {
+      const at3 = b.asc?.t ?? 0, rise = at3 > 0.5;
+      this.aura.scale.set(1, 1, rise ? 1.4 : 0.4 + at3);
+      for (const ch of this.aura.children) if (ch.userData.ph !== undefined) { ch.position.z = ((t * 6 + (ch.userData.ph as number)) % 3) - 0.5; ch.visible = rise; }
+      ((this.aura.children[0] as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = rise ? 0.35 + Math.sin(t * 20) * 0.08 : 0.15 + at3 * 0.3;
+    }
     if (b.mode !== 'roll') this.spinAcc = 0;
     this.tilt.rotation.set(-p.pitch - (b.mode === 'roll' ? Math.min(Math.PI * 2, this.spinAcc) : 0), p.side, 0);
     this.spine.rotation.set(-p.lean, p.side * 0.5, p.twist);
