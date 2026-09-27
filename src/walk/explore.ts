@@ -629,6 +629,11 @@ export class Explore {
     e.obj.add(s);
     e.obj.userData.seal = s;
   }
+  /** 이 상자가 봉인돼 있는가(없으면 null) */
+  isLocked(key: string): boolean | null {
+    const e = this.ents.find((q) => q.key === key && q.kind === 'chest');
+    return e ? !!e.locked : null;
+  }
   /** 야영지를 다 물리쳤다 — 봉인을 푼다 */
   unlock(key: string) {
     const e = this.ents.find((q) => q.key === key && q.kind === 'chest');

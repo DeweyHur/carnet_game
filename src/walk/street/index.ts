@@ -164,7 +164,7 @@ export class Street {
       if (Math.hypot(px - b.x, py - b.y) > 11) { this.ui.hideCard(); this.cardPlace = null; }
     }
     // 걸은 만큼 사건이 가까워진다
-    if (b.speed > 0.5 && !this.quest && !this.eiffel.active) this.eventT -= dt;
+    if (b.speed > 0.5 && !this.quest && !this.eiffel.active && !this.suppressLine) this.eventT -= dt; // 첫걸음 동안엔 거리 사건을 미룬다
     if (this.eventT < 0 && !this.quest && !this.eiffel.active) { this.eventT = 70 + Math.random() * 60; this.startEvent(); }
   }
 

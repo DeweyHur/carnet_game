@@ -27,7 +27,7 @@ import type { Dish } from './content';
 import { openMenu, openVisit } from './inside';
 import type { Shot } from './inside';
 import { Hero } from './hero';
-import { Heli, HELI_ROUTE, HELI_SPEED, routeSamples } from './heli';
+import { Heli, HELI_ROUTE, HELI_SPEED } from './heli';
 import { Sky as SkyLife } from './sky';
 import { Pins } from './pins';
 import type { Pin } from './pins';
@@ -47,6 +47,7 @@ import { Wish } from './wish';
 import { Combat } from './combat';
 import { Companion } from './companion';
 import { Ascend } from './ascend';
+import { Prologue, PROLOGUE_START, TOWER } from './prologue';
 import { CHAPTERS } from './street/story';
 
 maplibregl.setWorkerUrl(workerUrl);
@@ -119,6 +120,7 @@ let wish: Wish;
 let combat: Combat;
 let companion: Companion;
 let ascend: Ascend;
+let prologue: Prologue;
 let guideTarget: Place | null = null; // 빛기둥으로 안내하는 곳(현지인이 알려 준 곳 등)
 let entering = false;
 let mapMode = false; // 🗺 지도 보기(위에서 내려다보며 목적지를 찍는다)
@@ -156,8 +158,9 @@ async function boot() {
     places = parsePlaces(data.places, district.curated, ALL_RICH);
     for (const p of places) allPlaces.set(p.id, p);
     if (graph.nodes.length < 50) throw new Error('거리 그래프가 비어 있습니다.');
-    S.node = nearestNode(graph, district.start);
-    S.pos = graph.nodes[S.node];
+    // 첫걸음: 에펠탑 앞 샹드마르스 잔디밭에서(헤맬 일 없이 할 거리가 가장 많은 곳)
+    S.node = nearestNode(graph, PROLOGUE_START);
+    S.pos = PROLOGUE_START;
     S.trail = [S.pos];
     S.origin = S.pos;
 
@@ -172,6 +175,7 @@ async function boot() {
       hero.attach();
       hero.setLanes(laneSegments(graph));
       hero.reset(S.pos);
+      { const [tx, ty] = hero.frame.toLocal(TOWER); hero.body.facing = ((Math.atan2(tx, ty) * 180) / Math.PI + 360) % 360; hero.cam.snap(hero.body); } // 탑을 바라보며
       hero.town.setFar(st.fallback ? 300 : 1e6);
       applyQuality();
       dressTown();
@@ -501,7 +505,7 @@ function heroFrame(dt: number) {
   const talking = !!street?.holding;
   const frozen = !live || !!openPlace || modal || mapMode || talking || entering;
   // 빛기둥: 자동으로 걷는 길의 끝 > 사건(풍선·강아지) > 현지인이 알려 준 곳
-  const qb = street?.beacon;
+  const qb = prologue?.beacon() ?? street?.beacon;
   const beacon = S.path.length > 1 ? S.path[S.path.length - 1] : qb ? hero.frame.toLngLat(qb[0], qb[1]) : guideTarget ? guideTarget.pos : null;
   miniBeacon = beacon ? hero.frame.toLocal(beacon) : null;
   const r = hero.tick(dt, {
@@ -531,6 +535,7 @@ function heroFrame(dt: number) {
   const exploring = live && !modal && !mapMode && !openPlace && !entering && !talking && !heli?.riding && !sky?.riding;
   companion?.update(dt, live && !mapMode && !modal);
   ascend?.update(dt, r.f, exploring);
+  prologue?.update(dt, live && !mapMode);
   combat?.update(dt, r.f, exploring); // 먼저: 원점이 바뀌면 싸움이 먼저 비우고, 탐험이 야영지를 다시 세운다
   explore?.update(dt, r.f, exploring);
   hero.hud.override = exploring ? explore?.prompt() ?? null : null;
@@ -765,6 +770,17 @@ function setupAdventure() {
     used: (t) => { if (t.z1 - hero.body.z > 40) toast(`⤒ 상승! ${Math.round(t.z1)} m 위로`); },
   });
   hero.crowd.scene.add(ascend.group);
+  prologue = new Prologue({
+    hero, progress,
+    explore: () => explore ?? null, story: () => street?.story ?? null, companion: () => companion ?? null,
+    journalOpen: () => !!journal?.open, wishOpen: () => !!wish?.open,
+    toast, hint: (s2) => hint(s2), money: addMoney,
+    quiet: (on) => {
+      if (street) { street.suppressLine = on; street.story.quiet = on; if (on) street.ui.questLine(''); }
+      if (companion) companion.hush = on;
+    },
+    touch: () => document.body.classList.contains('touch-play'),
+  });
   wish = new Wish(progress, wardrobe, addMoney);
   wish.onToggle = (on) => { if (!on) hud(); };
   // 지도 보기의 순간이동 포인트(누르면 순간이동)
@@ -1492,54 +1508,34 @@ async function prepare(fallback: boolean) {
   const go = $<HTMLButtonElement>('#go');
   const status = $('#status');
   preparing = true;
-  // 헬기: 불로뉴 숲 위에서 에펠탑 쪽을 보며 떠 있다(시작하면 북동쪽으로 날아간다)
-  heli = new Heli();
-  heli.setFrame((p) => hero.frame.toLocal(p));
-  hero.crowd.scene.add(heli.group); // 사람들 장면(조명이 있다)
-  seatOnHeli();
-  hero.cam.snap(hero.body);
-  hero.cam.yaw = (heli.heading + 330) % 360; // 헬기 옆구리와 앞쪽 시내가 같이 보이게
-  hero.cam.pitch = 14;
-  hero.cam.wantDist = 17;
-  hero.hud.jumpLabel = '뛰어내리기';
+  hero.cam.pitch = 10;
+  hero.cam.wantDist = 7.5;
   sky = new SkyLife({ say: (at, text, secs, voice) => street?.ui.say(at, text, secs, '', voice), toast, terrain: (x, y) => hero.world.terrain(x, y) });
   hero.crowd.scene.add(sky.group);
   sky.reset(hero.body.x, hero.body.y);
-  if (map.getSource('heli')) (map.getSource('heli') as GeoJSONSource).setData(line(HELI_ROUTE.map((w) => w.pos)));
-  // 헬기 노선 전체를 미리: 타일(건물·길·강)을 받고, 노선 둘레 1.3 km의 먼 도시를 세워 둔다
-  hero.ensureAlong(routeSamples(600));
-  hero.town.far.keepNear(routeSamples(400).map((p) => hero.frame.toLocal(p)), 1300);
-  map.setCenterClampedToGround(false);
-  if (map.getLayer('vision')) map.setLayoutProperty('vision', 'visibility', 'none');
-  // 다른 동네 거리 데이터도 미리 받아 둔다 — 낙하산으로 경계를 넘을 때 기다리지 않게
-  let fetched = false;
-  void unifyStreets().catch(() => undefined).then(() => { fetched = true; });
+  // 다른 동네 거리 데이터는 뒤에서 받는다(시작을 기다리게 하지 않는다)
+  void unifyStreets().catch(() => undefined);
   const town = hero.town;
   town.budget = 40; // 인트로가 가리고 있으니 한 프레임에 많이 지어도 된다
   const t0 = performance.now();
-  let calm = 0, shown = 0, lastBacklog = -1, lastMove = t0, farMax = 0;
+  let calm = 0, shown = 0, lastBacklog = -1, lastMove = t0;
   await new Promise<void>((done) => {
     const check = () => {
       const tiles = fallback || hero.world.tilesReady();
       const built = town.inView ? 1 - town.backlog / town.inView : 0;
-      farMax = Math.max(farMax, town.far.backlog);
-      const farDone = farMax ? 1 - town.far.backlog / farMax : 1;
-      const [tl0, tt0] = hero.world.tileProgress();
-      const tileDone = fallback ? 1 : tt0 ? tl0 / tt0 : 0;
-      // 헬기 노선 타일 35% · 노선의 도시 35% · 발밑 거리 25% · 마무리 5%
-      const pct = Math.round(Math.min(0.98, tileDone * 0.35 + (fetched ? farDone * 0.35 : 0) + built * 0.25 + Math.min(calm, 20) * 0.0025) * 100);
+      const [tl, tt] = hero.world.tileProgress();
+      const tileDone = fallback ? 1 : tt ? tl / tt : 0;
+      // 발밑 지도 45% · 거리 45% · 마무리 10%
+      const pct = Math.round(Math.min(0.98, tileDone * 0.45 + built * 0.45 + Math.min(calm, 20) * 0.005) * 100);
       shown = Math.max(shown, pct);
       go.textContent = `준비 중… ${shown}%`;
-      const [tl, tt] = hero.world.tileProgress();
-      status.textContent = !tiles ? `헬기 노선의 지도를 받는 중 (${tl}/${tt})` : !fetched ? '파리 거리 지도를 받는 중' : town.far.backlog ? `헬기 노선의 도시를 세우는 중 (${town.far.backlog})` : town.backlog ? `거리를 세우는 중 (${town.inView - town.backlog}/${town.inView})` : '사람들을 불러 모으는 중';
+      status.textContent = !tiles ? `샹드마르스 지도를 받는 중 (${tl}/${tt})` : town.backlog ? `거리를 세우는 중 (${town.inView - town.backlog}/${town.inView})` : '사람들을 불러 모으는 중';
       // 다 지은 뒤에도 20프레임 더 그려 둔다(셰이더 준비·사람 채우기·첫 그림)
-      if (tiles && town.inView > 0 && town.backlog === 0 && town.far.backlog === 0) calm++; else calm = 0;
-      // 지도 밖이라 영영 준비되지 않는 칸이 있을 수 있다 — 5초 동안 줄지 않으면 그만 기다린다
+      if (tiles && town.inView > 0 && town.backlog === 0) calm++; else calm = 0;
       const now = performance.now();
       if (town.backlog !== lastBacklog) { lastBacklog = town.backlog; lastMove = now; }
-      const stuck = tiles && now - lastMove > 5000;
-      if ((calm > 20 || stuck) && fetched) done();
-      else if (now - t0 > 60000) done(); // 헬기 노선 전체를 받으니 넉넉히
+      const stuck = tiles && now - lastMove > 5000; // 지도 밖이라 영영 준비되지 않는 칸
+      if (calm > 20 || stuck || now - t0 > 40000) done();
       else requestAnimationFrame(check);
     };
     check();
@@ -1552,7 +1548,7 @@ async function prepare(fallback: boolean) {
   lastTrail = S.pos;
   status.textContent = '';
   go.removeAttribute('disabled');
-  go.textContent = '🚁 헬기 타기';
+  go.textContent = prologue && !prologue.done ? '▶ 에펠탑 앞에서 시작' : '▶ 샹드마르스에서 걷기';
 }
 
 async function start(resumeAt?: Waypoint) {
@@ -1572,16 +1568,15 @@ async function start(resumeAt?: Waypoint) {
   $('#hud').classList.add('on');
   mapHandlers(false);
   avatar.getElement().classList.add('hidden');
-  if (heli) heli.flying = true;
-  if (resumeAt && heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; }
   hud();
   if (resumeAt) await teleport(resumeAt); // 원신처럼: 지난번 순간이동 포인트에서 바로
-  // 길잡이 리리의 첫인사(처음이면 자기소개)
-  let first = true;
-  try { first = !localStorage.getItem('carnet-lili'); localStorage.setItem('carnet-lili', '1'); } catch { /* 무시 */ }
-  setTimeout(() => companion?.greet(first), resumeAt ? 1500 : 6000);
   const touch = hero.input.touched || matchMedia('(pointer: coarse)').matches;
   if (touch) document.body.classList.add('touch-play');
+  // 첫걸음(아직이면) — 리리가 한 단계씩 안내한다. 끝냈으면 리리의 인사만.
+  let first = true;
+  try { first = !localStorage.getItem('carnet-lili'); localStorage.setItem('carnet-lili', '1'); } catch { /* 무시 */ }
+  if (!prologue.done) setTimeout(() => prologue.begin(), resumeAt ? 1200 : 2400);
+  else setTimeout(() => companion?.greet(first), resumeAt ? 1500 : 3000);
 }
 
 const mode = (xs: string[]) => [...xs.reduce((m, x) => m.set(x, (m.get(x) ?? 0) + 1), new Map<string, number>())].sort((a, b) => b[1] - a[1])[0][0];
@@ -1715,7 +1710,7 @@ window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (wish?.
 // 이 화면은 스크롤되지 않는다. 그런데도 포커스 이동·scrollIntoView가 문서를 밀어 올려
 // 아래에 대기 중인 요약 패널이 딸려 올라오는 일이 반복돼서, 밀리면 바로 되돌린다.
 window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
-if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; if (heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; } $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map, heli: () => heli, sky: () => sky, wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal, progress: () => progress, explore: () => explore, wish: () => wish, combat: () => combat, companion: () => companion, ascend: () => ascend, teleport: (id: string) => { const wp = WAYPOINTS.find((w) => w.id === id); return wp ? teleport(wp) : null; } };
+if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown as { __walk: unknown }).__walk = { S, hero: () => hero, arrive: async (id: keyof typeof DISTRICTS) => { metroMap.ride('#bf3283', [{ name: 'a', pos: S.pos }, { name: 'b', pos: DISTRICTS[id].start }]); await new Promise((r) => setTimeout(r, 1500)); metroMap.clear(); await enterDistrict(DISTRICTS[id], DISTRICTS[id].start); }, quick: async () => { preparing = false; if (heli) { hero.crowd.scene.remove(heli.group); heli = null; hero.hud.jumpLabel = null; } $('#intro').classList.add('gone'); sfx.unlock(); S.started = true; $('#hud').classList.add('on'); await enterDistrict(district, district.start); }, walkTo, openCard, finish, cpu, street: () => street, transit: () => transit, travel, ride, planJourney, DISTRICTS, places: () => places, graph: () => graph, map: () => map, heli: () => heli, sky: () => sky, wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal, progress: () => progress, explore: () => explore, wish: () => wish, combat: () => combat, companion: () => companion, ascend: () => ascend, prologue: () => prologue, teleport: (id: string) => { const wp = WAYPOINTS.find((w) => w.id === id); return wp ? teleport(wp) : null; } };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
 requestAnimationFrame(frame);
 void boot();
