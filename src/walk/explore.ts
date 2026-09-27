@@ -148,7 +148,7 @@ export class Explore {
       if (this.P.chests.has(f.key)) continue;
       const [x, y, z] = this.at(f.pos);
       const e = this.add({ key: f.key, kind: 'chest', tier: f.tier, x, y, z, obj: this.chestModel(f.tier), locked: f.kind === 'camp' });
-      if (f.kind === 'camp') { this.seal(e, true); this.c.camp?.(f.key, x, y, z, 0.1, ['slime', 'slime']); }
+      if (f.kind === 'camp') { this.seal(e, true); this.c.camp?.(f.key, x, y, z, 0.1, ['rat', 'slime']); }
     }
   }
 
@@ -206,7 +206,8 @@ export class Explore {
   private genCell(ix: number, iy: number): boolean {
     const key = `c:${ix}:${iy}`;
     const r = hash(ix, iy, 1);
-    const kind = r < 0.38 ? 'common' : r < 0.5 ? 'camp' : r < 0.68 ? 'roof' : r < 0.77 ? 'cat' : r < 0.84 ? 'challenge' : r < 0.93 ? 'plume' : null;
+    // 요괴가 많다: 야영지(상자를 지킨다) 25% · 떠도는 무리 18%
+    const kind = r < 0.2 ? 'common' : r < 0.45 ? 'camp' : r < 0.63 ? 'pack' : r < 0.75 ? 'roof' : r < 0.82 ? 'cat' : r < 0.88 ? 'challenge' : r < 0.95 ? 'plume' : null;
     if (!kind) return true;
     if (kind === 'plume' ? this.P.plumesGot.has(key) : this.P.chests.has(key)) return true;
     const w = this.hero.world;
@@ -227,7 +228,14 @@ export class Explore {
       }
       return false;
     }
-    if (kind === 'camp' && this.c.calm?.(cx, cy)) return false; // 5초마다 다시 본다 — 첫걸음을 마치면 세운다
+    if ((kind === 'camp' || kind === 'pack') && this.c.calm?.(cx, cy)) return false; // 5초마다 다시 본다 — 첫걸음을 마치면 세운다
+    if (kind === 'pack') {
+      // 떠도는 무리(상자 없음) — 탁 트인 곳에
+      const sp = this.groundSpot(cx, cy, ix, iy, 85, true);
+      if (!sp) return false;
+      this.c.camp?.(`pack:${key}`, sp[0], sp[1], sp[2], hash(ix, iy, 13));
+      return true;
+    }
     const campSpot = kind === 'camp' ? this.groundSpot(cx, cy, ix, iy, 85, true) : null;
     const spot = campSpot ?? this.groundSpot(cx, cy, ix, iy, 70);
     if (!spot) return false;

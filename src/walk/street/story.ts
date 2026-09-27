@@ -29,7 +29,9 @@ type Beat =
   | { kind: 'fetch'; what: string; emoji: string; spots: [number, number, number][]; line: string }
   | { kind: 'sit'; at: UV; r: number; minDz?: number; secs: number; line: string; done?: string }
   | { kind: 'talk'; line: string; fr: string; ko: string }
-  | { kind: 'check'; line: string; test: (s: Story) => boolean; done?: string };
+  | { kind: 'check'; line: string; test: (s: Story) => boolean; done?: string }
+  /** 싸움: at(높이 dz)에 적 무리가 나타나고, 다 물리치면 다음 */
+  | { kind: 'fight'; at: UV; dz?: number; foes: string[]; line: string; done?: string };
 
 export interface Chapter {
   id: string;
@@ -55,7 +57,9 @@ export const CHAPTERS: Chapter[] = [
     giver: { name: '귀스타브 (탑 안내인)', role: 'reader', at: [-30, -80], facing: 0, call: 'Vous voulez voir Paris d’en haut ?' },
     intro: { fr: 'En 1889, tout le monde détestait cette tour. Montez tout en haut, et vous comprendrez pourquoi on l’a gardée.', ko: '1889년엔 다들 이 탑을 싫어했어요. "흉물"이라고요. 꼭대기까지 올라가 보면 왜 허물지 않았는지 알게 될 거예요. 꼭대기에서 파리를 한 장 찍어 와 줄래요?' },
     beats: [
-      { kind: 'high', at: [0, 0], r: 24, dz: 270, line: '🗼 에펠탑 꼭대기(276 m)까지 — 탑 한가운데 아래에서 ⤒ 상승(T) 두 번, 또는 다리를 타고', done: '🗼 꼭대기! 바람이 세다. 파리가 발밑에 깔려 있다' },
+      { kind: 'fight', at: [0, 0], foes: ['rat', 'rat', 'rat', 'rat'], line: '🐀 탑 아래에 쥐 떼가 몰려 있다 — 쥐 기사 넷을 쫓아내자', done: '🐀 쥐 떼를 쫓아냈다. 귀스타브가 멀리서 손을 흔든다' },
+      { kind: 'fetch', what: '에펠의 설계도 조각', emoji: '📜', spots: [[0, 28, 58], [17, 0, 115]], line: '📜 바람에 날린 에펠의 설계도 조각 둘 — 1층(58 m)과 2층(115 m) 전망대에서 줍자 (⤒ 상승 T)' },
+      { kind: 'high', at: [0, 0], r: 24, dz: 270, line: '🗼 에펠탑 꼭대기(276 m)까지 — 탑 한가운데 아래에서 ⤒ 상승(T), 2층에선 벽을 타거나 다시 T', done: '🗼 꼭대기! 바람이 세다. 파리가 발밑에 깔려 있다' },
       { kind: 'photo', minDz: 240, line: '📷 꼭대기에서 파리를 한 장 (3)', label: '에펠탑 꼭대기에서 본 파리' },
       { kind: 'talk', line: '🗼 귀스타브에게 사진을 보여 주자 (뛰어내려 글라이더로)', fr: 'Voilà ! Vous avez vu ? Paris entier. Gustave Eiffel avait raison.', ko: '봤죠? 파리 전체요. 에펠 씨 말이 맞았어요 — 이 탑은 무선 전신 안테나로 쓸모가 생겨서 살아남았답니다.' },
     ],
@@ -68,7 +72,8 @@ export const CHAPTERS: Chapter[] = [
     intro: { fr: 'Sous l’Arc dort un soldat inconnu. Chaque soir depuis 1923, on ranime sa flamme.', ko: '개선문 아래엔 이름 모를 병사가 잠들어 있어요. 1923년부터 매일 저녁 그 불꽃을 다시 지핀답니다. 불꽃 앞에 잠깐 서 있다가, 옥상에 올라가 샹젤리제를 봐 주세요. 내 다리로는 이제 284계단이 무리라서.' },
     beats: [
       { kind: 'reach', at: [0, 0], r: 3.2, line: '🔥 아치 한가운데, 꺼지지 않는 불꽃 앞에 서자', done: '🔥 무명용사의 불꽃 앞에 섰다 — 잠깐 고개를 숙인다' },
-      { kind: 'high', at: [0, 0], r: 26, dz: 49, line: '🏛 개선문 옥상 테라스(50 m)로 — 단마다 난 턱에서 기력을 채우며 올라가자', done: '🏛 옥상! 열두 길이 별처럼 뻗어 나간다(그래서 "에투알", 별 광장)' },
+      { kind: 'high', at: [0, 0], r: 26, dz: 49, line: '🏛 개선문 옥상 테라스(50 m)로 — 벽에 붙어 ⤒ 상승(T), 또는 단마다 난 턱에서 쉬며 올라가자', done: '🏛 옥상! 열두 길이 별처럼 뻗어 나간다(그래서 "에투알", 별 광장)' },
+      { kind: 'fight', at: [0, 0], dz: 50, foes: ['gargoyle', 'gargoyle', 'rat'], line: '🗿 옥상을 차지한 돌 가고일들을 쫓아내자 (구르기 V로 돌진을 피하며)', done: '🗿 옥상이 조용해졌다' },
       { kind: 'photo', minDz: 44, face: 112, faceTol: 25, line: '📷 옥상에서 샹젤리제 쪽(동남, 콩코르드 방향)을 보고 한 장 (3)', label: '개선문 위에서 본 샹젤리제' },
       { kind: 'talk', line: '🏛 마르셀에게 돌아가자', fr: 'Les Champs, jusqu’à la Concorde… Merci, vraiment.', ko: '샹젤리제가 콩코르드까지… 정말 고마워요. 옛날엔 저 길을 행진했었지.' },
     ],
@@ -81,6 +86,7 @@ export const CHAPTERS: Chapter[] = [
     intro: { fr: 'Le vent a emporté mes plans du musée ! Il en manque trois… dont un sur la pyramide, je crois.', ko: '바람에 박물관 안내도가 날아갔어요! 세 장이 없어요… 하나는 피라미드 위에 걸린 것 같아요. 유리 위는 미끄러우니 조심해요!' },
     beats: [
       { kind: 'fetch', what: '박물관 안내도', emoji: '🗺', spots: [[-120, 34, 0], [-72, -44, 0], [0, 0, 21.7]], line: '🗺 날아간 박물관 안내도 세 장을 찾자' },
+      { kind: 'fight', at: [-60, 0], foes: ['slime', 'slime', 'rat', 'rat'], line: '🌫 안내도를 노린 안개 슬라임과 쥐 기사가 광장에 나타났다 — 물리치자', done: '🌫 광장이 다시 조용해졌다' },
       { kind: 'talk', line: '🗺 아멜리에게 안내도를 돌려주자', fr: 'Merci ! Maintenant, une photo : on fait semblant de tenir la pointe de la pyramide !', ko: '고마워요! 이제 관광객들이 다 하는 그 사진 — 멀찍이 서서 손끝으로 피라미드 꼭짓점을 잡는 척하는 사진, 하나 찍어 봐요.' },
       { kind: 'photo', of: [0, 0], dist: [22, 90], faceTol: 12, line: '📷 피라미드에서 20~90 m 떨어져, 꼭짓점을 정면으로 두고 한 장 (3)', label: '루브르 피라미드' },
     ],
@@ -94,6 +100,7 @@ export const CHAPTERS: Chapter[] = [
     beats: [
       { kind: 'reach', at: [-100, 0], r: 2.6, line: '⭐ 성당 앞 광장의 "푸앵 제로"(파리 거리의 기준점)를 밟자', done: '⭐ 푸앵 제로! 여기를 밟으면 파리에 다시 온다는 말이 있다' },
       { kind: 'high', at: [-56, 0], r: 24, dz: 67, line: '🔔 탑 꼭대기(69 m)로 — 정면의 회랑 턱(17·31·46·57 m)에서 쉬어 가며', done: '🔔 탑 위! 가고일들이 파리를 내려다보고 있다' },
+      { kind: 'fight', at: [-56, 0], dz: 68, foes: ['gargoyle', 'gargoyle', 'gargoyle'], line: '🗿 가고일 셋이 깨어나 덤빈다! — 탑 위에서 물리치자 (떨어지지 않게)', done: '🗿 가고일들이 다시 돌이 됐다' },
       { kind: 'photo', minDz: 60, line: '📷 탑 위에서 가고일 너머 파리를 한 장 (3)', label: '노트르담 탑 위에서 본 파리' },
       { kind: 'talk', line: '🔔 캉탱에게 돌아가자', fr: 'Elles vont bien ? Ah, mes belles !', ko: '다들 잘 있던가요? 아, 내 예쁜이들! 2019년 불 속에서도 저 탑은 버텼어요.' },
     ],
@@ -106,7 +113,8 @@ export const CHAPTERS: Chapter[] = [
     intro: { fr: 'Je peins Paris depuis les marches. Montez, asseyez-vous, regardez… et dites-moi ce que je dois peindre.', ko: '계단에서 파리를 그리고 있어요. 올라가서 앉아 봐요, 가만히 내려다보고… 그다음엔 돔 위에서 본 걸 알려 줘요. 오늘 그림은 당신이 정해요.' },
     beats: [
       { kind: 'high', at: [-30, 0], r: 42, dz: 11.4, line: '⛪ 큰 계단을 올라 성당 앞까지(몽마르트르 언덕 꼭대기)', done: '⛪ 파리에서 가장 높은 언덕. 발밑에 도시가 펼쳐진다' },
-      { kind: 'sit', at: [-30, 0], r: 42, minDz: 11, secs: 8, line: '🪑 성당 앞 계단에 앉아 파리를 내려다보자 (4 앉기)', done: '🪑 한참 앉아 있었다. 아코디언 소리가 어디선가 들린다' },
+      { kind: 'fight', at: [-50, 0], foes: ['rat', 'rat', 'rat', 'gargoyle'], line: '🐀 계단의 화가들을 괴롭히는 쥐 기사들을 쫓아내자', done: '🐀 계단이 다시 평화로워졌다' },
+      { kind: 'sit', at: [-30, 0], r: 42, minDz: 11, secs: 8, line: '🪑 성당 앞 계단에 앉아 파리를 내려다보자 (4 또는 🧚 메뉴 → 🪑 앉기)', done: '🪑 한참 앉아 있었다. 아코디언 소리가 어디선가 들린다' },
       { kind: 'high', at: [10, 0], r: 14, dz: 45, line: '⛪ 큰 돔 꼭대기로 — 드럼 벽을 타고 올라가자', done: '⛪ 돔 위! 에펠탑과 몽파르나스 타워가 한눈에' },
       { kind: 'talk', line: '🎨 엘로디에게 무엇을 봤는지 말해 주자', fr: 'Alors ? … Les toits gris et la tour au loin. D’accord, je la peins pour vous !', ko: '그래서요? … 회색 지붕들과 멀리 탑. 좋아요, 당신 걸로 그려 줄게요!' },
     ],
@@ -255,7 +263,15 @@ export class Story {
     if (!this.started.has(ch.id)) return ch.giver ? `${ch.giver.name}에게 말을 걸자` : ch.intro.ko;
     const r = this.run(ch.id), b = ch.beats[r.beat];
     if (!b) return '';
+    if (b.kind === 'photo') return b.line.replace('(3)', '— 오른쪽 위 📷 단추(또는 3)');
     return b.kind === 'fetch' ? `${b.line} (${r.got}/${b.spots.length})` : b.line;
+  }
+  /** 지금 추적 중인 이벤트가 사진을 기다리나(📷 단추를 반짝인다) */
+  get wantsPhoto() {
+    const id = this.tracked;
+    if (!id || this.done.has(id) || !this.started.has(id)) return false;
+    const r = this.run(id);
+    return r.ch.beats[r.beat]?.kind === 'photo';
   }
   landmarkName(ch: Chapter) { return LANDMARKS.find((l) => l.id === ch.landmark)?.name ?? ch.landmark; }
   distTo(ch: Chapter) { const L = this.lm(ch.landmark), b = this.hero.body; return L ? Math.hypot(L.x - b.x, L.y - b.y) : Infinity; }
@@ -301,7 +317,7 @@ export class Story {
     const b = ch.beats[r.beat];
     if (!b) return null;
     switch (b.kind) {
-      case 'reach': case 'high': case 'sit': return this.at(ch.landmark, b.at);
+      case 'reach': case 'high': case 'sit': case 'fight': return this.at(ch.landmark, b.at);
       case 'fetch': { const i = r.picked.findIndex((p) => !p); return i >= 0 ? this.at(ch.landmark, [b.spots[i][0], b.spots[i][1]]) : null; }
       case 'talk': return r.npc ? [r.npc.x, r.npc.y] : ch.giver ? this.at(ch.landmark, ch.giver.at) : null;
       case 'photo': return b.of ? this.at(ch.landmark, b.of) : null;
@@ -383,6 +399,13 @@ export class Story {
         break;
       case 'check': if (bt.test(this)) this.advance(r, bt.done); break;
       case 'fetch': this.stepFetch(r, bt); break;
+      case 'fight': {
+        const key = `story:${ch.id}:${r.beat}`;
+        const [x, y] = this.at(ch.landmark, bt.at)!;
+        if (Math.hypot(x - b.x, y - b.y) < 90) this.h.c.fight?.(key, x, y, L.z + (bt.dz ?? 0), bt.foes);
+        if (this.h.c.fightDone?.(key)) this.advance(r, bt.done);
+        break;
+      }
       default: break;
     }
   }

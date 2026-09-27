@@ -2,6 +2,8 @@
 // 순간이동 포인트 · 연 보물상자 · 오늘의 의뢰 · 기원 천장. 판이 끝나도 남는다(localStorage).
 
 export const AR_MAX = 30;
+/** 처음부터 켜져 있는 순간이동 포인트 */
+export const START_WAYPOINTS = ['wp-eiffel', 'wp-trocadero', 'wp-marais'];
 /** 이 등급에서 다음 등급까지 필요한 경험치 */
 export const arNeed = (ar: number) => Math.round(250 + ar * 90 + ar * ar * 6);
 
@@ -29,6 +31,8 @@ interface Save {
   day: string; commissions: Commission[]; commissionBonus: boolean;
   pity4: number; pity5: number; wishes: number;
   last?: string;
+  /** 처음부터 켜 두는 순간이동 포인트를 줬나 */
+  granted?: boolean;
 }
 const KEY = 'carnet-progress-v1';
 const today = () => new Date().toISOString().slice(0, 10);
@@ -45,6 +49,7 @@ export class Progress {
   pity4 = 0; pity5 = 0; wishes = 0;
   /** 마지막으로 켜거나 순간이동한 포인트(이어서 하기) */
   last = '';
+  granted = false;
   onXp?: (gain: number, why: string) => void;
   onRank?: (ar: number, reward: { stars: number; eur: number }) => void;
   onCommission?: (c: Commission, all: boolean) => void;
@@ -60,15 +65,17 @@ export class Progress {
         for (const x of d.plumesGot ?? []) this.plumesGot.add(x);
         for (const x of d.rings ?? []) this.rings.add(x);
         this.day = d.day ?? ''; this.commissions = d.commissions ?? []; this.commissionBonus = !!d.commissionBonus;
-        this.pity4 = d.pity4 ?? 0; this.pity5 = d.pity5 ?? 0; this.wishes = d.wishes ?? 0; this.last = d.last ?? '';
+        this.pity4 = d.pity4 ?? 0; this.pity5 = d.pity5 ?? 0; this.wishes = d.wishes ?? 0; this.last = d.last ?? ''; this.granted = !!d.granted;
       }
     } catch { /* 처음부터 */ }
     if (this.commissions.some((c) => c.kind === 'eat')) this.commissions = [];
+    // 처음부터 켜 둔 순간이동 포인트: 샹드마르스(에펠탑) · 트로카데로 · 마레
+    if (!this.granted) { this.granted = true; for (const id of START_WAYPOINTS) this.waypoints.add(id); this.save(); }
     this.rollDay();
   }
 
   save() {
-    const d: Save = { ar: this.ar, xp: this.xp, stars: this.stars, plumes: this.plumes, offered: this.offered, waypoints: [...this.waypoints], chests: [...this.chests], plumesGot: [...this.plumesGot], rings: [...this.rings], day: this.day, commissions: this.commissions, commissionBonus: this.commissionBonus, pity4: this.pity4, pity5: this.pity5, wishes: this.wishes, last: this.last };
+    const d: Save = { ar: this.ar, xp: this.xp, stars: this.stars, plumes: this.plumes, offered: this.offered, waypoints: [...this.waypoints], chests: [...this.chests], plumesGot: [...this.plumesGot], rings: [...this.rings], day: this.day, commissions: this.commissions, commissionBonus: this.commissionBonus, pity4: this.pity4, pity5: this.pity5, wishes: this.wishes, last: this.last, granted: this.granted };
     try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { /* 무시 */ }
     this.onChange?.();
   }

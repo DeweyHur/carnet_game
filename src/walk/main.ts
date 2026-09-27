@@ -35,7 +35,9 @@ import { Combat } from './combat';
 import { Companion } from './companion';
 import { Ascend } from './ascend';
 import { Domain } from './domain';
-import { Prologue, PROLOGUE_START, TOWER } from './prologue';
+import { Prologue, PROLOGUE_START, TOWER, KING_AT } from './prologue';
+import { GEAR } from './gear';
+import type { Kind as FoeKind } from './combat';
 import { CHAPTERS } from './street/story';
 
 maplibregl.setWorkerUrl(workerUrl);
@@ -268,7 +270,7 @@ function frameBody(t: number) {
   districtAcc += dt;
   if (districtAcc > 1.5) { districtAcc = 0; autoDistrict(); }
   lookAcc += dt;
-  if (lookAcc > 0.25 && S.started && hero) { lookAcc = 0; look(); paintSky(); milestones(); }
+  if (lookAcc > 0.25 && S.started && hero) { lookAcc = 0; look(); paintSky(); milestones(); photoBtn.classList.toggle('nudge', !!street?.wantsPhoto || prologue?.stepId === 'photo'); }
 }
 
 /** 거리(Town)에 이 동네의 장소(가게 간판)·지하철 입구·버스 정류장을 알려 준다(풍경) */
@@ -495,6 +497,8 @@ function makeStreet(): Street {
     frozen: () => modalOpen() || mapMode,
     charm: () => wardrobe.has('mariniere'),
     gear: (id) => wardrobe.unlock(id),
+    fight: (key, x, y, z, foes) => combat?.spawnCamp(key, x, y, z, 0.3, foes as FoeKind[]),
+    fightDone: (key) => !!combat?.campDone(key),
   });
 }
 
@@ -527,7 +531,7 @@ function setupAdventure() {
   progress.onChange = () => { journal?.refresh(); paintMenu(); for (const [id, el] of wpPins) el.classList.toggle('on', progress.waypoints.has(id)); };
   explore = new Explore({
     hero, progress, toast, hint: (s2) => hint(s2), money: (eur) => addMoney(wardrobe.has('satchel') ? Math.round(eur * 1.5) : eur), xpMul,
-    camp: (key, x, y, z, seed, only) => combat?.spawnCamp(key, x, y, z, seed, only),
+    camp: (key, x, y, z, seed, only) => combat?.spawnCamp(key, x, y, z, seed, only ?? towerRats(x, y, seed)),
     calm: (x, y) => !!prologue && !prologue.done && (() => { const [tx, ty] = hero.frame.toLocal(TOWER); return Math.hypot(x - tx, y - ty) < 450; })(),
     revealNear: (pos, r) => { let n = 0; for (const p of places) if (!p.minor && !S.seen.has(p.id) && dist(p.pos, pos) < r) { S.seen.set(p.id, S.clock); showMarker(p); n++; } return n; },
   });
@@ -538,6 +542,12 @@ function setupAdventure() {
     night: () => hero.town.uniforms.uNight.value,
     cleared: (key) => { if (key.startsWith('dom:')) domain?.cleared(key); else explore.unlock(key); },
     bossSpot: () => explore.bossSpot(),
+    kingSpot: () => { const [x, y] = hero.frame.toLocal(KING_AT); return [x, y, hero.world.terrain(x, y)]; },
+    kingSlain: () => {
+      // 5★ 장비 하나(없는 것) — 다 있으면 별조각
+      const g = GEAR.filter((q) => q.star === 5 && !wardrobe.owned.has(q.id))[0];
+      if (g) wardrobe.unlock(g.id); else progress.addStars(120);
+    },
     respawn: async () => {
       if (domain?.active) { await domain.fail('down'); return; } // 비경에서 쓰러지면 입구 앞으로
       // 가장 가까운 켠 순간이동 포인트(없으면 샹드마르스)
@@ -574,6 +584,11 @@ function setupAdventure() {
       if (companion) companion.hush = on;
     },
     touch: () => document.body.classList.contains('touch-play'),
+    mapOpen: () => mapMode,
+    photos: () => street?.stats.photos ?? 0,
+    king: () => combat?.kingInfo() ?? null,
+    provoke: (on) => { if (combat) combat.kingProvoked = on; },
+    downs: () => combat?.downs ?? 0,
   });
   wish = new Wish(progress, wardrobe, addMoney);
   wish.onToggle = () => paintMenu();
@@ -650,6 +665,13 @@ function setupGear() {
     if (on) { hint(''); menu(false); }
     if (on && hero.body.mode === 'ground') hero.body.facing = (hero.cam.yaw + 180) % 360; // 카메라 쪽으로 돌아선다
   };
+}
+
+/** 에펠탑 둘레(1.1 km)의 요괴 무리는 거의 쥐 — 탑 밑 하수도에서 올라온다 */
+function towerRats(x: number, y: number, seed: number): FoeKind[] | undefined {
+  const [tx, ty] = hero.frame.toLocal(TOWER);
+  if (Math.hypot(x - tx, y - ty) > 1100) return undefined;
+  return seed < 0.4 ? ['rat', 'rat', 'rat'] : seed < 0.75 ? ['rat', 'rat', 'slime', 'rat'] : ['rat', 'rat', 'gargoyle'];
 }
 
 /** 걷다 보면 생기는 것들 — 의뢰·경험치·장비 */
@@ -850,6 +872,8 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#menu .mgrid butto
       case 'gear': menu(false); closet.toggle(true); break;
       case 'wish': menu(false); wish.toggle(true); break;
       case 'photo': menu(false); setTimeout(() => hero.input.press('photo'), 250); break;
+      case 'sit': menu(false); setTimeout(() => hero.input.press('sit'), 200); break;
+      case 'wave': menu(false); setTimeout(() => hero.input.press('wave'), 200); break;
       case 'sound': sfx.unlock(); sfx.setMuted(!sfx.isMuted()); paintMenu(); break;
       case 'keys': { const k = $<HTMLElement>('.mkeys'); k.hidden = !k.hidden; break; }
     }
@@ -969,6 +993,8 @@ tap('#gear-go', () => { menu(false); journal.toggle(false); closet.toggle(); });
 tap('#wish-go', () => { menu(false); closet.toggle(false); journal.toggle(false); wish.toggle(); });
 tap('#journal-go', () => { menu(false); closet.toggle(false); journal.toggle(); });
 tap('#menu-go', () => menu());
+const photoBtn = $<HTMLButtonElement>('#photo-go');
+tap('#photo-go', () => { menu(false); hero.input.press('photo'); });
 window.addEventListener('keydown', (e) => {
   if (!S.started || e.repeat || domain?.active) return;
   const free = !modalOpen() && !mapMode;

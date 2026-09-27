@@ -26,15 +26,24 @@ export interface CombatCtx {
   cleared(key: string): void;
   /** 우두머리 자리(로컬) — 없으면 null */
   bossSpot(): [number, number, number] | null;
+  /** 쥐왕의 굴(로컬) — 없으면 null */
+  kingSpot?(): [number, number, number] | null;
+  /** 쥐왕을 쓰러뜨렸다 */
+  kingSlain?(): void;
 }
 
-type Kind = 'slime' | 'rat' | 'gargoyle' | 'boss';
+export type Kind = 'slime' | 'rat' | 'gargoyle' | 'boss' | 'ratking';
 const STATS: Record<Kind, { hp: number; dmg: number; speed: number; range: number; windup: number; cd: number; xp: number; eur: number; name: string; fly?: boolean }> = {
   slime: { hp: 70, dmg: 8, speed: 2.4, range: 1.4, windup: 0.55, cd: 1.7, xp: 8, eur: 1, name: '센 강 안개 슬라임' },
   rat: { hp: 110, dmg: 11, speed: 3.6, range: 1.9, windup: 0.6, cd: 1.9, xp: 12, eur: 2, name: '하수도 쥐 기사' },
   gargoyle: { hp: 150, dmg: 15, speed: 5, range: 9, windup: 0.85, cd: 3.2, xp: 20, eur: 3, name: '돌 가고일', fly: true },
   boss: { hp: 1800, dmg: 20, speed: 4, range: 5, windup: 1.2, cd: 2.6, xp: 400, eur: 40, name: '노트르담의 큰 가고일', fly: true },
+  // 쥐왕: 모험 등급을 따라 세지지 않는다(늘 Lv.40) — 처음엔 두 방이면 쓰러지고, 등급을 올려야 잡는다
+  ratking: { hp: 7000, dmg: 75, speed: 5.4, range: 3.4, windup: 1.0, cd: 2.1, xp: 3000, eur: 150, name: '쥐왕 (Roi des Rats)' },
 };
+const RATKING_LV = 40;
+/** 덩치 큰 우두머리(내려치기·돌진·빨간 원) */
+const big = (f: { kind: Kind }) => f.kind === 'boss' || f.kind === 'ratking';
 
 interface Foe {
   id: number; kind: Kind; lv: number;
@@ -72,6 +81,14 @@ export class Combat {
   private tornado: { x: number; y: number; dx: number; dy: number; t: number; tick: number; obj: THREE.Object3D } | null = null;
   private bossDay = '';
   private boss: Foe | null = null;
+  // 쥐왕
+  private king: Foe | null = null;
+  private kingDay = '';
+  private kingRing: THREE.Mesh | null = null;
+  /** 첫걸음의 만남: 멀리서도 달려든다 */
+  kingProvoked = false;
+  /** 쓰러진 횟수 */
+  downs = 0;
   // 화면
   private readonly ui: HTMLElement;
   private readonly hpBar: HTMLElement;
@@ -86,7 +103,7 @@ export class Combat {
   constructor(c: CombatCtx) {
     this.c = c;
     this.group.name = 'combat';
-    try { this.bossDay = localStorage.getItem('carnet-boss-day') ?? ''; } catch { /* 무시 */ }
+    try { this.bossDay = localStorage.getItem('carnet-boss-day') ?? ''; this.kingDay = localStorage.getItem('carnet-ratking-day') ?? ''; } catch { /* 무시 */ }
     this.ui = document.createElement('div');
     this.ui.className = 'cbt';
     this.ui.innerHTML = `<div class="hp"><i></i><span></span></div>
@@ -113,6 +130,8 @@ export class Combat {
     this.recalc(true);
   }
 
+  /** 적의 힘: 보통은 적 레벨로, 쥐왕은 고정 — 대신 모험 등급이 오를수록 덜 아프다(방어, 최대 절반) */
+  private lvMul(f: Foe) { return f.kind === 'ratking' ? 1 - Math.min(0.5, this.ar * 0.025) : 1 + 0.2 * (f.lv - 1); }
   private get hero() { return this.c.hero; }
   /** 지금 몸이 선 세계(비경 안이면 비경) */
   private get W() { return this.hero.sceneWorld ?? this.hero.world; }
@@ -145,8 +164,8 @@ export class Combat {
 
   private spawn(kind: Kind, x: number, y: number, z: number, camp: Camp | null): Foe {
     const S = STATS[kind];
-    const lv = 1 + Math.floor(this.ar / 4);
-    const hp = Math.round(S.hp * (1 + 0.28 * (lv - 1)));
+    const lv = kind === 'ratking' ? RATKING_LV : 1 + Math.floor(this.ar / 4);
+    const hp = kind === 'ratking' ? S.hp : Math.round(S.hp * (1 + 0.28 * (lv - 1)));
     const { obj, mats } = this.model(kind);
     obj.position.set(x, y, z);
     this.group.add(obj);
@@ -169,8 +188,9 @@ export class Combat {
       for (const sx of [-1, 1]) body.add(new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6).translate(sx * 0.17, 0.46, 0.55), eye));
       const wisp = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 8).rotateX(Math.PI / 2).translate(0, 0, 0.95), M(0xcfe6f7, { transparent: true, opacity: 0.7 }));
       body.add(wisp);
-    } else if (kind === 'rat') {
-      const fur = M(0x6e6258), pink = M(0xe8a7a0), steel = M(0xc9ccd0), red = M(0xb3262c);
+    } else if (kind === 'rat' || kind === 'ratking') {
+      const king = kind === 'ratking';
+      const fur = M(king ? 0x3a322d : 0x6e6258), pink = M(0xe8a7a0), steel = M(king ? 0xe6c35a : 0xc9ccd0), red = M(0xb3262c);
       body.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.45, 4, 10).rotateX(Math.PI / 2).translate(0, 0, 0.62), fur));
       const head = new THREE.Group(); head.position.set(0, 0.12, 1.12); body.add(head);
       head.add(new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), fur));
@@ -183,6 +203,15 @@ export class Combat {
       arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.75).translate(0, 0.12, -0.25).rotateX(-1.1), steel)); // 칼
       body.userData.arm = arm;
       for (const sx of [-1, 1]) body.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.3, 3, 6).rotateX(Math.PI / 2).translate(sx * 0.13, 0, 0.2), fur));
+      if (king) {
+        // 쥐왕: 세 배 덩치, 금관, 붉은 망토, 빛나는 눈
+        const gold = M(0xe6b422, { emissive: 0x3a2a00 });
+        for (let i = 0; i < 6; i++) { const a = (i / 6) * TAU; head.add(new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.12, 5).rotateX(Math.PI / 2).translate(Math.cos(a) * 0.13, Math.sin(a) * 0.13, 0.33), gold)); }
+        head.add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.06, 14, 1, true).rotateX(Math.PI / 2).translate(0, 0, 0.27), gold));
+        const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.9).rotateX(Math.PI / 2 - 0.25).translate(0, -0.3, 0.65), M(0x8e1a22, { side: THREE.DoubleSide }));
+        body.add(cape);
+        body.scale.setScalar(3.1);
+      }
     } else {
       const big = kind === 'boss' ? 3.2 : 1;
       const stone = M(kind === 'boss' ? 0x5c5f66 : 0x8a8d93), dark = M(kind === 'boss' ? 0x3b3d42 : 0x6c6f75);
@@ -235,6 +264,7 @@ export class Combat {
     else if (this.pending && b.act?.kind !== this.pending.kind) this.pending = null;
     for (const e of this.hero.events) if (e === 'plunge') this.plungeHit();
     this.stepBoss();
+    this.stepKing();
     for (const foe of this.foes.slice()) this.stepFoe(foe, dt);
     this.stepTornado(dt);
     this.stepFx(dt);
@@ -245,12 +275,13 @@ export class Combat {
   // ───────── 비경(따로 떨어진 곳) ─────────
   /** 비경 안인가: 우두머리를 깨우지 않고, 바깥 적은 잠시 치워 둔다 */
   zone = false;
-  private stashed: { foes: Foe[]; camps: Map<string, Camp>; boss: Foe | null } | null = null;
+  private stashed: { foes: Foe[]; camps: Map<string, Camp>; boss: Foe | null; king: Foe | null } | null = null;
   enterZone() {
     if (this.zone) return;
     for (const f of this.foes) { this.group.remove(f.obj); f.bar?.remove(); f.bar = null; if (f.slam) { this.group.remove(f.slam); f.slam = undefined; } if (f.state !== 'dead') f.state = 'idle'; }
-    this.stashed = { foes: this.foes, camps: this.camps, boss: this.boss };
-    this.foes = []; this.camps = new Map(); this.boss = null;
+    this.stashed = { foes: this.foes, camps: this.camps, boss: this.boss, king: this.king };
+    this.foes = []; this.camps = new Map(); this.boss = null; this.king = null;
+    if (this.kingRing) this.kingRing.visible = false;
     this.clearFx();
     this.bossBar.classList.remove('on');
     this.zone = true;
@@ -260,7 +291,7 @@ export class Combat {
     this.clearAll();
     const st = this.stashed;
     if (st) {
-      this.foes = st.foes; this.camps = st.camps; this.boss = st.boss;
+      this.foes = st.foes; this.camps = st.camps; this.boss = st.boss; this.king = st.king;
       for (const f of this.foes) if (f.state !== 'dead') this.group.add(f.obj);
       // 바깥 적은 제자리로
       for (const f of this.foes) if (f.state !== 'dead') { [f.x, f.y, f.z] = f.home; f.hp = f.maxHp; }
@@ -279,7 +310,8 @@ export class Combat {
 
   private clearAll() {
     for (const f of this.foes) { this.group.remove(f.obj); f.bar?.remove(); if (f.slam) this.group.remove(f.slam); }
-    this.foes = []; this.camps.clear(); this.boss = null;
+    this.foes = []; this.camps.clear(); this.boss = null; this.king = null;
+    if (this.kingRing) this.kingRing.visible = false;
     for (const x of this.fx) this.group.remove(x.obj);
     this.fx = [];
     if (this.tornado) { this.group.remove(this.tornado.obj); this.tornado = null; }
@@ -363,7 +395,7 @@ export class Combat {
         const k = Math.min(1, 2 / Math.max(0.1, d));
         f.x += (b.x - f.x) * k * 0.6; f.y += (b.y - f.y) * k * 0.6;
         this.damage(f, this.atk * 2.2, 'skill');
-        if (f.kind !== 'boss') { f.lift = 0.1; f.vz = 5; }
+        if (!big(f)) { f.lift = 0.1; f.vz = 5; }
         n++;
       }
       this.energy = Math.min(this.energyMax, this.energy + n * 6 + (n ? 4 : 0));
@@ -377,12 +409,12 @@ export class Combat {
     for (const f of this.foes) {
       if (f.state === 'dead') continue;
       const dx = f.x - b.x, dy = f.y - b.y, d = Math.hypot(dx, dy);
-      const size = f.kind === 'boss' ? 2.4 : 0.5;
-      if (d - size > reach || Math.abs(f.z + (f.kind === 'boss' ? 2 : 0.6) - (b.z + 1)) > (f.kind === 'boss' ? 4 : 2.2)) continue;
+      const size = big(f) ? 2.4 : 0.5;
+      if (d - size > reach || Math.abs(f.z + (big(f) ? 2 : 0.6) - (b.z + 1)) > (big(f) ? 4 : 2.2)) continue;
       if (d > size && Math.abs(angDiff(b.facing, bearing(dx, dy))) > cone / 2) continue;
       this.damage(f, this.atk * (kind === 'atk1' ? 1 : kind === 'atk2' ? 1.1 : 1.8), heavy ? 'heavy' : 'hit');
       // 밀어낸다
-      if (f.kind !== 'boss') { const k = heavy ? 1.6 : 0.6; f.x += (dx / (d || 1)) * k; f.y += (dy / (d || 1)) * k; }
+      if (!big(f)) { const k = heavy ? 1.6 : 0.6; f.x += (dx / (d || 1)) * k; f.y += (dy / (d || 1)) * k; }
       n++;
     }
     if (n) { this.energy = Math.min(this.energyMax, this.energy + 2 * n); sfx.bump(); }
@@ -396,7 +428,7 @@ export class Combat {
     let n = 0;
     for (const f of this.foes) {
       if (f.state === 'dead') continue;
-      if (Math.hypot(f.x - b.x, f.y - b.y) > (f.kind === 'boss' ? 5.5 : 3.4) || Math.abs(f.z - b.z) > 4) continue;
+      if (Math.hypot(f.x - b.x, f.y - b.y) > (big(f) ? 5.5 : 3.4) || Math.abs(f.z - b.z) > 4) continue;
       this.damage(f, this.atk * (2.6 + Math.min(3, drop / 10)), 'heavy');
       n++;
     }
@@ -410,7 +442,7 @@ export class Combat {
     f.flash = 0.12;
     f.seen = 4;
     if (f.state === 'idle' || f.state === 'return') this.aggro(f);
-    this.float(f.x, f.y, f.z + (f.kind === 'boss' ? 5.5 : 1.6), `${dmg}${crit ? '!' : ''}`, crit ? 'crit' : how === 'skill' || how === 'burst' ? 'wind' : 'dmg');
+    this.float(f.x, f.y, f.z + (big(f) ? 5.5 : 1.6), `${dmg}${crit ? '!' : ''}`, crit ? 'crit' : how === 'skill' || how === 'burst' ? 'wind' : 'dmg');
     if (f.hp <= 0) this.kill(f);
   }
 
@@ -423,8 +455,9 @@ export class Combat {
     this.burstWind(f.x, f.y, f.z + 0.8, f.kind === 'slime' ? 0x9fc9ea : f.kind === 'rat' ? 0xb8a898 : 0xbfc3c9);
     sfx.chime();
     const P = this.c.progress;
-    P.addXp(Math.round(S.xp * f.lv * this.c.xpMul()), S.name);
-    this.c.money(S.eur * f.lv);
+    const lvK = f.kind === 'ratking' ? 1 : f.lv;
+    P.addXp(Math.round(S.xp * lvK * this.c.xpMul()), S.name);
+    this.c.money(S.eur * lvK);
     P.bump('defeat');
     if (f.kind === 'boss') {
       P.stars += 60;
@@ -435,11 +468,26 @@ export class Combat {
       this.bossDay = new Date().toISOString().slice(0, 10);
       try { localStorage.setItem('carnet-boss-day', this.bossDay); } catch { /* 무시 */ }
     }
+    if (f.kind === 'ratking') {
+      P.stars += 300;
+      this.king = null;
+      this.kingProvoked = false;
+      if (this.kingRing) this.kingRing.visible = false;
+      this.bossBar.classList.remove('on');
+      sfx.fanfare();
+      this.c.toast(`🐀👑 쥐왕을 쓰러뜨렸다!! ⭐300 · €${S.eur} · 경험치 ${Math.round(S.xp * this.c.xpMul())} — 파리의 쥐들이 잠잠해진다(내일 다시 나타난다)`);
+      this.kingDay = new Date().toISOString().slice(0, 10);
+      try { localStorage.setItem('carnet-ratking-day', this.kingDay); localStorage.setItem('carnet-ratking-slain', '1'); } catch { /* 무시 */ }
+      this.c.kingSlain?.();
+    }
     const camp = f.camp;
     if (camp && !camp.done && camp.foes.every((q) => q.state === 'dead')) {
       camp.done = true;
-      if (camp.key.startsWith('dom:')) this.c.cleared(camp.key); // 비경의 물결 — 알림은 비경이
-      else setTimeout(() => { sfx.questDone(); this.c.toast('⚔️ 적을 모두 물리쳤다 — 보물상자의 봉인이 풀렸다'); this.c.cleared(camp.key); }, 600);
+      const k = camp.key;
+      if (k.startsWith('dom:')) this.c.cleared(k); // 비경의 물결 — 알림은 비경이
+      else if (k.startsWith('story:')) { sfx.questDone(); this.c.cleared(k); }
+      else if (k.startsWith('pack:')) setTimeout(() => { sfx.questDone(); this.c.toast(`⚔️ ${camp.foes.some((q) => q.kind === 'rat') ? '🐀 쥐 떼를' : '요괴 무리를'} 쫓아냈다`); this.c.cleared(k); }, 500);
+      else setTimeout(() => { sfx.questDone(); this.c.toast('⚔️ 적을 모두 물리쳤다 — 보물상자의 봉인이 풀렸다'); this.c.cleared(k); }, 600);
     }
   }
 
@@ -466,7 +514,7 @@ export class Combat {
     }
     const dx = b.x - f.x, dy = b.y - f.y, d = Math.hypot(dx, dy);
     const far = Math.hypot(f.x - f.home[0], f.y - f.home[1]);
-    if (d > 180) { f.obj.visible = false; return; }
+    if (d > (f.kind === 'ratking' ? 460 : 180)) { f.obj.visible = false; return; }
     f.obj.visible = true;
     // 떠오름(스킬에 맞아)
     if (f.lift > 0 || f.vz > 0) { f.vz -= 18 * dt; f.lift = Math.max(0, f.lift + f.vz * dt); if (f.lift === 0) f.vz = 0; }
@@ -484,7 +532,7 @@ export class Combat {
         f.wander -= dt;
         if (f.wander < 0) { f.wander = 3 + Math.random() * 4; f.dash = [f.home[0] + (Math.random() - 0.5) * 6, f.home[1] + (Math.random() - 0.5) * 6]; }
         if (f.dash) move(f.dash[0], f.dash[1], S.speed * 0.35);
-        if (d < (f.kind === 'boss' ? 22 : 13) && Math.abs(b.z - f.z) < 8 && !this.downing) this.aggro(f);
+        if (d < (f.kind === 'ratking' ? (this.kingProvoked ? 70 : 15) : big(f) ? 22 : 13) && Math.abs(b.z - f.z) < 8 && !this.downing) this.aggro(f);
         break;
       case 'return':
         move(f.home[0], f.home[1], S.speed * 1.2);
@@ -493,24 +541,24 @@ export class Combat {
         break;
       case 'chase':
         f.cd -= dt;
-        if (far > (f.kind === 'boss' ? 45 : 28) || this.downing) { f.state = 'return'; break; }
+        if (far > (f.kind === 'ratking' ? (this.kingProvoked ? 90 : 34) : big(f) ? 45 : 28) || this.downing) { f.state = 'return'; break; }
         if (d > S.range * (f.kind === 'gargoyle' ? 1 : 0.85)) move(b.x, b.y, S.speed);
-        else { f.facing = bearing(dx, dy); if (f.cd <= 0) { f.state = 'windup'; f.t = 0; if (f.kind === 'boss' && d < 6) this.telegraph(f, b.x, b.y); } }
+        else { f.facing = bearing(dx, dy); if (f.cd <= 0) { f.state = 'windup'; f.t = 0; if (big(f) && d < 6) this.telegraph(f, b.x, b.y); } }
         if (f.kind === 'gargoyle' && d < S.range && f.cd <= 0) { f.state = 'windup'; f.t = 0; }
         break;
       case 'windup': {
         f.facing = bearing(dx, dy);
         if (f.t >= S.windup) {
-          if (f.kind === 'gargoyle' || (f.kind === 'boss' && !f.slam)) { f.state = 'dash'; f.t = 0; const L = d || 1; f.dash = [dx / L, dy / L]; }
-          else { this.foeHit(f, f.kind === 'boss' ? 4.5 : S.range + 0.5); f.state = 'recover'; f.t = 0; }
+          if (f.kind === 'gargoyle' || (big(f) && !f.slam)) { f.state = 'dash'; f.t = 0; const L = d || 1; f.dash = [dx / L, dy / L]; }
+          else { this.foeHit(f, big(f) ? 4.5 : S.range + 0.5); f.state = 'recover'; f.t = 0; }
         }
         break;
       }
       case 'dash': {
-        const sp = f.kind === 'boss' ? 16 : 13;
+        const sp = big(f) ? 16 : 13;
         const p = { x: f.x + f.dash![0] * sp * dt, y: f.y + f.dash![1] * sp * dt };
         f.x = p.x; f.y = p.y;
-        if (Math.hypot(b.x - f.x, b.y - f.y) < (f.kind === 'boss' ? 2.6 : 1.3) && Math.abs(b.z + 1 - (f.z + 1)) < 2.5) { this.hurt(S.dmg * (1 + 0.2 * (f.lv - 1)), f); f.state = 'recover'; f.t = 0; }
+        if (Math.hypot(b.x - f.x, b.y - f.y) < (big(f) ? 2.6 : 1.3) && Math.abs(b.z + 1 - (f.z + 1)) < 2.5) { this.hurt(S.dmg * this.lvMul(f), f); f.state = 'recover'; f.t = 0; }
         if (f.t > 0.55) { f.state = 'recover'; f.t = 0; }
         break;
       }
@@ -520,14 +568,14 @@ export class Combat {
     }
     // 높이: 걷는 것은 땅을, 나는 것은 땅 위 2.5 m를 따른다
     const g = w.ground(f.x, f.y, f.z + 1.5, 2);
-    const want = S.fly ? Math.max(g, w.terrain(f.x, f.y)) + (f.kind === 'boss' ? 1.2 : 2.3) + Math.sin(f.t * 2 + f.id) * 0.25 : g;
+    const want = S.fly ? Math.max(g, w.terrain(f.x, f.y)) + (big(f) ? 1.2 : 2.3) + Math.sin(f.t * 2 + f.id) * 0.25 : g;
     f.z += (want - f.z) * Math.min(1, dt * (S.fly ? 3 : 12));
     f.obj.position.set(f.x, f.y, f.z + f.lift);
     f.obj.rotation.z = (-f.facing * Math.PI) / 180;
     // 몸짓
     const wind = f.state === 'windup' ? Math.min(1, f.t / S.windup) : 0;
     if (f.kind === 'slime') { const hop = f.state === 'chase' || f.state === 'return' ? Math.abs(Math.sin(f.t * 7)) : 0.3 * Math.abs(Math.sin(f.t * 2)); body.position.z = hop * 0.35 + wind * 0.2; body.scale.set(1 + wind * 0.25, 1 + wind * 0.25, 1 - wind * 0.35 + hop * 0.1); }
-    else if (f.kind === 'rat') { const arm = body.userData.arm as THREE.Object3D; arm.rotation.x = f.state === 'windup' ? -1.4 * wind : f.state === 'recover' ? 1.2 : Math.sin(f.t * 8) * 0.2; body.rotation.x = f.state === 'chase' ? 0.15 : 0; body.position.z = f.state === 'chase' ? Math.abs(Math.sin(f.t * 10)) * 0.08 : 0; }
+    else if (f.kind === 'rat' || f.kind === 'ratking') { const arm = body.userData.arm as THREE.Object3D; arm.rotation.x = f.state === 'windup' ? -1.4 * wind : f.state === 'recover' ? 1.2 : Math.sin(f.t * 8) * 0.2; body.rotation.x = f.state === 'chase' ? 0.15 : 0; body.position.z = f.state === 'chase' ? Math.abs(Math.sin(f.t * 10)) * 0.08 : 0; }
     else { const wings = f.obj.userData.wings as THREE.Object3D[]; const fl = Math.sin(f.t * (f.state === 'dash' ? 20 : 8)) * 0.6; wings[0].rotation.y = fl; wings[1].rotation.y = -fl; body.rotation.x = f.state === 'windup' ? -0.5 * wind : f.state === 'dash' ? 0.7 : 0; }
     for (const m of f.mats) m.emissive.setHex(f.flash > 0 ? 0xffffff : wind > 0.6 ? 0x661100 : 0x000000);
     if (f.flash > 0) f.flash -= dt;
@@ -545,15 +593,15 @@ export class Combat {
 
   private foeHit(f: Foe, reach: number) {
     const b = this.hero.body, S = STATS[f.kind];
-    if (f.kind === 'boss' && f.slam) {
+    if (big(f) && f.slam) {
       const [x, y] = f.dash!;
       this.group.remove(f.slam); f.slam = undefined;
       this.ring(x, y, this.W.ground(x, y, b.z + 1, 2) + 0.2, 0xff7a50, 4.5);
       sfx.land();
-      if (Math.hypot(b.x - x, b.y - y) < 4.5 && b.z - f.z < 4) this.hurt(S.dmg * 1.4 * (1 + 0.2 * (f.lv - 1)), f);
+      if (Math.hypot(b.x - x, b.y - y) < 4.5 && b.z - f.z < 4) this.hurt(S.dmg * 1.4 * this.lvMul(f), f);
       return;
     }
-    if (Math.hypot(b.x - f.x, b.y - f.y) < reach && Math.abs(b.z - f.z) < 2) this.hurt(S.dmg * (1 + 0.2 * (f.lv - 1)), f);
+    if (Math.hypot(b.x - f.x, b.y - f.y) < reach && Math.abs(b.z - f.z) < 2) this.hurt(S.dmg * this.lvMul(f), f);
   }
 
   private hurt(dmg: number, from: Foe | null) {
@@ -574,6 +622,7 @@ export class Combat {
   private async down() {
     this.hp = 0;
     this.downing = true;
+    this.downs++;
     for (const f of this.foes) if (f.state !== 'dead') { f.state = 'return'; if (f.slam) { this.group.remove(f.slam); f.slam = undefined; } }
     this.c.toast(this.zone ? '💫 쓰러졌다… 비경에서 밀려난다' : '💫 쓰러졌다… 가까운 순간이동 포인트에서 다시 일어난다');
     await new Promise((r) => setTimeout(r, 1200));
@@ -610,6 +659,55 @@ export class Combat {
     }
   }
 
+  // ───────── 쥐왕 ─────────
+  /** 쥐왕이 있나 · 어디 · 싸우는 중인가(첫걸음·리리가 본다) */
+  kingInfo(): { x: number; y: number; hp: number; max: number; fighting: boolean } | null {
+    const f = this.king;
+    if (!f || f.state === 'dead') return null;
+    return { x: f.x, y: f.y, hp: f.hp, max: f.maxHp, fighting: f.state !== 'idle' && f.state !== 'return' };
+  }
+  get kingSlainEver() { try { return !!localStorage.getItem('carnet-ratking-slain'); } catch { return false; } }
+  private stepKing() {
+    if (this.zone) return;
+    const spot = this.c.kingSpot?.();
+    if (!spot) return;
+    const b = this.hero.body;
+    const today = new Date().toISOString().slice(0, 10);
+    if (!this.king) {
+      if (this.kingDay === today || Math.hypot(spot[0] - b.x, spot[1] - b.y) > 420) return;
+      this.king = this.spawn('ratking', spot[0], spot[1], spot[2], null);
+      // 이름표(빨간 글씨) — 멀리서도 보인다
+      const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96;
+      const g = cv.getContext('2d')!;
+      g.fillStyle = '#2a0d0dcc'; g.beginPath(); g.roundRect(6, 10, 500, 76, 26); g.fill();
+      g.font = 'bold 40px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ff6b5e';
+      g.fillText(`👑 ${STATS.ratking.name} · Lv.${RATKING_LV}`, 256, 50);
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      const plate = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, depthTest: false }));
+      plate.scale.set(6, 1.1, 1); plate.position.z = 7.2; plate.renderOrder = 5;
+      this.king.obj.add(plate);
+      if (!this.kingRing) {
+        this.kingRing = new THREE.Mesh(new THREE.RingGeometry(14.2, 15, 64), new THREE.MeshBasicMaterial({ color: 0xff3b2f, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide }));
+        this.group.add(this.kingRing);
+      }
+    }
+    const f = this.king;
+    if (this.kingRing) { this.kingRing.visible = true; this.kingRing.position.set(f.home[0], f.home[1], this.W.ground(f.home[0], f.home[1], f.home[2] + 1, 2) + 0.08); (this.kingRing.material as THREE.MeshBasicMaterial).opacity = 0.3 + 0.2 * Math.sin(performance.now() / 300); }
+    const show = f.state !== 'idle' && f.state !== 'return' && f.state !== 'dead';
+    if (show) {
+      this.bossBar.classList.add('on');
+      this.bossBar.querySelector('b')!.textContent = `👑 ${STATS.ratking.name} · Lv.${RATKING_LV}`;
+      (this.bossBar.querySelector('i') as HTMLElement).style.width = `${Math.max(0, (f.hp / f.maxHp) * 100)}%`;
+    } else if (!this.boss || this.boss.state === 'idle') this.bossBar.classList.remove('on');
+    if (f.state === 'return') this.kingProvoked = false;
+    // 절반이 되면 쥐 기사 셋을 부른다
+    if (f.hp < f.maxHp / 2 && !f.obj.userData.summoned) {
+      f.obj.userData.summoned = true;
+      for (let i = 0; i < 3; i++) { const q = this.spawn('rat', f.x + Math.cos(i * 2.1) * 5, f.y + Math.sin(i * 2.1) * 5, f.z, null); this.aggro(q); }
+      this.c.toast('🐀👑 쥐왕이 휘파람을 불었다 — 쥐 기사들이 몰려온다!');
+    }
+  }
+
   // ───────── 원소 폭발 ─────────
   private tornadoModel() {
     const g = new THREE.Group();
@@ -630,11 +728,11 @@ export class Combat {
     for (const f of this.foes) {
       if (f.state === 'dead') continue;
       const d = Math.hypot(f.x - T.x, f.y - T.y);
-      if (d < 5 && f.kind !== 'boss') { f.x += (T.x - f.x) * Math.min(1, dt * 2.5); f.y += (T.y - f.y) * Math.min(1, dt * 2.5); f.lift = Math.max(f.lift, 0.8 + Math.sin(T.t * 6 + f.id) * 0.3); }
+      if (d < 5 && !big(f)) { f.x += (T.x - f.x) * Math.min(1, dt * 2.5); f.y += (T.y - f.y) * Math.min(1, dt * 2.5); f.lift = Math.max(f.lift, 0.8 + Math.sin(T.t * 6 + f.id) * 0.3); }
     }
     if (T.tick <= 0) {
       T.tick = 0.5;
-      for (const f of this.foes) if (f.state !== 'dead' && Math.hypot(f.x - T.x, f.y - T.y) < (f.kind === 'boss' ? 5.5 : 3.8)) this.damage(f, this.atk * 1.15, 'burst');
+      for (const f of this.foes) if (f.state !== 'dead' && Math.hypot(f.x - T.x, f.y - T.y) < (big(f) ? 5.5 : 3.8)) this.damage(f, this.atk * 1.15, 'burst');
     }
     if (T.t > 6) { this.group.remove(T.obj); this.tornado = null; for (const f of this.foes) f.lift = Math.min(f.lift, 0.01); }
   }
@@ -705,7 +803,7 @@ export class Combat {
   /** 적 머리 위 피 막대(싸우는 중이거나 맞은 적만) */
   private paintMarks() {
     for (const f of this.foes) {
-      const show = f.state !== 'dead' && f.kind !== 'boss' && (f.seen > 0 || f.state === 'chase' || f.state === 'windup' || f.state === 'dash' || f.state === 'recover') && f.obj.visible;
+      const show = f.state !== 'dead' && !big(f) && (f.seen > 0 || f.state === 'chase' || f.state === 'windup' || f.state === 'dash' || f.state === 'recover') && f.obj.visible;
       if (!show) { if (f.bar) { f.bar.remove(); f.bar = null; } continue; }
       if (!f.bar) { f.bar = document.createElement('div'); f.bar.className = 'cbt-bar'; f.bar.innerHTML = `<small>Lv.${f.lv}</small><span><i></i></span>`; this.layer.appendChild(f.bar); }
       if (this.hero.view.project(f.x, f.y, f.z + f.lift + (f.kind === 'gargoyle' ? 1.6 : 1.5), this.pt)) {
@@ -717,7 +815,7 @@ export class Combat {
 
   /** 미니맵: 싸우는 적은 빨간 점 */
   marks(): { x: number; y: number; icon: string }[] {
-    return this.foes.filter((f) => f.state !== 'dead').map((f) => ({ x: f.x, y: f.y, icon: f.kind === 'boss' ? '👑' : f.kind === 'slime' ? '🌫' : f.kind === 'rat' ? '🐀' : '🗿' }));
+    return this.foes.filter((f) => f.state !== 'dead').map((f) => ({ x: f.x, y: f.y, icon: f.kind === 'boss' ? '👑' : f.kind === 'ratking' ? '🐀👑' : f.kind === 'slime' ? '🌫' : f.kind === 'rat' ? '🐀' : '🗿' }));
   }
   list() { return this.foes.map((f) => ({ id: f.id, kind: f.kind, x: f.x, y: f.y, z: f.z, hp: f.hp, max: f.maxHp, state: f.state, camp: f.camp?.key ?? null })); }
   campDone(key: string) { return !!this.camps.get(key)?.done; }

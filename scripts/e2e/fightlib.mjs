@@ -8,7 +8,7 @@ export async function fight(p, done, ms = 120000, dodge = false) {
       const W = window.__walk, C = W.combat(), b = W.hero().body;
       const foes = C.list().filter((f) => f.state !== 'dead').map((f) => ({ ...f, d: Math.hypot(f.x - b.x, f.y - b.y) })).sort((a, b) => a.d - b.d);
       // 빨간 원·날갯짓(기합)을 보고 피해야 할 적
-      const threat = foes.find((f) => f.state === 'windup' && f.d < (f.kind === 'boss' ? 7 : f.kind === 'gargoyle' ? 9 : 2.6)) ?? null;
+      const threat = foes.find((f) => f.state === 'windup' && f.d < (f.kind === 'boss' || f.kind === 'ratking' ? 7 : f.kind === 'gargoyle' ? 9 : 2.6)) ?? null;
       return { foe: foes[0] ?? null, threat, n: foes.length, hp: Math.round(C.hp), max: C.maxHp, energy: C.energy, skillReady: C.skillCd === 0, mode: b.mode };
     });
     if (lastHp !== null && s.hp > lastHp + 50) deaths++;
@@ -25,7 +25,7 @@ export async function fight(p, done, ms = 120000, dodge = false) {
       dodges++;
       continue;
     }
-    const reach = s.foe.kind === 'boss' ? 3.4 : 2.1;
+    const reach = s.foe.kind === 'boss' || s.foe.kind === 'ratking' ? 3.4 : 2.1;
     if (s.foe.d > reach) {
       await E(p, (f) => { window.__bot.steerAt(f.x, f.y); window.__bot.hold('KeyW', true); }, s.foe);
       await p.waitForTimeout(150);

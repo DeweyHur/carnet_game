@@ -11,10 +11,12 @@ export default async (p, shot) => {
   lap(s);
   await E(p, () => window.__bot.stopRender());
   await shot('pro_0_start');
-  // 1) 포인트
-  await E(p, async ([x, y]) => window.__bot.walkTo(x, y, 2, 60000), s.beacon);
-  s = await wait('waypoint'); lap(s);
-  await shot('pro_1_wp');
+  // 1) 지도: M으로 열고 닫기(켜 둔 🔷 확인)
+  await p.keyboard.press('KeyM');
+  await p.waitForTimeout(2000);
+  await shot('pro_1_map');
+  await p.keyboard.press('KeyM');
+  s = await wait('map'); lap(s);
   // 2) 상자
   await E(p, async ([x, y]) => { await window.__bot.walkTo(x, y, 1.6, 30000); await window.__bot.sleep(300); await window.__bot.press('KeyF'); }, s.beacon);
   s = await wait('chest'); lap(s);
@@ -34,6 +36,16 @@ export default async (p, shot) => {
     if (r.opened) break;
   }
   s = await wait('camp'); lap(s);
+  // 5) 사진: 탑을 보고 📷 단추
+  await E(p, () => { const h = window.__walk.hero(), b = h.body; const [tx, ty] = window.__bot.at('eiffel', [0, 0]); h.cam.yaw = Math.atan2(tx - b.x, ty - b.y) * 180 / Math.PI; b.facing = h.cam.yaw; });
+  await p.waitForTimeout(500);
+  console.log('photo nudge', await E(p, () => document.querySelector('#photo-go').classList.contains('nudge')));
+  await p.click('#photo-go', { force: true });
+  s = await wait('photo', 15000); lap(s);
+  // 6) 쥐왕: 걸어가서 가만히(쓰러질 때까지)
+  await E(p, async ([x, y]) => window.__bot.walkTo(x, y, 8, 90000), s.beacon);
+  s = await wait('king', 90000); lap(s);
+  await shot('pro_6_king');
   // 5) 상승
   await E(p, async ([x, y]) => window.__bot.walkTo(x, y, 2.5, 60000), s.beacon);
   const av = await E(p, () => window.__walk.ascend().available);

@@ -24,6 +24,9 @@ export interface StreetCtx {
   charm?: () => boolean;
   /** 장비를 얻었다 */
   gear?: (id: string) => void;
+  /** 이야기 속 싸움: 그 자리에 적 무리를 세운다(이미 있으면 그대로) · 다 물리쳤나 */
+  fight?: (key: string, x: number, y: number, z: number, foes: string[]) => void;
+  fightDone?: (key: string) => boolean;
   /** 모험 경험치·별조각(원신처럼) */
   xp?: (xp: number, stars: number, why: string) => void;
 }
@@ -82,6 +85,9 @@ export class Street {
     this.story = new Story({ ui: this.ui, c, items: this.items, helped: (what) => { this.stats.helped++; this.stats.quests.push(what); }, sparkling: () => this.eiffel.sparkling });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && this.ui.talking) this.ui.onTalkKey?.(-1); });
   }
+
+  /** 지금 사진이 필요한가(📷 단추를 반짝인다) */
+  get wantsPhoto() { return this.quest?.kind === 'photo' || this.eiffel.active === 'photo' || this.story.wantsPhoto; }
 
   /** 대화 중이거나 연출 중이면 걷기를 멈춘다 */
   get holding() { return this.busy || this.ui.talking; }
