@@ -341,7 +341,9 @@ export class Story {
     }
     if (showLine) {
       const id = this.tracked;
-      const s = id && !this.done.has(id) && this.started.has(id) ? `${this.run(id).ch.main ? '⭐ ' : ''}${this.lineOf(this.run(id).ch)}` : '';
+      // 추적 중인 메인은 말을 걸기 전에도 한 줄(누구에게 가면 되는지)
+      const ch = id ? this.run(id).ch : null;
+      const s = ch && !this.done.has(ch.id) && (this.started.has(ch.id) || (ch.main && ch.giver)) ? `${ch.main ? '⭐ ' : ''}${this.lineOf(ch)}` : '';
       if (s !== this.lastLine) { this.lastLine = s; this.h.ui.questLine(s); }
     } else this.lastLine = '\u0000';
   }

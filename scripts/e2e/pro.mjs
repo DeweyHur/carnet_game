@@ -53,12 +53,12 @@ export default async (p, shot) => {
   s = await wait('glide', 10000); lap(s);
   await shot('pro_6_landed');
   // 7) 기원: ✨ 단추 → 1번 → 닫기
-  await p.click('#wish-go');
+  await p.click('#wish-go', { force: true });
   await p.waitForTimeout(700);
-  await p.click('#wish .one');
+  await p.click('#wish .one', { force: true });
   await p.waitForTimeout(1200);
   await shot('pro_7_wish');
-  await p.click('#wish .x');
+  await p.click('#wish .x', { force: true });
   s = await wait('wish'); lap(s);
   // 8) 수첩
   await p.keyboard.press('KeyJ');
