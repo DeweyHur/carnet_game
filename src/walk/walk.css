@@ -653,3 +653,16 @@ body:not(.hero-on) .pro, body.closet-on .pro, body.map-mode .pro { display:none;
 .nudge { animation:nudge 1s ease-in-out infinite !important; box-shadow:0 0 0 3px #7ff5d0, 0 0 18px #7ff5d0 !important; }
 @keyframes nudge { 50% { transform:scale(1.14); } }
 @media (max-width: 560px) { .pro { top:46px; width:calc(100vw - 150px); } .pro .t { font-size:12.5px; } }
+
+/* 비경 */
+.dom-hud { position:fixed; left:50%; top:62px; translate:-50% 0; display:none; align-items:center; gap:12px; background:#1f1b16e6; color:#fff; padding:8px 16px; border-radius:16px; z-index:5; box-shadow:0 4px 16px #0006; font-size:14px; white-space:nowrap; }
+.dom-hud.on { display:flex; }
+.dom-hud b small { color:#d9c2ff; font-weight:600; margin-left:4px; }
+.dom-hud .tm { font-variant-numeric:tabular-nums; font-weight:800; font-size:18px; color:#ffe7a8; }
+.dom-hud .tm.low { color:#ff8a7a; animation:pro-now .6s infinite; }
+.dom-hud .st { color:#ffd166; letter-spacing:1px; }
+.dom-hud > small { color:#cfc6b8; }
+body:not(.domain-on) .dom-hud { display:none; }
+body.domain-on .pro, body.domain-on .asc-btn, body.domain-on .hhelp { display:none !important; }
+body.domain-on #view .pins { display:none; }
+@media (max-width: 560px) { .dom-hud { top:54px; font-size:12px; gap:8px; padding:6px 10px; } .dom-hud > small { display:none; } }

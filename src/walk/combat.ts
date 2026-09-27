@@ -242,6 +242,41 @@ export class Combat {
     this.paintMarks();
   }
 
+  // ───────── 비경(따로 떨어진 곳) ─────────
+  /** 비경 안인가: 우두머리를 깨우지 않고, 바깥 적은 잠시 치워 둔다 */
+  zone = false;
+  private stashed: { foes: Foe[]; camps: Map<string, Camp>; boss: Foe | null } | null = null;
+  enterZone() {
+    if (this.zone) return;
+    for (const f of this.foes) { this.group.remove(f.obj); f.bar?.remove(); f.bar = null; if (f.slam) { this.group.remove(f.slam); f.slam = undefined; } if (f.state !== 'dead') f.state = 'idle'; }
+    this.stashed = { foes: this.foes, camps: this.camps, boss: this.boss };
+    this.foes = []; this.camps = new Map(); this.boss = null;
+    this.clearFx();
+    this.bossBar.classList.remove('on');
+    this.zone = true;
+  }
+  leaveZone() {
+    if (!this.zone) return;
+    this.clearAll();
+    const st = this.stashed;
+    if (st) {
+      this.foes = st.foes; this.camps = st.camps; this.boss = st.boss;
+      for (const f of this.foes) if (f.state !== 'dead') this.group.add(f.obj);
+      // 바깥 적은 제자리로
+      for (const f of this.foes) if (f.state !== 'dead') { [f.x, f.y, f.z] = f.home; f.hp = f.maxHp; }
+    }
+    this.stashed = null;
+    this.zone = false;
+    this.hp = Math.max(this.hp, this.maxHp * 0.5);
+  }
+  /** 비경 안의 무리가 몇이 남았나 */
+  alive(key: string) { return this.camps.get(key)?.foes.filter((f) => f.state !== 'dead').length ?? 0; }
+  private clearFx() {
+    for (const x of this.fx) this.group.remove(x.obj);
+    this.fx = [];
+    if (this.tornado) { this.group.remove(this.tornado.obj); this.tornado = null; }
+  }
+
   private clearAll() {
     for (const f of this.foes) { this.group.remove(f.obj); f.bar?.remove(); if (f.slam) this.group.remove(f.slam); }
     this.foes = []; this.camps.clear(); this.boss = null;
@@ -403,7 +438,8 @@ export class Combat {
     const camp = f.camp;
     if (camp && !camp.done && camp.foes.every((q) => q.state === 'dead')) {
       camp.done = true;
-      setTimeout(() => { sfx.questDone(); this.c.toast('⚔️ 적을 모두 물리쳤다 — 보물상자의 봉인이 풀렸다'); this.c.cleared(camp.key); }, 600);
+      if (camp.key.startsWith('dom:')) this.c.cleared(camp.key); // 비경의 물결 — 알림은 비경이
+      else setTimeout(() => { sfx.questDone(); this.c.toast('⚔️ 적을 모두 물리쳤다 — 보물상자의 봉인이 풀렸다'); this.c.cleared(camp.key); }, 600);
     }
   }
 
@@ -539,7 +575,7 @@ export class Combat {
     this.hp = 0;
     this.downing = true;
     for (const f of this.foes) if (f.state !== 'dead') { f.state = 'return'; if (f.slam) { this.group.remove(f.slam); f.slam = undefined; } }
-    this.c.toast('💫 쓰러졌다… 가까운 순간이동 포인트에서 다시 일어난다');
+    this.c.toast(this.zone ? '💫 쓰러졌다… 비경에서 밀려난다' : '💫 쓰러졌다… 가까운 순간이동 포인트에서 다시 일어난다');
     await new Promise((r) => setTimeout(r, 1200));
     await this.c.respawn();
     this.hp = this.maxHp;
@@ -550,6 +586,7 @@ export class Combat {
   // ───────── 우두머리 ─────────
   private stepBoss() {
     const today = new Date().toISOString().slice(0, 10);
+    if (this.zone) return;
     if (this.boss || this.bossDay === today) { if (this.boss) this.paintBoss(); return; }
     const spot = this.c.bossSpot();
     if (!spot) return;

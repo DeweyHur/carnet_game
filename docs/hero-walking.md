@@ -310,3 +310,10 @@ GPU 없는 환경에서도 헤드리스 크롬(SwiftShader)으로 돌려 볼 수
 - `Prologue`(`src/walk/prologue.ts`): 8단계(`waypoint · chest · quiz · camp · ascend · glide · wish · journal`), 단계마다 조건(`met`) · 빛기둥(`beacon`, 거리 안내보다 먼저) · 리리 한마디(`companion.line`, 40초마다 다시) · 보상. 튜토리얼 상자 `pro:chest`와 슬라임 둘이 지키는 `pro:camp`는 `Explore.addFixed`로. 기원 단계는 별조각이 모자라면 채우고 ✨ 단추를, 수첩 단계는 📖 단추를 `.nudge`로 반짝인다. 진행 중엔 `quiet(true)` — 거리 한 줄·거리 사건·발견 알림·리리 잡담을 멈추고, 탑 둘레 450 m엔 무작위 요괴 야영지를 세우지 않는다(`ExploreCtx.calm`, 첫 시험에서 봇이 야영지 셋에 휘말렸다). 끝나면 ⭐100·€20·경험치 200, `story.tracked = 'm-eiffel'` — 추적 중인 메인은 말을 걸기 전에도 위쪽 한 줄("귀스타브에게 말을 걸자")이 뜬다.
 - 봇 시험(`scripts/e2e/pro.mjs`, `NOQUICK=1`로 진짜 시작 단추): 빛기둥을 따라 걸어 포인트 → F로 상자 → 쥘리 퀴즈 → 진짜 마우스 톡·E·구르기로 슬라임 둘 → 봉인 풀린 상자 → 탑 한가운데에서 T로 62 m → 걸어 떨어지며 Space 글라이더로 잔디밭(기력 0.04 남음) → 약 7분에 기원 단계까지. 뒷부분(`protail.mjs`): ✨ 단추 → 1번 기원 → ✕ → J → 완료·귀스타브 추적.
 
+## 비경
+
+- `Domain`(`src/walk/domain.ts`): 지하철(`Transit`)처럼 따로 된 `THREE.Scene` + `World(new Frame([0,0]))`를 `hero.sceneWorld`로 쓰고 `view.renderWith`로 같은 캔버스에 그린다. main의 `frameBody`가 비경 중이면 `domain.frame(dt)`만 부른다(거리·탐험·거리 사람은 멈춘다). 부딪힘 벽은 높이 40 m, `kind` 없음(상승의 벽 모드·지붕 판정에서 빠진다), 보이는 벽·천장은 7 m.
+- 싸움과 함께 쓰기: `combat.enterZone()`이 바깥 적·야영지·우두머리를 치워 두고(`zone = true` — 우두머리를 깨우지 않는다) `leaveZone()`이 비경 적을 지우고 되돌린다(바깥 적은 집으로, HP 절반 이상). 물결은 `spawnCamp('dom:<run>:<n>', …, only)` — 키가 `dom:`이면 싸움은 알림 없이 `cleared`만 부르고 main이 `domain.cleared`로 넘긴다. `atWaypoint`(회복)는 비경 안에선 거짓, `respawn`은 비경 안이면 `domain.fail('down')`. `combat.group`과 `companion.group`은 비경 동안 비경 장면으로 옮겨 붙인다(조명 때문).
+- 입구: `DOMAINS[].pos` 둘레 40 m를 나선으로 훑어 반지름 2.5 m 안에 벽이 없고 물이 아닌 곳으로 옮긴다(`settle`, 건물 자료가 들어온 뒤) — 박물관 좌표 그대로면 벽 속이라 다가갈 수 없었다(봇 시험에서 잡았다).
+- 봇 시험(`scripts/e2e/dom.mjs`): 하수도 입구 F → 받침 F → 광장 → 진짜 공격·E·Q·구르기로 물결 셋(39초, 한 번도 안 쓰러짐) → ★★★ · 보상(오늘 2번 남음) → 고리 F로 나와 바깥 적 5마리 되돌아옴. `domfail.mjs`: 채석장에서 HP 1로 쓰러짐 → 10초 만에 입구 앞, HP 가득, `sceneWorld` 비움.
+
