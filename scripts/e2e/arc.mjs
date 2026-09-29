@@ -1,4 +1,4 @@
-import { E, start, st, climb, walk, glideTo, report, photo, body } from './common.mjs';
+import { E, start, st, climb, walk, glideTo, report, photo, body, fightBeat } from './common.mjs';
 export default async (p, shot) => {
   const id = 'm-arc';
   await start(p, id, 'arc', [-50, 44]);
@@ -9,6 +9,8 @@ export default async (p, shot) => {
   await walk(p, 'arc', [0, -34], 2);
   await climb(p, 'arc', [0, 0], 49, 400000);
   console.log('roof', await st(p, id), await body(p));
+  await fightBeat(p, id);
+  await walk(p, 'arc', [0, 0], 3);
   await shot('arc_roof');
   await photo(p, id, 112);
   const g = await E(p, () => { const n = window.__walk.street().story.run('m-arc').npc; return n ? [n.x, n.y] : window.__bot.at('arc', [-40, 32]); });

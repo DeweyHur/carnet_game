@@ -25,7 +25,7 @@ export interface StreetCtx {
   /** 장비를 얻었다 */
   gear?: (id: string) => void;
   /** 이야기 속 싸움: 그 자리에 적 무리를 세운다(이미 있으면 그대로) · 다 물리쳤나 */
-  fight?: (key: string, x: number, y: number, z: number, foes: string[]) => void;
+  fight?: (key: string, x: number, y: number, z: number, foes: string[], ring?: number) => void;
   fightDone?: (key: string) => boolean;
   /** 모험 경험치·별조각(원신처럼) */
   xp?: (xp: number, stars: number, why: string) => void;

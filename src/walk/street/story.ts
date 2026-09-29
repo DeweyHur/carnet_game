@@ -31,7 +31,7 @@ type Beat =
   | { kind: 'talk'; line: string; fr: string; ko: string }
   | { kind: 'check'; line: string; test: (s: Story) => boolean; done?: string }
   /** 싸움: at(높이 dz)에 적 무리가 나타나고, 다 물리치면 다음 */
-  | { kind: 'fight'; at: UV; dz?: number; foes: string[]; line: string; done?: string };
+  | { kind: 'fight'; at: UV; dz?: number; ring?: number; foes: string[]; line: string; done?: string }; // ring: 적이 둘러선 거리 배율(좁은 탑 위는 작게)
 
 export interface Chapter {
   id: string;
@@ -99,8 +99,8 @@ export const CHAPTERS: Chapter[] = [
     intro: { fr: 'Tout part d’ici : le point zéro des routes de France. Trouvez-le, puis montez voir mes gargouilles.', ko: '프랑스의 모든 길은 여기서 시작해요 — 광장 바닥의 "푸앵 제로(0 km)". 그걸 밟고 나서, 탑 꼭대기에 올라가 내 가고일들한테 안부 좀 전해 줘요. 불이 난 뒤로 다시 올라갈 수 있게 됐거든요.' },
     beats: [
       { kind: 'reach', at: [-100, 0], r: 2.6, line: '⭐ 성당 앞 광장의 "푸앵 제로"(파리 거리의 기준점)를 밟자', done: '⭐ 푸앵 제로! 여기를 밟으면 파리에 다시 온다는 말이 있다' },
-      { kind: 'high', at: [-56, 0], r: 24, dz: 67, line: '🔔 탑 꼭대기(69 m)로 — 정면의 회랑 턱(17·31·46·57 m)에서 쉬어 가며', done: '🔔 탑 위! 가고일들이 파리를 내려다보고 있다' },
-      { kind: 'fight', at: [-56, 0], dz: 68, foes: ['gargoyle', 'gargoyle', 'gargoyle'], line: '🗿 가고일 셋이 깨어나 덤빈다! — 탑 위에서 물리치자 (떨어지지 않게)', done: '🗿 가고일들이 다시 돌이 됐다' },
+      { kind: 'high', at: [-51.5, 14], r: 9, dz: 67, line: '🔔 북쪽 탑 꼭대기(69 m)로 — 정면의 회랑 턱(17·31·46·57 m)에서 쉬어 가며', done: '🔔 탑 위! 가고일들이 파리를 내려다보고 있다' },
+      { kind: 'fight', at: [-51.5, 14], dz: 70, ring: 0.5, foes: ['gargoyle', 'gargoyle', 'gargoyle'], line: '🗿 가고일 셋이 깨어나 덤빈다! — 탑 위에서 물리치자 (떨어지지 않게)', done: '🗿 가고일들이 다시 돌이 됐다' },
       { kind: 'photo', minDz: 60, line: '📷 탑 위에서 가고일 너머 파리를 한 장 (3)', label: '노트르담 탑 위에서 본 파리' },
       { kind: 'talk', line: '🔔 캉탱에게 돌아가자', fr: 'Elles vont bien ? Ah, mes belles !', ko: '다들 잘 있던가요? 아, 내 예쁜이들! 2019년 불 속에서도 저 탑은 버텼어요.' },
     ],
@@ -402,7 +402,7 @@ export class Story {
       case 'fight': {
         const key = `story:${ch.id}:${r.beat}`;
         const [x, y] = this.at(ch.landmark, bt.at)!;
-        if (Math.hypot(x - b.x, y - b.y) < 90) this.h.c.fight?.(key, x, y, L.z + (bt.dz ?? 0), bt.foes);
+        if (Math.hypot(x - b.x, y - b.y) < 90) this.h.c.fight?.(key, x, y, L.z + (bt.dz ?? 0), bt.foes, bt.ring);
         if (this.h.c.fightDone?.(key)) this.advance(r, bt.done);
         break;
       }

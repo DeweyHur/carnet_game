@@ -166,14 +166,14 @@ export class Combat {
 
   // ───────── 적 만들기 ─────────
   /** 야영지(보물상자 지키기): 탐험(칸)에서 부른다 */
-  spawnCamp(key: string, x: number, y: number, z: number, seed: number, only?: Kind[]) {
+  spawnCamp(key: string, x: number, y: number, z: number, seed: number, only?: Kind[], ring = 1) {
     if (this.camps.has(key)) return;
     const night = this.c.night() > 0.5;
     const r = seed;
     const kinds: Kind[] = only ? only : night && r < 0.5 ? ['gargoyle', 'gargoyle', 'slime'] : r < 0.4 ? ['slime', 'slime', 'slime'] : r < 0.75 ? ['rat', 'rat', 'slime'] : ['rat', 'gargoyle', 'slime'];
     const camp: Camp = { key, x, y, z, foes: [], done: false };
     kinds.forEach((k, i) => {
-      const a = (i / kinds.length) * TAU + seed * 5, d = 4 + i;
+      const a = (i / kinds.length) * TAU + seed * 5, d = (4 + i) * ring;
       const fx = x + Math.cos(a) * d, fy = y + Math.sin(a) * d;
       const fz = this.W.ground(fx, fy, z + 2, 2.5);
       camp.foes.push(this.spawn(k, fx, fy, fz, camp));

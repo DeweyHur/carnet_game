@@ -45,3 +45,26 @@ export async function photo(p, id, yaw) {
   await p.waitForTimeout(500);
   console.log('photo', await st(p, id));
 }
+/** 이벤트의 싸움 단계: 적이 나오면 싸우고(진짜 입력), 단계가 넘어가면 끝 */
+export async function fightBeat(p, id, ms = 300000) {
+  const { fight } = await import('./fightlib.mjs');
+  const b0 = (await st(p, id)).beat;
+  const r = await fight(p, async () => (await st(p, id)).beat !== b0, ms, true);
+  console.log('fight', JSON.stringify(r), await st(p, id), await body(p));
+  return r;
+}
+/** ⤒ 상승(T): 쓸 수 있게 되길 기다렸다가 누르고, 위에 내려설 때까지 */
+export async function ascend(p, lm) {
+  const r = await E(p, async (lm) => {
+    const A = window.__walk.ascend(), B = window.__bot, b = window.__walk.hero().body, L = B.lm(lm);
+    const t0 = performance.now();
+    while (performance.now() - t0 < 10000 && !A.available) await B.sleep(50);
+    if (!A.available) return { ok: false, why: 'not available', dz: +(b.z - L.z).toFixed(1) };
+    const z0 = b.z; await B.press('KeyT');
+    const t1 = performance.now();
+    while (performance.now() - t1 < 90000 && !(b.mode === 'ground' && b.z > z0 + 3)) await B.sleep(100);
+    return { ok: b.z > z0 + 3, dz: +(b.z - L.z).toFixed(1), mode: b.mode };
+  }, lm);
+  console.log('ascend', lm, r);
+  return r;
+}

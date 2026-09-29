@@ -1,4 +1,4 @@
-import { E, start, st, climb, walk, report, photo, body, glideTo } from './common.mjs';
+import { E, start, st, climb, walk, glideTo, report, photo, body, fightBeat } from './common.mjs';
 export default async (p, shot) => {
   const id = 'm-louvre';
   await start(p, id, 'louvre', [-50, -32]);
@@ -10,6 +10,9 @@ export default async (p, shot) => {
   await shot('louvre_top');
   const g = await E(p, () => { const n = window.__walk.street().story.run('m-louvre').npc; return n ? [n.x, n.y] : window.__bot.at('louvre', [-38, -26]); });
   await glideTo(p, g[0], g[1]);
+  await fightBeat(p, id);
+  const g2 = await E(p, () => { const n = window.__walk.street().story.run('m-louvre').npc; return [n.x, n.y]; });
+  await E(p, async (g) => window.__bot.walkTo(g[0], g[1], 2, 60000), g2);
   await report(p, id);
   await walk(p, 'louvre', [-50, 0], 1.5);
   await photo(p, id, 115);

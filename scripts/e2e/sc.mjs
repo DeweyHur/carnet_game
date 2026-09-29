@@ -1,11 +1,13 @@
-import { E, start, st, climb, glideTo, report, body } from './common.mjs';
+import { E, start, st, climb, glideTo, report, body, fightBeat } from './common.mjs';
 export default async (p, shot) => {
   const id = 'm-sacre-coeur';
   await start(p, id, 'sacre-coeur', [-96, 12], 'montmartre');
   await climb(p, 'sacre-coeur', [-30, 0], 11.4, 120000); // 큰 계단
   console.log('steps', await st(p, id));
+  await fightBeat(p, id);
+  await climb(p, 'sacre-coeur', [-30, 0], 11.4, 120000);
   await E(p, () => window.__bot.press('Digit4'));
-  await p.waitForTimeout(11000);
+  for (let i = 0; i < 60 && (await st(p, id)).beat === 2; i++) await p.waitForTimeout(1000);
   console.log('sat', await st(p, id), await body(p));
   await climb(p, 'sacre-coeur', [10, 0], 45, 400000); // 돔
   console.log('dome', await st(p, id), await body(p));

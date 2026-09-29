@@ -355,6 +355,9 @@ export class Body {
     this.speed = this.rollV * (1 - 0.55 * k);
     const [fx, fy] = dirOf(this.facing);
     const p = { x: this.x + fx * this.speed * dt, y: this.y + fy * this.speed * dt };
+    // 구르기는 낭떠러지(4 m 넘게 떨어지는 곳) 앞에서 멈춘다 — 지붕·탑 위 싸움에서 피하다 떨어지지 않게(뛰어내리려면 점프)
+    const ahead = w.ground(this.x + fx * (R + 0.35), this.y + fy * (R + 0.35), this.z, STEP + 0.1);
+    if (this.z - ahead > 4) { p.x = this.x; p.y = this.y; this.rollV *= 0.5; }
     const hit = w.collide(p, this.z, R, 1.0, STEP);
     if (hit && -(fx * hit.nx + fy * hit.ny) > 0.5) this.rollV *= 0.5; // 벽에 부딪히면 멈춘다
     this.x = p.x; this.y = p.y;

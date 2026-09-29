@@ -499,7 +499,7 @@ function makeStreet(): Street {
     frozen: () => modalOpen() || mapMode,
     charm: () => wardrobe.has('mariniere'),
     gear: (id) => wardrobe.unlock(id),
-    fight: (key, x, y, z, foes) => combat?.spawnCamp(key, x, y, z, 0.3, foes as FoeKind[]),
+    fight: (key, x, y, z, foes, ring) => combat?.spawnCamp(key, x, y, z, 0.3, foes as FoeKind[], ring),
     fightDone: (key) => !!combat?.campDone(key),
   });
 }
