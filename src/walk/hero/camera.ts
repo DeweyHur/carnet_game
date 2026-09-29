@@ -25,6 +25,10 @@ export class OrbitCam {
   }
 
   recenter() { this.recenterT = 0.35; }
+  /** 흔들림(맞히거나 맞았을 때): 세기 m, 실제 시간으로 줄어든다(히트스톱 중에도 흔들린다) */
+  private shakeAmp = 0; private shakeAt = 0;
+  shake(amp: number) { const now = performance.now(); const left = this.shakeLeft(now); this.shakeAmp = Math.max(left, amp); this.shakeAt = now; }
+  private shakeLeft(now: number) { return this.shakeAmp * Math.max(0, 1 - (now - this.shakeAt) / 260); }
   /** 잠시 이 각도로 내려다본다(상승 뒤 꼭대기 풍경) */
   private tilt: { pitch: number; t: number } | null = null;
   tiltTo(pitch: number, secs: number) { this.tilt = { pitch, t: secs }; }
@@ -96,6 +100,11 @@ export class OrbitCam {
     // 카메라 높이가 바닥에 걸려 올라갔으면 초점을 보도록 각도를 다시 잰다
     const horiz = Math.hypot(this.fx - x, this.fy - y);
     const lookDown = (Math.atan2(z - this.fz, horiz) * 180) / Math.PI;
+    const k = this.shakeLeft(performance.now());
+    if (k > 0.001) {
+      const t = performance.now() * 0.09, ox = Math.sin(t * 1.7) * k, oy = Math.cos(t * 2.3) * k, oz = Math.sin(t * 2.9 + 1) * k * 0.7;
+      return { x: x + ox, y: y + oy, z: z + oz, bearing: this.yaw, pitch: Math.min(85, 90 - lookDown), fx: this.fx + ox * 0.6, fy: this.fy + oy * 0.6, fz: this.fz + oz * 0.6 };
+    }
     return { x, y, z, bearing: this.yaw, pitch: Math.min(85, 90 - lookDown), fx: this.fx, fy: this.fy, fz: this.fz };
   }
 }

@@ -65,6 +65,7 @@ interface Foe {
   t: number; cd: number; flash: number; home: [number, number, number]; camp: Camp | null;
   dash?: [number, number]; slam?: THREE.Mesh; wander: number; bar: HTMLElement | null; seen: number;
   /** 밤 습격: 끝까지 쫓아온다 */ hunter?: boolean;
+  /** 맞아서 밀려나는 속도 · 움찔 · 쓰러질 때 도는 쪽 */ kbx?: number; kby?: number; hurtT?: number; spin?: number;
   /** 정예(크고 세다) */ elite?: boolean;
 }
 interface Camp { key: string; x: number; y: number; z: number; foes: Foe[]; done: boolean }
@@ -186,7 +187,7 @@ export class Combat {
     const f = this.spawn(kind, x, y, z, null);
     f.hunter = true; f.elite = elite; f.lv = lv;
     f.maxHp = f.hp = Math.round(STATS[kind].hp * (1 + 0.28 * (lv - 1)) * (elite ? 3 : 1));
-    if (elite) (f.obj.userData.body as THREE.Object3D).scale.multiplyScalar(1.4);
+    if (elite) f.obj.scale.setScalar(1.4);
     f.state = 'chase'; f.t = Math.random() * 0.5; f.cd = 1 + Math.random() * 1.5;
     return f;
   }
@@ -194,13 +195,13 @@ export class Combat {
   huntersAlive() { let n = 0; for (const f of this.foes) if (f.hunter && f.state !== 'dead') n++; return n; }
   /** 밤 습격을 거둔다(낮으로 바꾸거나 쓰러졌을 때) */
   clearHunters() {
-    for (const f of this.foes.slice()) if (f.hunter) { this.group.remove(f.obj); f.bar?.remove(); f.bar = null; if (f.slam) this.group.remove(f.slam); }
+    for (const f of this.foes.slice()) if (f.hunter) { this.drop(f.obj); f.bar?.remove(); f.bar = null; if (f.slam) this.group.remove(f.slam); }
     this.foes = this.foes.filter((f) => !f.hunter);
   }
 
   // ───────── 적 만들기 ─────────
   /** 야영지(보물상자 지키기): 탐험(칸)에서 부른다 */
-  spawnCamp(key: string, x: number, y: number, z: number, seed: number, only?: Kind[], ring = 1) {
+  spawnCamp(key: string, x: number, y: number, z: number, seed: number, only?: Kind[], ring = 1, elites = 0) {
     if (this.camps.has(key)) return;
     const night = this.c.night() > 0.5;
     const r = seed;
@@ -210,7 +211,9 @@ export class Combat {
       const a = (i / kinds.length) * TAU + seed * 5, d = (4 + i) * ring;
       const fx = x + Math.cos(a) * d, fy = y + Math.sin(a) * d;
       const fz = this.W.ground(fx, fy, z + 2, 2.5);
-      camp.foes.push(this.spawn(k, fx, fy, fz, camp));
+      const f = this.spawn(k, fx, fy, fz, camp);
+      if (i < elites) { f.elite = true; f.obj.scale.setScalar(1.4); f.maxHp = f.hp = f.hp * 3; }
+      camp.foes.push(f);
     });
     this.camps.set(key, camp);
   }
@@ -369,7 +372,7 @@ export class Combat {
   }
 
   private clearAll() {
-    for (const f of this.foes) { this.group.remove(f.obj); f.bar?.remove(); if (f.slam) this.group.remove(f.slam); }
+    for (const f of this.foes) { this.drop(f.obj); f.bar?.remove(); if (f.slam) this.group.remove(f.slam); }
     this.foes = []; this.camps.clear(); this.boss = null; this.king = null;
     if (this.kingRing) this.kingRing.visible = false;
     for (const x of this.fx) this.group.remove(x.obj);
@@ -400,7 +403,6 @@ export class Combat {
     this.pending = { at: kind === 'atk3' ? 0.26 : kind === 'atk4' ? 0.2 : 0.12, kind };
     this.armCounter();
     b.drawn = 4;
-    sfx.roll();
   }
 
   /** 강공격: 끌지 않고 길게 눌렀다 뗀다 — 앞으로 내달리며 찌르고, 줄지어 선 적을 꿰뚫는다(기력 20%) */
@@ -414,7 +416,7 @@ export class Combat {
     this.combo = 0; this.comboT = 0;
     this.pending = { at: 0.3, kind: 'charge' };
     b.drawn = 4;
-    sfx.vault();
+    sfx.chargeWhoosh();
     this.armCounter();
   }
   /** 구르기로 피한 직후(구르기가 끝나고 0.5초 안)의 공격 = 반격: 반드시 치명타, 1.5배 */
@@ -462,7 +464,8 @@ export class Combat {
     this.energy = 0;
     if (this.gm.tail) this.tailT = 6;
     b.drawn = 5;
-    sfx.fanfare();
+    sfx.burstRoar();
+    this.hero.cam.shake(0.18);
     this.pending = { at: 0.5, kind: 'burst' };
   }
 
@@ -489,6 +492,8 @@ export class Combat {
       return;
     }
     if (kind === 'skill') {
+      sfx.skillBlast();
+      this.hero.cam.shake(0.1);
       let n = 0;
       for (const f of this.foes) {
         if (f.state === 'dead') continue;
@@ -518,15 +523,16 @@ export class Combat {
         const size = big(f) ? 2.4 : 0.5;
         if (along < -1 || along > 5 + ran + this.wep.reach + size || side > 1.4 + size || Math.abs(f.z - b.z) > (big(f) ? 4 : 2.2)) continue;
         this.damage(f, this.atk * 2.8 * this.gm.charge, 'heavy');
-        if (!big(f)) { f.x += fx * 2; f.y += fy * 2; f.lift = Math.max(f.lift, 0.3); f.vz = 3; }
+        if (!big(f)) { f.lift = Math.max(f.lift, 0.3); f.vz = 3; }
         n++;
       }
-      if (n) { this.energy = Math.min(this.energyMax, this.energy + 4 * n * this.energyK); sfx.bump(); }
+      if (n) { this.energy = Math.min(this.energyMax, this.energy + 4 * n * this.energyK); }
       this.counterArmed = false;
       return;
     }
     if (kind === 'atk4') {
       // 한 바퀴 돌며 둘레를 모두 벤다(넷째 — 마무리)
+      sfx.spinWhoosh();
       let n = 0;
       this.ring(b.x, b.y, b.z + 1, 0xfff2b0, 3.4 + this.wep.reach);
       for (const f of this.foes) {
@@ -535,16 +541,16 @@ export class Combat {
         const size = big(f) ? 2.4 : 0.5;
         if (d - size > 3.3 + this.wep.reach || Math.abs(f.z - b.z) > (big(f) ? 4 : 2.2)) continue;
         this.damage(f, this.atk * 2.4 * this.gm.finisher, 'heavy');
-        if (!big(f)) { const k = 2.2; f.x += (dx / (d || 1)) * k; f.y += (dy / (d || 1)) * k; }
         n++;
       }
-      if (n) { this.energy = Math.min(this.energyMax, this.energy + 3 * n * this.energyK); sfx.bump(); }
+      if (n) { this.energy = Math.min(this.energyMax, this.energy + 3 * n * this.energyK); }
       this.counterArmed = false;
       return;
     }
     const heavy = kind === 'atk3';
     const reach = (heavy ? 3.1 : 2.6) + this.wep.reach, cone = heavy ? 100 : 75;
-    this.swing(b.x, b.y, b.z + 1.1, b.facing, heavy);
+    this.swing(b.x, b.y, b.z + 1.1, b.facing, heavy, kind === 'atk2');
+    sfx.whoosh(kind === 'atk1' ? 0 : kind === 'atk2' ? 1 : 2);
     let n = 0;
     for (const f of this.foes) {
       if (f.state === 'dead') continue;
@@ -553,11 +559,9 @@ export class Combat {
       if (d - size > reach || Math.abs(f.z + (big(f) ? 2 : 0.6) - (b.z + 1)) > (big(f) ? 4 : 2.2)) continue;
       if (d > size && Math.abs(angDiff(b.facing, bearing(dx, dy))) > cone / 2) continue;
       this.damage(f, this.atk * (kind === 'atk1' ? 1 : kind === 'atk2' ? 1.1 : 1.8), heavy ? 'heavy' : 'hit');
-      // 밀어낸다
-      if (!big(f)) { const k = heavy ? 1.6 : 0.6; f.x += (dx / (d || 1)) * k; f.y += (dy / (d || 1)) * k; }
       n++;
     }
-    if (n) { this.energy = Math.min(this.energyMax, this.energy + 2 * n * this.energyK); sfx.bump(); }
+    if (n) { this.energy = Math.min(this.energyMax, this.energy + 2 * n * this.energyK); }
     this.counterArmed = false;
   }
 
@@ -586,23 +590,113 @@ export class Combat {
     const juggle = f.lift > 0.2 && !big(f) && how !== 'skill' ? 1.25 : 1;
     const dmg = Math.round(raw * talent * (0.9 + Math.random() * 0.2) * (crit ? w.critDmg + g.critDmg : 1) * juggle * this.hitMul * (counter ? 1.5 : 1));
     this.countHit();
+    this.juice(f, how, crit);
     if ((w.heal || g.steal) && (how === 'hit' || how === 'heavy')) this.hp = Math.min(this.maxHp, this.hp + this.maxHp * (w.heal + g.steal)); // 바게트·크루아상: 한 입
     f.hp -= dmg;
     f.flash = 0.12;
     f.seen = 4;
     if (f.state === 'idle' || f.state === 'return') this.aggro(f);
     this.float(f.x, f.y, f.z + (big(f) ? 5.5 : 1.6), `${dmg}${crit ? '!' : ''}`, crit ? 'crit' : how === 'skill' || how === 'burst' ? 'wind' : 'dmg');
-    if (f.hp <= 0) this.kill(f);
+    if (f.hp <= 0) this.kill(f, how);
   }
 
-  private kill(f: Foe) {
+  // ───────── 타격감: 히트스톱 · 흔들림 · 소리 · 불꽃 · 밀림 · 끊기 ─────────
+  private stopT = 0; private stopScale = 1; private sndAt = 0;
+  /** 잠깐 멈춘 듯 느리게(secs 동안 시간 × scale) — 센 것이 이긴다 */
+  private stop(secs: number, scale: number) { if (this.stopT <= 0) { this.stopT = secs; this.stopScale = scale; } else { this.stopT = Math.max(this.stopT, secs); this.stopScale = Math.min(this.stopScale, scale); } }
+  /** 밖(한 프레임)에서: 이번 프레임의 시간 배율 */
+  timeScale(dt: number) { if (this.stopT <= 0) return 1; this.stopT -= dt; const k = this.stopScale; if (this.stopT <= 0) this.stopScale = 1; return k; }
+  private juice(f: Foe, how: 'hit' | 'heavy' | 'skill' | 'burst', crit: boolean) {
+    const heavy = how === 'heavy' || how === 'skill';
+    const now = performance.now();
+    if (now - this.sndAt > 35) { this.sndAt = now; sfx.impact(heavy, crit, f.kind === 'slime' ? 'gel' : f.kind === 'gargoyle' || f.kind === 'boss' ? 'stone' : 'fur'); }
+    this.stop(how === 'burst' ? 0.03 : crit ? 0.09 : heavy ? 0.07 : 0.05, 0.05);
+    this.hero.cam.shake(crit ? 0.13 : heavy ? 0.1 : how === 'burst' ? 0.04 : 0.055);
+    const hz = f.z + (big(f) ? 2.4 : 0.8) + f.lift;
+    this.spark(f.x, f.y, hz, crit ? 0xffd166 : how === 'skill' || how === 'burst' ? 0x9ff3e0 : 0xffffff, crit);
+    if (crit) this.flash();
+    if (this.touch) navigator.vibrate?.(crit ? 28 : heavy ? 18 : 10);
+    // 밀려나고 움찔한다(큰 녀석은 안 밀린다)
+    const b = this.hero.body, dx = f.x - b.x, dy = f.y - b.y, L = Math.hypot(dx, dy) || 1;
+    f.hurtT = 0.22;
+    if (!big(f)) { const v = (how === 'heavy' ? 7 : how === 'hit' ? 3.2 : 1.5) * (crit ? 1.3 : 1) / (f.elite ? 2 : 1); f.kbx = (dx / L) * v; f.kby = (dy / L) * v; }
+    // 공격을 끊는다: 작은 녀석은 한 대로, 정예는 센 한 방·치명타로
+    if (f.state === 'windup' && !big(f) && (!f.elite || how === 'heavy' || crit)) {
+      f.state = 'recover'; f.t = 0; f.cd = Math.max(f.cd, 0.9);
+      if (f.slam) { this.group.remove(f.slam); f.slam = undefined; }
+      this.float(f.x, f.y, hz + 0.8, '끊었다!', 'wind'); sfx.parry();
+    }
+  }
+  private readonly touch = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+  private flashEl: HTMLElement | null = null;
+  private flash() {
+    if (!this.flashEl) { this.flashEl = document.createElement('div'); this.flashEl.className = 'cbt-flash'; document.body.appendChild(this.flashEl); }
+    const el = this.flashEl; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+  }
+  private static starTex: THREE.Texture | null = null;
+  private starTex() {
+    if (!Combat.starTex) {
+      const c = document.createElement('canvas'); c.width = c.height = 64;
+      const g = c.getContext('2d')!;
+      const grd = g.createRadialGradient(32, 32, 0, 32, 32, 30); grd.addColorStop(0, '#ffffff'); grd.addColorStop(0.2, '#ffffffaa'); grd.addColorStop(1, '#ffffff00');
+      g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+      g.fillStyle = '#ffffff';
+      for (const [w, h] of [[3, 30], [30, 3]]) { g.beginPath(); g.moveTo(32 - w, 32); g.lineTo(32, 32 - h); g.lineTo(32 + w, 32); g.lineTo(32, 32 + h); g.closePath(); g.fill(); }
+      Combat.starTex = new THREE.CanvasTexture(c);
+    }
+    return Combat.starTex;
+  }
+  /** 맞은 자리의 번쩍(별 모양) + 튀는 조각 */
+  private spark(x: number, y: number, z: number, color: number, big2: boolean) {
+    const m = new THREE.SpriteMaterial({ map: this.starTex(), color, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, rotation: Math.random() * TAU });
+    const sp = new THREE.Sprite(m);
+    sp.position.set(x, y, z);
+    const s0 = big2 ? 2.2 : 1.3;
+    sp.scale.setScalar(s0);
+    sp.renderOrder = 10;
+    this.group.add(sp);
+    this.fx.push({ obj: sp, t: 0, life: 0.14, step: (o, t) => { o.scale.setScalar(s0 * (1 + t * 5)); ((o as THREE.Sprite).material as THREE.SpriteMaterial).opacity = 1 - t / 0.14; } });
+    this.shards(x, y, z, color, big2 ? 16 : 8);
+  }
+  private shards(x: number, y: number, z: number, color: number, N: number) {
+    const pos = new Float32Array(N * 3), vel = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) { pos.set([x, y, z], i * 3); const a = Math.random() * TAU, s = 4 + Math.random() * 5; vel.set([Math.cos(a) * s, Math.sin(a) * s, 1 + Math.random() * 4], i * 3); }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color, size: 0.14, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    pts.frustumCulled = false;
+    this.group.add(pts);
+    this.fx.push({ obj: pts, t: 0, life: 0.3, step: (o, t, dt) => { const a = (o as THREE.Points).geometry.attributes.position as THREE.BufferAttribute; for (let i = 0; i < a.count; i++) { vel[i * 3 + 2] -= 14 * dt; a.setXYZ(i, a.getX(i) + vel[i * 3] * dt, a.getY(i) + vel[i * 3 + 1] * dt, a.getZ(i) + vel[i * 3 + 2] * dt); } a.needsUpdate = true; ((o as THREE.Points).material as THREE.PointsMaterial).opacity = 1 - t / 0.3; } });
+  }
+  /** 다 쓴 것은 GPU에서도 치운다(밤 습격은 수백 마리) */
+  private drop(o: THREE.Object3D) {
+    this.group.remove(o);
+    o.traverse((q) => {
+      const m = q as THREE.Mesh;
+      m.geometry?.dispose();
+      const mat = m.material as THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach((x) => x.dispose()); else mat?.dispose();
+    });
+  }
+
+  private kill(f: Foe, how: 'hit' | 'heavy' | 'skill' | 'burst' = 'hit') {
     f.state = 'dead';
     f.t = 0;
+    // 날아가며 쓰러진다
+    f.vz = big(f) ? 0 : how === 'heavy' ? 8 : 5.5; f.lift = Math.max(f.lift, 0.01);
+    f.spin = (Math.random() < 0.5 ? -1 : 1) * (6 + Math.random() * 6);
+    if (!big(f)) { f.kbx = (f.kbx ?? 0) * 1.6; f.kby = (f.kby ?? 0) * 1.6; }
+    sfx.kill(big(f));
+    this.stop(big(f) ? 0.35 : 0.1, big(f) ? 0.15 : 0.05);
+    this.hero.cam.shake(big(f) ? 0.35 : 0.16);
+    // 무리의 마지막 하나 · 습격 물결의 마지막 하나 = 느린 화면
+    const lastOfCamp = !!f.camp && f.camp.foes.every((q) => q.state === 'dead');
+    const lastHunter = !!f.hunter && this.huntersAlive() === 0;
+    if (lastOfCamp || lastHunter) { this.stop(0.5, 0.22); this.flash(); }
     f.bar?.remove(); f.bar = null;
     if (f.slam) { this.group.remove(f.slam); f.slam = undefined; }
     const S = STATS[f.kind];
     this.burstWind(f.x, f.y, f.z + 0.8, f.kind === 'slime' ? 0x9fc9ea : f.kind === 'rat' ? 0xb8a898 : 0xbfc3c9);
-    sfx.chime();
     const P = this.c.progress;
     const lvK = (f.kind === 'ratking' ? 1 : f.lv) * (f.elite ? 3 : 1);
     P.addXp(Math.round(S.xp * lvK * this.c.xpMul()), f.elite ? `정예 ${S.name}` : S.name);
@@ -636,7 +730,7 @@ export class Combat {
       camp.done = true;
       const k = camp.key;
       if (k.startsWith('dom:')) this.c.cleared(k); // 비경의 물결 — 알림은 비경이
-      else if (k.startsWith('story:')) { sfx.questDone(); this.c.cleared(k); }
+      else if (k.startsWith('story:') || k.startsWith('tale:')) { sfx.questDone(); this.c.cleared(k); }
       else if (k.startsWith('pack:')) setTimeout(() => { sfx.questDone(); this.c.toast(`⚔️ ${camp.foes.some((q) => q.kind === 'rat') ? '🐀 쥐 떼를' : '요괴 무리를'} 쫓아냈다`); this.c.cleared(k); }, 500);
       else setTimeout(() => { sfx.questDone(); this.c.toast('⚔️ 적을 모두 물리쳤다 — 보물상자의 봉인이 풀렸다'); this.c.cleared(k); }, 600);
     }
@@ -659,13 +753,28 @@ export class Combat {
     if (f.seen > 0) f.seen -= dt;
     const body = f.obj.userData.body as THREE.Object3D;
     if (f.state === 'dead') {
-      body.scale.setScalar(Math.max(0.01, 1 - f.t * 2.5));
-      if (f.t > 0.5) { this.group.remove(f.obj); this.foes = this.foes.filter((q) => q !== f); }
+      // 날아가 돌며 떨어지다 사라진다
+      f.x += (f.kbx ?? 0) * dt; f.y += (f.kby ?? 0) * dt;
+      f.vz -= 22 * dt; f.lift = Math.max(0, f.lift + f.vz * dt);
+      f.obj.position.set(f.x, f.y, f.z + f.lift);
+      f.obj.rotation.z += (f.spin ?? 0) * dt;
+      body.rotation.x = -Math.min(1.4, f.t * 5);
+      body.scale.setScalar(f.t < 0.35 ? 1 : Math.max(0.01, 1 - (f.t - 0.35) * 3));
+      for (const m of f.mats) m.emissive.setHex(f.t < 0.08 ? 0xffffff : 0x000000);
+      if (f.t > 0.68) { this.drop(f.obj); this.foes = this.foes.filter((q) => q !== f); }
       return;
+    }
+    // 맞아서 밀린다
+    if (f.kbx || f.kby) {
+      const p = { x: f.x + (f.kbx ?? 0) * dt, y: f.y + (f.kby ?? 0) * dt };
+      if (!S.fly) w.collide(p, f.z, 0.45, 1.2, 0.6);
+      f.x = p.x; f.y = p.y;
+      const k = Math.exp(-9 * dt); f.kbx = (f.kbx ?? 0) * k; f.kby = (f.kby ?? 0) * k;
+      if (Math.abs(f.kbx) + Math.abs(f.kby) < 0.05) f.kbx = f.kby = 0;
     }
     const dx = b.x - f.x, dy = b.y - f.y, d = Math.hypot(dx, dy);
     const far = Math.hypot(f.x - f.home[0], f.y - f.home[1]);
-    if (f.hunter && d > 140) { this.group.remove(f.obj); f.bar?.remove(); this.foes = this.foes.filter((q) => q !== f); return; } // 너무 멀어진 습격 적은 거둔다(다시 몰려온다)
+    if (f.hunter && d > 140) { this.drop(f.obj); f.bar?.remove(); this.foes = this.foes.filter((q) => q !== f); return; } // 너무 멀어진 습격 적은 거둔다(다시 몰려온다)
     if (d > (f.kind === 'ratking' ? 460 : 180)) { f.obj.visible = false; return; }
     f.obj.visible = true;
     // 떠오름(스킬에 맞아)
@@ -728,9 +837,10 @@ export class Combat {
     f.obj.rotation.z = (-f.facing * Math.PI) / 180;
     // 몸짓
     const wind = f.state === 'windup' ? Math.min(1, f.t / S.windup) : 0;
-    if (f.kind === 'slime') { const hop = f.state === 'chase' || f.state === 'return' ? Math.abs(Math.sin(f.t * 7)) : 0.3 * Math.abs(Math.sin(f.t * 2)); body.position.z = hop * 0.35 + wind * 0.2; body.scale.set(1 + wind * 0.25, 1 + wind * 0.25, 1 - wind * 0.35 + hop * 0.1); }
+    if (f.kind === 'slime') { body.rotation.x = 0; const hop = f.state === 'chase' || f.state === 'return' ? Math.abs(Math.sin(f.t * 7)) : 0.3 * Math.abs(Math.sin(f.t * 2)); body.position.z = hop * 0.35 + wind * 0.2; body.scale.set(1 + wind * 0.25, 1 + wind * 0.25, 1 - wind * 0.35 + hop * 0.1); }
     else if (f.kind === 'rat' || f.kind === 'ratking') { const arm = body.userData.arm as THREE.Object3D; arm.rotation.x = f.state === 'windup' ? -1.4 * wind : f.state === 'recover' ? 1.2 : Math.sin(f.t * 8) * 0.2; body.rotation.x = f.state === 'chase' ? 0.15 : 0; body.position.z = f.state === 'chase' ? Math.abs(Math.sin(f.t * 10)) * 0.08 : 0; }
     else { const wings = f.obj.userData.wings as THREE.Object3D[]; const fl = Math.sin(f.t * (f.state === 'dash' ? 20 : 8)) * 0.6; wings[0].rotation.y = fl; wings[1].rotation.y = -fl; body.rotation.x = f.state === 'windup' ? -0.5 * wind : f.state === 'dash' ? 0.7 : 0; }
+    if (f.hurtT && f.hurtT > 0) { f.hurtT -= dt; const k = Math.max(0, f.hurtT / 0.22); body.rotation.x -= 0.55 * k * (big(f) ? 0.3 : 1); body.position.z += 0.12 * k; }
     for (const m of f.mats) m.emissive.setHex(f.flash > 0 ? 0xffffff : wind > 0.6 ? 0x661100 : f.elite ? 0x3a1450 : 0x000000);
     if (f.flash > 0) f.flash -= dt;
     if (f.slam) { const s = f.slam.material as THREE.MeshBasicMaterial; s.opacity = 0.25 + 0.35 * wind; }
@@ -767,6 +877,8 @@ export class Combat {
     if (this.hp <= 0 && this.gm.second && this.clock - this.secondAt > 90) { this.secondAt = this.clock; this.hp = Math.round(this.maxHp * 0.3); this.iframes = 1.5; this.float(b.x, b.y, b.z + 2.6, '🔥 두 번째 숨!', 'heal'); }
     this.iframes = 0.55;
     this.float(b.x, b.y, b.z + 2.2, `-${d}`, 'hurt');
+    this.hero.cam.shake(0.22); this.stop(0.06, 0.1);
+    if (this.touch) navigator.vibrate?.(40);
     this.vignette.classList.remove('go'); void this.vignette.offsetWidth; this.vignette.classList.add('go');
     sfx.hurt();
     if (from) { const dx = b.x - from.x, dy = b.y - from.y, L = Math.hypot(dx, dy) || 1; b.shove((dx / L) * 0.8, (dy / L) * 0.8, this.W); }
@@ -895,14 +1007,14 @@ export class Combat {
   }
 
   // ───────── 효과 ─────────
-  private swing(x: number, y: number, z: number, facing: number, heavy: boolean) {
+  private swing(x: number, y: number, z: number, facing: number, heavy: boolean, back = false) {
     const a0 = ((90 - facing) * Math.PI) / 180;
     const geo = new THREE.RingGeometry(1.2, heavy ? 3 : 2.6, 24, 1, a0 - 0.75, 1.5);
-    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: heavy ? 0xfff2b0 : 0xe8f6ff, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: heavy ? 0xfff2b0 : 0xe8f6ff, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
     m.position.set(x, y, z);
-    if (heavy) m.rotation.x = 0.35;
+    m.rotation.x = heavy ? 0.35 : back ? -0.28 : 0.18; // 되베기는 반대로 기울어진 호
     this.group.add(m);
-    this.fx.push({ obj: m, t: 0, life: 0.18, step: (o, t) => { ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.6 * (1 - t / 0.18); } });
+    this.fx.push({ obj: m, t: 0, life: 0.2, step: (o, t) => { o.scale.setScalar(1 + t * 1.2); ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - t / 0.2); } });
   }
   private ring(x: number, y: number, z: number, color: number, r: number) {
     const m = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 40), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
@@ -924,7 +1036,7 @@ export class Combat {
     for (const e of this.fx.slice()) {
       e.t += dt;
       e.step?.(e.obj, e.t, dt);
-      if (e.t >= e.life) { this.group.remove(e.obj); this.fx = this.fx.filter((q) => q !== e); }
+      if (e.t >= e.life) { this.drop(e.obj); this.fx = this.fx.filter((q) => q !== e); }
     }
   }
 

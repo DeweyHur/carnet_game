@@ -16,7 +16,9 @@ export function unlock() {
   master = ctx.createGain();
   master.gain.value = muted ? 0 : 1;
   master.connect(ctx.destination);
-  sfxBus = ctx.createGain(); sfxBus.gain.value = 1; sfxBus.connect(master);
+  // 효과음은 압축기를 거친다 — 여럿을 한꺼번에 때려도 찢어지지 않게
+  const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.knee.value = 8; comp.ratio.value = 5; comp.attack.value = 0.002; comp.release.value = 0.12;
+  sfxBus = ctx.createGain(); sfxBus.gain.value = 1; sfxBus.connect(comp).connect(master);
   musicFilter = ctx.createBiquadFilter(); musicFilter.type = 'lowpass'; musicFilter.frequency.value = 18000;
   musicBus = ctx.createGain(); musicBus.gain.value = 0; musicFilter.connect(musicBus).connect(master);
   ambBus = ctx.createGain(); ambBus.gain.value = 1; ambBus.connect(master);
@@ -515,3 +517,31 @@ export const ascendCharge = () => { sweep(180, 620, 0, 0.5, 0.045, 'triangle'); 
 export const ascendRise = () => { hiss(1.2, 0.45, 250, 3600); tone(784, 0, 0.35, 0.04, 'triangle'); tone(1175, 0.12, 0.45, 0.035, 'triangle'); tone(1568, 0.26, 0.6, 0.03); };
 export const ascendPop = () => { tone(1046, 0, 0.3, 0.05, 'triangle'); tone(1568, 0.08, 0.6, 0.045); tone(2093, 0.18, 0.7, 0.03); hiss(0.35, 0.45, 2400, 500); };
 export const ascendNo = () => { tone(330, 0, 0.12, 0.05, 'triangle'); tone(247, 0.1, 0.18, 0.05, 'triangle'); };
+
+// ───────── 싸움: 휘두르기 · 맞히기 · 쓰러뜨리기 ─────────
+/** 휘두르는 바람 소리 — 콤보 단계마다 높아진다(0..3) */
+export const whoosh = (step: number) => { const f = 650 + step * 260; hiss(0.13 + step * 0.02, 0.55 + step * 0.08, f, f * 3.4, 'bandpass'); };
+/** 4타 회오리 베기 */
+export const spinWhoosh = () => { hiss(0.34, 0.8, 450, 2800); hiss(0.26, 0.5, 2800, 700, 'bandpass', 0.14); sweep(140, 90, 0.05, 0.25, 0.08, 'triangle'); };
+/** 강공격: 모았다가 내지른다 */
+export const chargeWhoosh = () => { hiss(0.32, 0.9, 300, 3400); sweep(180, 620, 0, 0.26, 0.07, 'sawtooth'); };
+/** 맞았다: 낮은 쿵 + 딱 + 재질(젤리·털·돌) + 치명타 쨍 */
+export const impact = (heavy: boolean, crit: boolean, mat: 'gel' | 'fur' | 'stone') => {
+  sweep(heavy ? 170 : 230, 42, 0, heavy ? 0.17 : 0.11, heavy ? 0.55 : 0.38, 'sine');
+  hiss(0.045, heavy ? 1 : 0.7, 5200, 1800, 'highpass');
+  if (mat === 'gel') { sweep(640, 170, 0.01, 0.13, 0.13, 'triangle'); hiss(0.1, 0.35, 1400, 400, 'lowpass', 0.01); }
+  else if (mat === 'stone') { tone(310, 0, 0.06, 0.13, 'square'); tone(190, 0.01, 0.08, 0.08, 'square'); hiss(0.1, 0.55, 2600, 900, 'bandpass', 0.01); }
+  else hiss(0.08, 0.5, 1000, 380, 'lowpass', 0.01);
+  if (crit) { tone(1760, 0.01, 0.2, 0.07, 'triangle'); tone(2637, 0.03, 0.24, 0.05); hiss(0.12, 0.3, 7000, 3500, 'highpass', 0.02); }
+};
+/** 쓰러뜨렸다: 묵직한 쿵 · 흩어지는 소리 · 작은 종 */
+export const kill = (big = false) => {
+  sweep(big ? 100 : 130, 32, 0, big ? 0.6 : 0.34, big ? 0.7 : 0.5);
+  hiss(big ? 0.8 : 0.42, 0.7, 2000, 180, 'lowpass');
+  tone(988, 0.07, 0.25, 0.045, 'triangle'); tone(1319, 0.13, 0.32, 0.04, 'triangle');
+};
+/** 원소 스킬 · 폭발 */
+export const skillBlast = () => { hiss(0.5, 0.9, 250, 2600); sweep(90, 260, 0, 0.35, 0.12, 'triangle'); tone(784, 0.08, 0.3, 0.05); };
+export const burstRoar = () => { hiss(1.1, 1, 180, 3200, 'bandpass'); sweep(60, 180, 0, 0.9, 0.2, 'sawtooth'); [392, 523, 659, 784].forEach((f, i) => tone(f, 0.1 + i * 0.08, 0.5, 0.05, 'triangle')); };
+/** 적의 공격을 끊었다 */
+export const parry = () => { tone(1480, 0, 0.12, 0.08, 'square'); tone(2217, 0.02, 0.2, 0.05, 'triangle'); };

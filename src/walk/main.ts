@@ -28,6 +28,7 @@ import { Closet } from './closet';
 import { Growth, ARMOR_SLOTS } from './growth';
 import { GrowthPanel } from './growthui';
 import { Horde } from './horde';
+import { Tales } from './tales';
 import { Minimap } from './minimap';
 import { Journal } from './journal';
 import { Progress, arNeed, COMMISSION_TEXT, FEATURES } from './progress';
@@ -93,6 +94,7 @@ let prologue: Prologue;
 let growth: Growth;
 let growthUi: GrowthPanel;
 let horde: Horde;
+let tales: Tales;
 /** 🌙 밤 모드(밤 습격): 사람 대신 요괴가 물결마다 몰려온다 */
 let nightMode = (() => { try { return localStorage.getItem('carnet-mode') === 'night'; } catch { return false; } })();
 let entering = false;
@@ -262,7 +264,8 @@ function frame(t: number) {
 }
 function frameBody(t: number) {
   const raw = Math.min(1, (t - lastT) / 1000 || 0);
-  const dt = Math.min(0.1, raw);
+  // 히트스톱: 맞히는 순간 아주 잠깐 시간이 멎는다(타격감)
+  const dt = Math.min(0.1, raw) * (combat?.timeScale(Math.min(0.1, raw)) ?? 1);
   lastT = t;
   govern(raw); // 느린 기기는 실제 흐른 시간으로 재야 빨리 품질을 낮춘다
   soundAcc += dt;
@@ -387,7 +390,10 @@ function heroFrame(dt: number) {
   const talking = !!street?.holding;
   const frozen = !live || modal || mapMode || talking || entering;
   // 빛기둥: 첫걸음 > 거리의 일·부탁
-  const qb = prologue?.beacon() ?? street?.beacon;
+  // 밤이거나 두 얼굴의 자리가 가까우면(400 m) 그쪽을 먼저
+  const tb = tales?.target() ?? null;
+  const tNear = !!tb && (nightMode || Math.hypot(tb[0] - hero.body.x, tb[1] - hero.body.y) < 400);
+  const qb = prologue?.beacon() ?? (tNear ? tb : null) ?? street?.beacon ?? tb;
   const beacon = qb ? hero.frame.toLngLat(qb[0], qb[1]) : null;
   miniBeacon = qb;
   const r = hero.tick(dt, {
@@ -413,7 +419,8 @@ function heroFrame(dt: number) {
   if (horde) horde.pausedNow = !exploring || !!domain?.active;
   domain?.update(dt, r.f, exploring);
   explore?.update(dt, r.f, exploring);
-  hero.hud.override = exploring ? domain?.prompt2() ?? explore?.prompt() ?? null : null;
+  tales?.update(dt, r.f, exploring && !domain?.active);
+  hero.hud.override = exploring ? domain?.prompt2() ?? explore?.prompt() ?? tales?.prompt() ?? null : null;
   street?.update(dt, r.f, live && !modal && !mapMode && !entering);
   if (sky?.riding) { hero.hud.setPrompt(null); hero.hud.setPrompt2(null); }
   if (!live) { if (camOn) hero.drive(dt); return; }
@@ -589,7 +596,7 @@ function setupAdventure() {
     hero, progress, toast, hint: (s2) => hint(s2), money: addMoney, xpMul,
     atWaypoint: () => !domain?.active && explore.atWaypoint(),
     night: () => hero.town.uniforms.uNight.value,
-    cleared: (key) => { if (key.startsWith('dom:')) domain?.cleared(key); else explore.unlock(key); },
+    cleared: (key) => { if (key.startsWith('dom:')) domain?.cleared(key); else if (!key.startsWith('tale:')) explore.unlock(key); },
     bossSpot: () => explore.bossSpot(),
     kingSpot: () => { const [x, y] = hero.frame.toLocal(KING_AT); return [x, y, hero.world.terrain(x, y)]; },
     kingSlain: () => {
@@ -634,6 +641,23 @@ function setupAdventure() {
       if (r.sp) setTimeout(() => banner.unlock('🌟', '스킬 포인트 +1', `밤 습격 ${r.wave}물결을 넘겼다 — 🧚 메뉴 → 🌟 성장(K)에서 스킬 트리를 찍자`), 900);
     },
   });
+  tales = new Tales({
+    hero, toast, hint: (s2) => hint(s2),
+    night: () => nightMode,
+    spawn: (key, x, y, z, foes, elites) => combat.spawnCamp(key, x, y, z, 0.4, foes, 1, elites),
+    cleared: (key) => combat.campDone(key),
+    reward: (rw, why) => {
+      progress.addStars(rw.stars);
+      if (rw.ore) progress.addOre(rw.ore);
+      if (rw.books) { growth.addBooks(rw.books); feed.push('📘', `파리의 가르침 ×${rw.books}`, 'blue'); }
+      if (rw.eur) addMoney(rw.eur);
+      if (rw.sp) growth.addSp(rw.sp);
+      if (rw.gear) { const g = GEAR.filter((q) => q.star === 5 && !wardrobe.owned.has(q.id))[0]; if (g) wardrobe.unlock(g.id); else progress.addStars(160); }
+      progress.addXp(Math.round(rw.xp * xpMul()), why);
+      feed.push('⭐', `별조각 +${rw.stars}`, 'gold');
+    },
+  });
+  hero.crowd.scene.add(tales.group);
   growthUi = new GrowthPanel(growth);
   growthUi.ctx = {
     ar: () => progress.ar,
@@ -1132,7 +1156,7 @@ if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown
   street: () => street, DISTRICTS, places: () => places, graph: () => graph, map: () => map, sky: () => sky,
   wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal, progress: () => progress,
   explore: () => explore, wish: () => wish, combat: () => combat, companion: () => companion, ascend: () => ascend, domain: () => domain, prologue: () => prologue,
-  menu: (on?: boolean) => menu(on), banner: () => banner, growth: () => growth, growthUi: () => growthUi, horde: () => horde, setMode: (n: boolean) => setMode(n), night: () => nightMode, feed: () => feed, mapMode: (on: boolean) => setMapMode(on),
+  menu: (on?: boolean) => menu(on), banner: () => banner, growth: () => growth, growthUi: () => growthUi, tales: () => tales, horde: () => horde, setMode: (n: boolean) => setMode(n), night: () => nightMode, feed: () => feed, mapMode: (on: boolean) => setMapMode(on),
   teleport: (id: string) => { const wp = WAYPOINTS.find((w) => w.id === id); return wp ? teleport(wp) : null; },
 };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
