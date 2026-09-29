@@ -52,6 +52,7 @@ export class Horde {
     this.restT = 3.5;
     this.downsSeen = this.c.combat.downs;
     this.el.classList.add('on');
+    document.body.classList.add('horde-on');
     this.c.toast('🌙 밤 습격 — 사람들이 모두 집에 들어갔다. 요괴들이 몰려온다! 살아남아 물리치자');
     this.paint();
   }
@@ -60,6 +61,7 @@ export class Horde {
     this.active = false;
     this.c.combat.clearHunters();
     this.el.classList.remove('on');
+    document.body.classList.remove('horde-on');
   }
 
   /** 요괴를 하나 쓰러뜨렸다 — 떨어뜨린 것을 돌려준다 */

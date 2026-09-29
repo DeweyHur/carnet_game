@@ -754,3 +754,8 @@ body.night-mode .tunnel .line { color:#b79bff; }
 #growth .node.locked { opacity:.55; }
 #growth .node:disabled { cursor:default; }
 @media (max-width:620px) { #growth .tree { grid-template-columns:1fr; } #growth .talent { grid-template-columns:30px 1fr auto; } #growth .talent button { grid-column:1 / -1; } }
+/* 밤 습격 판이 떠 있으면 알림은 그 아래로 */
+body.horde-on #toast { top:58px; }
+@media (max-width:700px) { body.horde-on #toast { top:94px; } }
+body.touch-play.horde-on #toast { top:50px; }
+body.touch-play.hero-on.horde-on #hint { top:88px; }
