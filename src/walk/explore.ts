@@ -25,6 +25,8 @@ export interface ExploreCtx {
   camp?(key: string, x: number, y: number, z: number, seed: number, only?: ('slime' | 'rat' | 'gargoyle')[]): void;
   /** 여기엔 요괴 야영지를 세우지 않는다(첫걸음 동안 에펠탑 둘레 — 튜토리얼 야영지 하나에만 집중하게) */
   calm?(x: number, y: number): boolean;
+  /** 얻은 것 목록에 한 줄 */
+  got?(icon: string, text: string, tone?: '' | 'gold' | 'blue' | 'purple'): void;
 }
 
 const TAU = Math.PI * 2;
@@ -478,6 +480,7 @@ export class Explore {
     const P = this.P;
     const gx = Math.round(xp * this.c.xpMul());
     P.stars += stars;
+    if (stars) this.c.got?.('⭐', `별조각 +${stars}`, 'gold');
     if (eur) this.c.money(eur);
     P.addXp(gx, why);
     return `${stars ? `⭐ +${stars}` : ''}${eur ? ` · € +${eur}` : ''} · 모험 경험치 +${gx}`;
@@ -490,6 +493,10 @@ export class Explore {
     sfx.chime(); setTimeout(() => sfx.coin(), 250);
     this.spawnBurst(e.x, e.y, e.z + 0.7, e.tier === 'common' ? 0xfff0c0 : 0xffd966);
     this.c.toast(`🎁 ${T.name} — ${this.reward(T.xp, T.stars, T.eur, T.name)}`);
+    // 🔹 연마석(무기 강화)
+    const ore = e.tier === 'luxurious' ? 10 : e.tier === 'precious' ? 5 : e.tier === 'exquisite' ? 3 : 1;
+    this.P.addOre(ore);
+    this.c.got?.('🔹', `연마석 ×${ore}`, 'purple');
     this.P.bump('chest');
   }
 

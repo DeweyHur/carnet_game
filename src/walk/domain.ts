@@ -172,6 +172,7 @@ export class Domain {
   prompt2(): { verb: string; what: string } | null {
     const g = this.nearGate;
     if (!g) return null;
+    if (!this.c.progress.has('domain')) return { verb: '🔒 잠김', what: `${g.def.emoji} 비경 · ${g.def.name} — 모험 등급 5에 열린다` };
     const lv = this.levelFor(this.c.progress.ar);
     return { verb: '비경 들어가기', what: `${g.def.emoji} ${g.def.name} · 난도 ${ROMAN[lv]} · 오늘 보상 ${Math.max(0, this.rewardsLeft)}/${DAILY}` };
   }
@@ -201,7 +202,11 @@ export class Domain {
       if (d < 3.2 && Math.abs(b.z - g.z) < 2) near = g;
     }
     this.nearGate = live ? near : null;
-    if (live && near && f?.interact && !this.busy) { f.interact = false; void this.enter(near.def); }
+    if (live && near && f?.interact && !this.busy) {
+      f.interact = false;
+      if (this.c.progress.has('domain')) void this.enter(near.def);
+      else { sfx.exhausted(); this.c.hint('🔒 비경은 모험 등급 5에 열린다 — 상자·부탁·요괴로 등급을 올리자'); setTimeout(() => this.c.hint(''), 3500); }
+    }
   }
 
   // ───────── 안: 방 짓기 ─────────

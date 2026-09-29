@@ -148,6 +148,7 @@ export class Prologue {
     this.paint();
     if (s.id === 'wish') {
       const P = this.c.progress;
+      P.open('wish'); // 기원 단추가 나타난다(등급 2 전이라도)
       this.wishes0 = P.wishes;
       if (P.stars < WISH_COST) { const give = WISH_COST - P.stars; P.addStars(give); this.c.toast(`🧚 리리가 별조각 ⭐${give}을 나눠 줬다`); }
       this.nudge('#wish-go');

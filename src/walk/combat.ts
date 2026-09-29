@@ -32,7 +32,9 @@ export interface CombatCtx {
   /** 쥐왕을 쓰러뜨렸다 */
   kingSlain?(): void;
   /** 손에 든 무기(옷장) */
-  weapon?(): { id: string; emoji: string };
+  weapon?(): { id: string; emoji: string; lv: number };
+  /** 전리품(연마석 등) */
+  loot?(kind: Kind): void;
 }
 
 export type Kind = 'slime' | 'rat' | 'gargoyle' | 'boss' | 'ratking';
@@ -142,7 +144,9 @@ export class Combat {
   private get W() { return this.hero.sceneWorld ?? this.hero.world; }
   private get ar() { return this.c.progress.ar; }
   /** 손에 든 무기의 능력 */
-  private get wep(): WeaponStats { return weaponOf(this.c.weapon?.().id ?? 'umbrella'); }
+  private get wep(): WeaponStats { const w = this.c.weapon?.(); return weaponOf(w?.id ?? 'umbrella', w?.lv ?? 1); }
+  /** 화면에 보일 능력(옷장) */
+  stats() { const w = this.wep; return { atk: Math.round(this.atk), hp: this.maxHp, crit: Math.round(w.crit * 100), critDmg: w.critDmg }; }
   /** 모험 등급 × 무기 */
   private get atk() { return (16 + this.ar * 3) * this.wep.atk; }
   private recalc(full = false) {
@@ -468,6 +472,7 @@ export class Combat {
     P.addXp(Math.round(S.xp * lvK * this.c.xpMul()), S.name);
     this.c.money(S.eur * lvK);
     P.bump('defeat');
+    this.c.loot?.(f.kind);
     if (f.kind === 'boss') {
       P.stars += 60;
       this.boss = null;

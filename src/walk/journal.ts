@@ -56,7 +56,8 @@ export class Journal {
     if (P) {
       P.rollDay();
       const pct = P.ar >= AR_MAX ? 100 : Math.round((P.xp / arNeed(P.ar)) * 100);
-      const com = P.commissions.map((c) => `<li class="${c.done ? 'done' : ''}"><span>${esc(COMMISSION_TEXT[c.kind](c.goal))}</span><small>${c.kind === 'walk' ? Math.round(c.got) : c.got}/${c.goal}</small></li>`).join('');
+      const comLocked = !P.has('commission');
+      const com = comLocked ? '<li><span>🔒 모험 등급 3에 열린다 — 날마다 네 가지 부탁, 하나마다 ⭐10</span></li>' : P.commissions.map((c) => `<li class="${c.done ? 'done' : ''}"><span>${esc(COMMISSION_TEXT[c.kind](c.goal))}</span><small>${c.kind === 'walk' ? Math.round(c.got) : c.got}/${c.goal}</small></li>`).join('');
       adv = `<div class="adv">
         <div class="rank"><b>모험 등급 ${P.ar}</b><span class="bar"><i style="width:${pct}%"></i></span><small>${P.ar >= AR_MAX ? '최고 등급' : `${P.xp} / ${arNeed(P.ar)}`}</small></div>
         <div class="nums"><span>⭐ ${P.stars}<small>별조각(기원)</small></span><span>🪶 ${P.plumes}<small>바람 깃털 · 바친 것 ${P.offered}</small></span><span>💪 ${P.staminaLevel}단계<small>기력 소모 −${Math.round((1 - P.staminaCost) * 100)}%</small></span></div>

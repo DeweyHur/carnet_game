@@ -78,7 +78,13 @@ const WEAPON_STATS: Record<string, Partial<WeaponStats>> = {
   flagpole: { atk: 1.2, reach: 0.6, burst: 1.6, energy: 1.3 },
   jeanne: { atk: 1.45, crit: 0.25, critDmg: 2.0 },
 };
-export function weaponOf(id: string): WeaponStats { return { ...W0, ...(WEAPON_STATS[id] ?? {}) }; }
+/** 무기 능력(레벨마다 공격력 +6%) */
+export function weaponOf(id: string, lv = 1): WeaponStats { const w = { ...W0, ...(WEAPON_STATS[id] ?? {}) }; w.atk *= 1 + 0.06 * (lv - 1); return w; }
+export const WEAPON_MAX_LV = 20;
+/** 모험 등급마다 강화할 수 있는 끝(원신의 돌파처럼 — 등급을 올려야 더 올린다) */
+export const weaponCap = (ar: number) => Math.min(WEAPON_MAX_LV, 2 + ar * 2);
+/** lv → lv+1 비용: 🔹 연마석 · € */
+export const enhanceCost = (lv: number) => ({ ore: 2 + lv, eur: 8 * lv });
 
 /** 몸에 미치는 것(곱) */
 export interface Mods { run: number; climb: number; glide: number; hurt: number; swim: number; steady: boolean; gcost: number; scost: number }
@@ -99,6 +105,8 @@ const KEY = 'carnet-gear-v1';
 export class Wardrobe {
   loadout: Loadout = { ...DEFAULT_LOADOUT };
   readonly owned = new Set<string>(STARTER);
+  /** 무기 레벨(없으면 1) */
+  readonly weaponLv: Record<string, number> = {};
   onChange?: (l: Loadout) => void;
   /** 새로 얻었다(알림은 밖에서) */
   onUnlock?: (g: Gear) => void;
@@ -107,15 +115,19 @@ export class Wardrobe {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) {
-        const d = JSON.parse(raw) as { loadout?: Partial<Loadout>; owned?: string[] };
+        const d = JSON.parse(raw) as { loadout?: Partial<Loadout>; owned?: string[]; weaponLv?: Record<string, number> };
+        Object.assign(this.weaponLv, d.weaponLv ?? {});
         for (const id of d.owned ?? []) if (GEAR.some((g) => g.id === id)) this.owned.add(id);
         for (const s of SLOTS) { const v = d.loadout?.[s.id]; if (v && this.owned.has(v)) this.loadout[s.id] = v; }
       }
     } catch { /* 저장소를 못 쓰면 처음부터 */ }
   }
-  private save() { try { localStorage.setItem(KEY, JSON.stringify({ loadout: this.loadout, owned: [...this.owned] })); } catch { /* 무시 */ } }
+  private save() { try { localStorage.setItem(KEY, JSON.stringify({ loadout: this.loadout, owned: [...this.owned], weaponLv: this.weaponLv })); } catch { /* 무시 */ } }
 
   has(id: string) { return Object.values(this.loadout).includes(id); }
+  lvOf(id: string) { return this.weaponLv[id] ?? 1; }
+  /** 무기 레벨을 하나 올린다(비용은 밖에서 확인·지불) */
+  levelUp(id: string) { this.weaponLv[id] = this.lvOf(id) + 1; this.save(); this.onChange?.(this.loadout); }
   equip(id: string) {
     const g = GEAR.find((x) => x.id === id);
     if (!g || !this.owned.has(id)) return false;

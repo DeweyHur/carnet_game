@@ -4,6 +4,15 @@
 export const AR_MAX = 30;
 /** 처음부터 켜져 있는 순간이동 포인트 */
 export const START_WAYPOINTS = ['wp-eiffel', 'wp-trocadero', 'wp-marais'];
+
+/** 모험 등급에 따라 하나씩 열리는 것(원신처럼 — 처음엔 헷갈리지 않게 꼭 필요한 것만) */
+export type Feature = 'wish' | 'enhance' | 'commission' | 'domain';
+export const FEATURES: { id: Feature; ar: number; emoji: string; name: string; what: string }[] = [
+  { id: 'wish', ar: 2, emoji: '✨', name: '기원', what: '별조각 ⭐160으로 한 번 — 새 무기·옷이 나온다. 오른쪽 위 ✨' },
+  { id: 'enhance', ar: 2, emoji: '🔹', name: '무기 강화', what: '요괴·보물상자에서 나오는 🔹 연마석과 €로 무기 레벨을 올린다. 🎒 옷장 → 무기 칸' },
+  { id: 'commission', ar: 3, emoji: '📜', name: '오늘의 의뢰', what: '날마다 네 가지 — 하나마다 ⭐10 · 경험치 250, 넷 모두면 ⭐60 더. 📖 수첩에서 본다' },
+  { id: 'domain', ar: 5, emoji: '🌀', name: '비경', what: '파리 땅 밑의 도전 던전 — 하수도(알마 다리) · 카타콤(팡테옹) · 채석장(몽마르트르). 미니맵 🌀' },
+];
 /** 이 등급에서 다음 등급까지 필요한 경험치 */
 export const arNeed = (ar: number) => Math.round(250 + ar * 90 + ar * ar * 6);
 
@@ -33,6 +42,10 @@ interface Save {
   last?: string;
   /** 처음부터 켜 두는 순간이동 포인트를 줬나 */
   granted?: boolean;
+  /** 연마석(무기 강화) */
+  ore?: number;
+  /** 열린 것 */
+  features?: Feature[];
 }
 const KEY = 'carnet-progress-v1';
 const today = () => new Date().toISOString().slice(0, 10);
@@ -50,8 +63,12 @@ export class Progress {
   /** 마지막으로 켜거나 순간이동한 포인트(이어서 하기) */
   last = '';
   granted = false;
+  ore = 0;
+  readonly features = new Set<Feature>();
+  /** 새로 열렸다 */
+  onFeature?: (f: (typeof FEATURES)[number]) => void;
   onXp?: (gain: number, why: string) => void;
-  onRank?: (ar: number, reward: { stars: number; eur: number }) => void;
+  onRank?: (ar: number, reward: { stars: number; eur: number; ore: number }) => void;
   onCommission?: (c: Commission, all: boolean) => void;
   onChange?: () => void;
 
@@ -65,17 +82,19 @@ export class Progress {
         for (const x of d.plumesGot ?? []) this.plumesGot.add(x);
         for (const x of d.rings ?? []) this.rings.add(x);
         this.day = d.day ?? ''; this.commissions = d.commissions ?? []; this.commissionBonus = !!d.commissionBonus;
-        this.pity4 = d.pity4 ?? 0; this.pity5 = d.pity5 ?? 0; this.wishes = d.wishes ?? 0; this.last = d.last ?? ''; this.granted = !!d.granted;
+        this.pity4 = d.pity4 ?? 0; this.pity5 = d.pity5 ?? 0; this.wishes = d.wishes ?? 0; this.last = d.last ?? ''; this.granted = !!d.granted; this.ore = d.ore ?? 0; for (const f of d.features ?? []) this.features.add(f);
       }
     } catch { /* 처음부터 */ }
     if (this.commissions.some((c) => c.kind === 'eat')) this.commissions = [];
     // 처음부터 켜 둔 순간이동 포인트: 샹드마르스(에펠탑) · 트로카데로 · 마레
+    // 예전 저장: 등급에 맞는 것은 조용히 연다
+    for (const f of FEATURES) if (this.ar >= f.ar) this.features.add(f.id);
     if (!this.granted) { this.granted = true; for (const id of START_WAYPOINTS) this.waypoints.add(id); this.save(); }
     this.rollDay();
   }
 
   save() {
-    const d: Save = { ar: this.ar, xp: this.xp, stars: this.stars, plumes: this.plumes, offered: this.offered, waypoints: [...this.waypoints], chests: [...this.chests], plumesGot: [...this.plumesGot], rings: [...this.rings], day: this.day, commissions: this.commissions, commissionBonus: this.commissionBonus, pity4: this.pity4, pity5: this.pity5, wishes: this.wishes, last: this.last, granted: this.granted };
+    const d: Save = { ar: this.ar, xp: this.xp, stars: this.stars, plumes: this.plumes, offered: this.offered, waypoints: [...this.waypoints], chests: [...this.chests], plumesGot: [...this.plumesGot], rings: [...this.rings], day: this.day, commissions: this.commissions, commissionBonus: this.commissionBonus, pity4: this.pity4, pity5: this.pity5, wishes: this.wishes, last: this.last, granted: this.granted, ore: this.ore, features: [...this.features] };
     try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { /* 무시 */ }
     this.onChange?.();
   }
@@ -105,16 +124,30 @@ export class Progress {
     while (this.ar < AR_MAX && this.xp >= arNeed(this.ar)) {
       this.xp -= arNeed(this.ar);
       this.ar++;
-      const reward = { stars: 40 + this.ar * 5, eur: 10 + this.ar * 2 };
+      const reward = { stars: 40 + this.ar * 5, eur: 10 + this.ar * 2, ore: 3 + this.ar };
       this.stars += reward.stars;
+      this.ore += reward.ore;
       this.onRank?.(this.ar, reward);
+      for (const f of FEATURES) if (this.ar >= f.ar) this.open(f.id);
     }
     this.save();
   }
   addStars(n: number) { this.stars += n; this.save(); }
+  addOre(n: number) { this.ore += n; this.save(); }
+  /** 열렸나 */
+  has(f: Feature) { return this.features.has(f); }
+  /** 연다(처음이면 알린다) — 첫걸음이 등급보다 먼저 열 수도 있다 */
+  open(f: Feature) {
+    if (this.features.has(f)) return;
+    this.features.add(f);
+    const def = FEATURES.find((x) => x.id === f);
+    if (def) this.onFeature?.(def);
+    this.save();
+  }
 
   /** 의뢰 진행: kind를 n만큼 */
   bump(kind: CommissionKind, n = 1) {
+    if (!this.features.has('commission')) return; // 모험 등급 3부터
     this.rollDay();
     let changed = false;
     for (const c of this.commissions) {

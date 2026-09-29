@@ -5,6 +5,7 @@ export default async (p, shot) => {
   const t0 = Date.now();
   const info = () => E(p, () => { const W = window.__walk, pr = W.prologue(), h = W.hero(), b = h.body; return { step: pr.stepId, done: pr.done, beacon: pr.beacon(), b: { x: +b.x.toFixed(1), y: +b.y.toFixed(1), z: +b.z.toFixed(1), mode: b.mode }, line: document.querySelector('.pro .t')?.textContent, stars: W.progress().stars, ar: W.progress().ar }; });
   const wait = async (want, ms = 20000) => { const t = Date.now(); let s; while (Date.now() - t < ms) { s = await info(); if (s.step !== want) return s; await p.waitForTimeout(300); } return s; };
+  const clearBanner = async () => { for (let i = 0; i < 8; i++) { if (!(await E(p, () => window.__walk.banner().showing))) return; await p.waitForTimeout(500); await p.mouse.click(450, 280); await p.waitForTimeout(300); } };
   const lap = (s) => console.log(`[${Math.round((Date.now() - t0) / 1000)}s]`, JSON.stringify(s));
   let s = await info();
   for (let i = 0; i < 40 && !s.step; i++) { await p.waitForTimeout(500); s = await info(); }
@@ -12,6 +13,7 @@ export default async (p, shot) => {
   await E(p, () => window.__bot.stopRender());
   await shot('pro_0_start');
   // 1) 지도: M으로 열고 닫기(켜 둔 🔷 확인)
+  await clearBanner();
   await p.keyboard.press('KeyM');
   await p.waitForTimeout(2000);
   await shot('pro_1_map');
@@ -40,6 +42,7 @@ export default async (p, shot) => {
   await E(p, () => { const h = window.__walk.hero(), b = h.body; const [tx, ty] = window.__bot.at('eiffel', [0, 0]); h.cam.yaw = Math.atan2(tx - b.x, ty - b.y) * 180 / Math.PI; b.facing = h.cam.yaw; });
   await p.waitForTimeout(500);
   console.log('photo nudge', await E(p, () => document.querySelector('#photo-go').classList.contains('nudge')));
+  await clearBanner();
   await p.click('#photo-go', { force: true });
   s = await wait('photo', 15000); lap(s);
   // 6) 쥐왕: 걸어가서 가만히(쓰러질 때까지)
@@ -65,6 +68,7 @@ export default async (p, shot) => {
   s = await wait('glide', 10000); lap(s);
   await shot('pro_6_landed');
   // 7) 기원: ✨ 단추 → 1번 → 닫기
+  await clearBanner();
   await p.click('#wish-go', { force: true });
   await p.waitForTimeout(700);
   await p.click('#wish .one', { force: true });
@@ -73,6 +77,7 @@ export default async (p, shot) => {
   await p.click('#wish .x', { force: true });
   s = await wait('wish'); lap(s);
   // 8) 수첩
+  await clearBanner();
   await p.keyboard.press('KeyJ');
   await p.waitForTimeout(800);
   s = await wait('journal'); lap(s);

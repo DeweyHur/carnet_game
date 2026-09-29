@@ -27,7 +27,9 @@ import { Wardrobe, modsOf } from './gear';
 import { Closet } from './closet';
 import { Minimap } from './minimap';
 import { Journal } from './journal';
-import { Progress, arNeed, COMMISSION_TEXT } from './progress';
+import { Progress, arNeed, COMMISSION_TEXT, FEATURES } from './progress';
+import { Feed } from './feed';
+import { Banner } from './banner';
 import { Explore, WAYPOINTS } from './explore';
 import type { Waypoint } from './explore';
 import { Wish } from './wish';
@@ -507,30 +509,37 @@ let glideAcc = 0, climbAcc = 0;
 const adv: Partial<Record<'bonjour' | 'seen' | 'walked' | 'helped', number>> = {};
 const wpPins = new Map<string, HTMLElement>();
 const xpMul = () => (wardrobe?.has('tophat') ? 1.15 : 1);
-const addMoney = (eur: number) => { S.money = Math.round((S.money + eur) * 100) / 100; paintMenu(); };
+const feed = new Feed();
+const banner = new Banner();
+const addMoney = (eur: number) => {
+  S.money = Math.round((S.money + eur) * 100) / 100;
+  paintMenu();
+  if (eur >= 1) feed.push('💶', `€ +${Math.round(eur)}`, 'gold');
+};
+/** 모험 등급에 따라 보이는 단추(원신처럼 하나씩 열린다) */
+function paintGates() {
+  if (!progress) return;
+  $('#wish-go').hidden = !progress.has('wish');
+}
 
 function setupAdventure() {
   progress = new Progress();
-  let xpT: ReturnType<typeof setTimeout> | null = null;
-  const xpEl = document.createElement('div');
-  xpEl.className = 'xpgain';
-  document.body.appendChild(xpEl);
-  progress.onXp = (n, why) => {
-    xpEl.textContent = `모험 경험치 +${n} · ${why}`;
-    xpEl.classList.add('on');
-    if (xpT) clearTimeout(xpT);
-    xpT = setTimeout(() => xpEl.classList.remove('on'), 1800);
-  };
+  progress.onXp = (n) => feed.push('✦', `모험 경험치 +${n}`, 'blue');
   progress.onRank = (ar, rw) => {
     addMoney(rw.eur);
-    setTimeout(() => { sfx.fanfare(); toast(`🌟 모험 등급 ${ar}! 보상 ⭐${rw.stars} · €${rw.eur}`); }, 900);
+    combat?.heal(1);
+    const next = FEATURES.find((f) => f.ar > ar);
+    const line = next ? `다음 · 모험 등급 ${next.ar}에 ${next.emoji} ${next.name}이(가) 열린다` : ar < 20 ? '다음 목표 · 🐀👑 쥐왕 — 모험 등급 20쯤, 무기를 강화해서' : '🐀👑 쥐왕에게 도전할 때다!';
+    setTimeout(() => banner.rank(ar, [`⭐ ${rw.stars}`, `€ ${rw.eur}`, `🔹 ${rw.ore}`, '❤️ 체력 가득'], `${line} · 무기는 Lv.${Math.min(20, 2 + ar * 2)}까지 강화할 수 있다`), 700);
   };
+  progress.onFeature = (f) => { setTimeout(() => banner.unlock(f.emoji, f.name, f.what), 800); paintGates(); };
   progress.onCommission = (c, all) => {
     setTimeout(() => { sfx.questDone(); toast(`📜 오늘의 의뢰 완료 · ${COMMISSION_TEXT[c.kind](c.goal)} — ⭐10 · 경험치 250${all ? ' · 넷 모두! 추가 ⭐60' : ''}`); }, 1500);
   };
   progress.onChange = () => { journal?.refresh(); paintMenu(); for (const [id, el] of wpPins) el.classList.toggle('on', progress.waypoints.has(id)); };
   explore = new Explore({
     hero, progress, toast, hint: (s2) => hint(s2), money: (eur) => addMoney(wardrobe.has('satchel') ? Math.round(eur * 1.5) : eur), xpMul,
+    got: (icon, text, tone) => feed.push(icon, text, tone),
     camp: (key, x, y, z, seed, only) => combat?.spawnCamp(key, x, y, z, seed, only ?? towerRats(x, y, seed)),
     calm: (x, y) => !!prologue && !prologue.done && (() => { const [tx, ty] = hero.frame.toLocal(TOWER); return Math.hypot(x - tx, y - ty) < 450; })(),
     revealNear: (pos, r) => { let n = 0; for (const p of places) if (!p.minor && !S.seen.has(p.id) && dist(p.pos, pos) < r) { S.seen.set(p.id, S.clock); showMarker(p); n++; } return n; },
@@ -548,7 +557,12 @@ function setupAdventure() {
       const g = !wardrobe.owned.has('jeanne') ? GEAR.find((q) => q.id === 'jeanne') : GEAR.filter((q) => q.star === 5 && !wardrobe.owned.has(q.id))[0];
       if (g) wardrobe.unlock(g.id); else progress.addStars(120);
     },
-    weapon: () => { const id = wardrobe.loadout.weapon ?? 'umbrella'; return { id, emoji: GEAR.find((q) => q.id === id)?.emoji ?? '⚔️' }; },
+    weapon: () => { const id = wardrobe.loadout.weapon ?? 'umbrella'; return { id, emoji: GEAR.find((q) => q.id === id)?.emoji ?? '⚔️', lv: wardrobe.lvOf(id) }; },
+    loot: (kind) => {
+      // 🔹 연마석: 쥐·가고일은 늘, 슬라임은 가끔, 우두머리는 많이
+      const n = kind === 'ratking' ? 25 : kind === 'boss' ? 10 : kind === 'gargoyle' ? 2 : kind === 'rat' ? 1 : Math.random() < 0.4 ? 1 : 0;
+      if (n) { progress.addOre(n); feed.push('🔹', `연마석 ×${n}`, 'purple'); }
+    },
     respawn: async () => {
       if (domain?.active) { await domain.fail('down'); return; } // 비경에서 쓰러지면 입구 앞으로
       // 가장 가까운 켠 순간이동 포인트(없으면 샹드마르스)
@@ -647,6 +661,15 @@ async function teleport(wp: Waypoint) {
 function setupGear() {
   wardrobe = new Wardrobe();
   closet = new Closet(wardrobe);
+  closet.ctx = {
+    ar: () => progress?.ar ?? 1,
+    ore: () => progress?.ore ?? 0,
+    money: () => S.money,
+    canEnhance: () => !!progress?.has('enhance'),
+    pay: (ore, eur) => { if (!progress || progress.ore < ore || S.money < eur) return false; progress.ore -= ore; progress.save(); S.money = Math.round((S.money - eur) * 100) / 100; paintMenu(); return true; },
+    stats: () => combat?.stats() ?? { atk: 0, hp: 0, crit: 0, critDmg: 0 },
+    enhanced: (name, lv) => { sfx.questDone(); feed.push('⬆', `${name} Lv.${lv} — 공격력 +6%`, 'gold'); },
+  };
   const apply = () => {
     const l = wardrobe.loadout;
     hero.figure.setGear(l);
@@ -861,6 +884,7 @@ function paintMenu() {
   $('#m-xpt').textContent = `${progress.xp} / ${need}`;
   $('#m-stars').textContent = `⭐ ${progress.stars}`;
   $('#m-money').textContent = `€ ${Number.isInteger(S.money) ? S.money : S.money.toFixed(2)}`;
+  $('#m-ore').textContent = `🔹 ${progress.ore}`;
   $('#m-time').textContent = `파리 · ${fmtClock(S.clock)}${night01 > 0.5 ? ' 🌙' : ''} · 발견 ${S.seen.size}곳 · 걸은 거리 ${(S.walked / 1000).toFixed(1)} km`;
   $('#m-sound').textContent = sfx.isMuted() ? '🔇' : '🔊';
 }
@@ -986,6 +1010,7 @@ async function start(resumeAt?: Waypoint) {
   mapHandlers(false);
   avatar.getElement().classList.add('hidden');
   paintSky();
+  paintGates();
   if (resumeAt) await teleport(resumeAt); // 원신처럼: 지난번 순간이동 포인트에서 바로
   const touch = hero.input.touched || matchMedia('(pointer: coarse)').matches;
   if (touch) document.body.classList.add('touch-play');
@@ -1028,7 +1053,7 @@ if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown
   street: () => street, DISTRICTS, places: () => places, graph: () => graph, map: () => map, sky: () => sky,
   wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal, progress: () => progress,
   explore: () => explore, wish: () => wish, combat: () => combat, companion: () => companion, ascend: () => ascend, domain: () => domain, prologue: () => prologue,
-  menu: (on?: boolean) => menu(on), mapMode: (on: boolean) => setMapMode(on),
+  menu: (on?: boolean) => menu(on), banner: () => banner, feed: () => feed, mapMode: (on: boolean) => setMapMode(on),
   teleport: (id: string) => { const wp = WAYPOINTS.find((w) => w.id === id); return wp ? teleport(wp) : null; },
 };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
