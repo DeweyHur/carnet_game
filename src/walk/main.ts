@@ -544,10 +544,11 @@ function setupAdventure() {
     bossSpot: () => explore.bossSpot(),
     kingSpot: () => { const [x, y] = hero.frame.toLocal(KING_AT); return [x, y, hero.world.terrain(x, y)]; },
     kingSlain: () => {
-      // 5★ 장비 하나(없는 것) — 다 있으면 별조각
-      const g = GEAR.filter((q) => q.star === 5 && !wardrobe.owned.has(q.id))[0];
+      // 잔 다르크의 검이 먼저, 이미 있으면 없는 5★ 장비 하나 — 다 있으면 별조각
+      const g = !wardrobe.owned.has('jeanne') ? GEAR.find((q) => q.id === 'jeanne') : GEAR.filter((q) => q.star === 5 && !wardrobe.owned.has(q.id))[0];
       if (g) wardrobe.unlock(g.id); else progress.addStars(120);
     },
+    weapon: () => { const id = wardrobe.loadout.weapon ?? 'umbrella'; return { id, emoji: GEAR.find((q) => q.id === id)?.emoji ?? '⚔️' }; },
     respawn: async () => {
       if (domain?.active) { await domain.fail('down'); return; } // 비경에서 쓰러지면 입구 앞으로
       // 가장 가까운 켠 순간이동 포인트(없으면 샹드마르스)
@@ -653,10 +654,16 @@ function setupGear() {
     hero.body.golden = l.glider === 'golden';
   };
   apply();
-  wardrobe.onChange = () => { apply(); if (closet.open) sfx.questStart(); };
+  let lastWeapon = wardrobe.loadout.weapon;
+  wardrobe.onChange = () => {
+    apply();
+    if (closet.open) sfx.questStart();
+    // 무기를 바꾸면 잠깐 손에 들어 보여 준다
+    if (wardrobe.loadout.weapon !== lastWeapon) { lastWeapon = wardrobe.loadout.weapon; hero.body.drawn = 6; }
+  };
   wardrobe.onUnlock = (g) => {
     if (g.id === 'golden') { wardrobe.equip('golden'); return; } // 숨은 보상 — 알리지 않는다
-    setTimeout(() => { sfx.questDone(); toast(`🎁 새 장비: ${g.emoji} ${g.name} — 🎒 옷장(I)에서 입어 보자`); }, 1800);
+    setTimeout(() => { sfx.questDone(); toast(g.slot === 'weapon' ? `🗡 새 무기: ${g.emoji} ${g.name} — 🎒 옷장(I)의 무기 칸에서 바꿔 들자` : `🎁 새 장비: ${g.emoji} ${g.name} — 🎒 옷장(I)에서 입어 보자`); }, 1800);
   };
   closet.onToggle = (on) => {
     hero.cam.portrait = on;
@@ -682,6 +689,9 @@ function milestones() {
   if (S.seen.size >= 5) wardrobe.unlock('trench');
   if ((street?.stats.bonjour ?? 0) >= 10) wardrobe.unlock('leather');
   if (progress && progress.chests.size >= 5) wardrobe.unlock('satchel');
+  if (progress && progress.chests.size >= 3) wardrobe.unlock('baguette');
+  if (progress && progress.ar >= 5) wardrobe.unlock('oar');
+  if (domain?.threeStarAny) wardrobe.unlock('rapier');
   if (domain?.clearedAny) wardrobe.unlock('flag');
   if (progress && street) {
     const now = { bonjour: street.stats.bonjour, seen: S.seen.size, walked: S.walked, helped: street.stats.helped };

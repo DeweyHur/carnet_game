@@ -1,8 +1,10 @@
-// 장비(옷장): 모자 · 윗옷 · 가방 · 신발 · 글라이더 — 하나씩 입고, 입은 것에 따라 겉모습과 작은 능력이 바뀐다.
+// 장비(옷장): 무기 · 모자 · 윗옷 · 가방 · 신발 · 글라이더 — 하나씩 입고, 입은 것에 따라 겉모습과 능력이 바뀐다.
+// 무기는 손에 쥔 모양과 싸움 능력(공격력·치명타·사거리·폭발·흡혈)이 다르다.
 // 처음부터 있는 것 몇 가지, 나머지는 부탁을 들어주거나 걷다 보면 생긴다.
 
-export type Slot = 'head' | 'top' | 'back' | 'feet' | 'glider';
+export type Slot = 'weapon' | 'head' | 'top' | 'back' | 'feet' | 'glider';
 export const SLOTS: { id: Slot; name: string; emoji: string }[] = [
+  { id: 'weapon', name: '무기', emoji: '🗡' },
   { id: 'head', name: '모자', emoji: '🎩' },
   { id: 'top', name: '윗옷', emoji: '🧥' },
   { id: 'back', name: '가방', emoji: '🎒' },
@@ -24,6 +26,14 @@ export interface Gear {
 }
 
 export const GEAR: Gear[] = [
+  { id: 'umbrella', slot: 'weapon', name: '접은 파리 우산', emoji: '☂️', perk: '공격력 ×1.0 · 치명타 15% — 균형 잡힌 기본 무기' },
+  { id: 'baguette', slot: 'weapon', name: '바게트 검', emoji: '🥖', perk: '공격력 ×0.9 · 맞힐 때마다 체력 2% 회복', unlock: '보물상자 3개 열기', star: 4 },
+  { id: 'cane', slot: 'weapon', name: '멋쟁이 지팡이 검', emoji: '🦯', perk: '공격력 ×1.0 · 치명타 30% · 치명타 피해 ×2.0', unlock: '기원(4★)', star: 4 },
+  { id: 'oar', slot: 'weapon', name: '센 강 뱃사공의 노', emoji: '🛶', perk: '공격력 ×1.3 · 사거리 +0.9 m · 치명타 10%', unlock: '모험 등급 5', star: 4 },
+  { id: 'rapier', slot: 'weapon', name: '삼총사의 레이피어', emoji: '🤺', perk: '공격력 ×1.15 · 치명타 25% · 원소 스킬 피해 +40%', unlock: '비경 ★★★ 한 번', star: 4 },
+  { id: 'flagpole', slot: 'weapon', name: '혁명의 깃발', emoji: '🚩', perk: '공격력 ×1.2 · 사거리 +0.6 m · 원소 폭발 피해 +60% · 에너지 +30%', unlock: '기원(5★)', star: 5 },
+  { id: 'jeanne', slot: 'weapon', name: '잔 다르크의 검', emoji: '⚔️', perk: '공격력 ×1.45 · 치명타 25% · 치명타 피해 ×2.0 — 가장 센 검', unlock: '쥐왕 쓰러뜨리기 · 기원(5★)', star: 5 },
+
   { id: 'beret', slot: 'head', name: '빨간 베레모', emoji: '🔴', perk: '파리 사람 분위기(능력 없음)' },
   { id: 'panama', slot: 'head', name: '파나마 모자', emoji: '👒', perk: '달리기가 5% 빠르다', unlock: '에펠탑 1층에 걸린 모자를 찾아 주기' , star: 4 },
   { id: 'aviator', slot: 'head', name: '비행 모자·고글', emoji: '🥽', perk: '높은 데서 떨어져도 1.6배까지 다치지 않는다', unlock: '에펠탑 2층 3분 도전' , star: 4 },
@@ -53,8 +63,22 @@ export const GEAR: Gear[] = [
 ];
 
 export type Loadout = Record<Slot, string>;
-export const DEFAULT_LOADOUT: Loadout = { head: 'beret', top: 'jacket', back: 'backpack', feet: 'boots', glider: 'tricolore' };
+export const DEFAULT_LOADOUT: Loadout = { weapon: 'umbrella', head: 'beret', top: 'jacket', back: 'backpack', feet: 'boots', glider: 'tricolore' };
 const STARTER = new Set(GEAR.filter((g) => !g.unlock).map((g) => g.id));
+
+/** 무기의 싸움 능력 */
+export interface WeaponStats { atk: number; crit: number; critDmg: number; reach: number; skill: number; burst: number; energy: number; heal: number }
+const W0: WeaponStats = { atk: 1, crit: 0.15, critDmg: 1.8, reach: 0, skill: 1, burst: 1, energy: 1, heal: 0 };
+const WEAPON_STATS: Record<string, Partial<WeaponStats>> = {
+  umbrella: {},
+  baguette: { atk: 0.9, heal: 0.02 },
+  cane: { crit: 0.3, critDmg: 2.0 },
+  oar: { atk: 1.3, reach: 0.9, crit: 0.1 },
+  rapier: { atk: 1.15, crit: 0.25, skill: 1.4 },
+  flagpole: { atk: 1.2, reach: 0.6, burst: 1.6, energy: 1.3 },
+  jeanne: { atk: 1.45, crit: 0.25, critDmg: 2.0 },
+};
+export function weaponOf(id: string): WeaponStats { return { ...W0, ...(WEAPON_STATS[id] ?? {}) }; }
 
 /** 몸에 미치는 것(곱) */
 export interface Mods { run: number; climb: number; glide: number; hurt: number; swim: number; steady: boolean; gcost: number; scost: number }

@@ -8,6 +8,7 @@ import type { Frame as InputFrame } from './hero/input';
 import type { CombatAct } from './hero/body';
 import type { Progress } from './progress';
 import * as sfx from './sound';
+import { weaponOf, type WeaponStats } from './gear';
 
 export interface CombatCtx {
   hero: Hero;
@@ -30,6 +31,8 @@ export interface CombatCtx {
   kingSpot?(): [number, number, number] | null;
   /** 쥐왕을 쓰러뜨렸다 */
   kingSlain?(): void;
+  /** 손에 든 무기(옷장) */
+  weapon?(): { id: string; emoji: string };
 }
 
 export type Kind = 'slime' | 'rat' | 'gargoyle' | 'boss' | 'ratking';
@@ -95,6 +98,7 @@ export class Combat {
   private readonly hpText: HTMLElement;
   private readonly skillBtn: HTMLElement;
   private readonly burstBtn: HTMLElement;
+  private readonly atkBtn: HTMLElement;
   private readonly layer: HTMLElement;
   private readonly vignette: HTMLElement;
   private readonly bossBar: HTMLElement;
@@ -115,6 +119,7 @@ export class Combat {
     this.hpText = this.ui.querySelector('.hp span')!;
     this.skillBtn = this.ui.querySelector('.skill')!;
     this.burstBtn = this.ui.querySelector('.burst')!;
+    this.atkBtn = this.ui.querySelector('.atk')!;
     const tap = (sel: string, e: 'attack' | 'skill' | 'burst') => this.ui.querySelector(sel)!.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); c.hero.input.press(e); });
     tap('.atk', 'attack'); tap('.skill', 'skill'); tap('.burst', 'burst');
     this.layer = document.createElement('div');
@@ -136,8 +141,10 @@ export class Combat {
   /** 지금 몸이 선 세계(비경 안이면 비경) */
   private get W() { return this.hero.sceneWorld ?? this.hero.world; }
   private get ar() { return this.c.progress.ar; }
-  /** 모험 등급에 따라 */
-  private get atk() { return 16 + this.ar * 3; }
+  /** 손에 든 무기의 능력 */
+  private get wep(): WeaponStats { return weaponOf(this.c.weapon?.().id ?? 'umbrella'); }
+  /** 모험 등급 × 무기 */
+  private get atk() { return (16 + this.ar * 3) * this.wep.atk; }
   private recalc(full = false) {
     const m = 120 + this.ar * 12;
     if (m !== this.maxHp) { const r = this.hp / this.maxHp; this.maxHp = m; this.hp = full ? m : Math.max(1, Math.round(r * m)); }
@@ -394,16 +401,16 @@ export class Combat {
         // 가운데로 끌어당기며 띄운다
         const k = Math.min(1, 2 / Math.max(0.1, d));
         f.x += (b.x - f.x) * k * 0.6; f.y += (b.y - f.y) * k * 0.6;
-        this.damage(f, this.atk * 2.2, 'skill');
+        this.damage(f, this.atk * 2.2 * this.wep.skill, 'skill');
         if (!big(f)) { f.lift = 0.1; f.vz = 5; }
         n++;
       }
-      this.energy = Math.min(this.energyMax, this.energy + n * 6 + (n ? 4 : 0));
+      this.energy = Math.min(this.energyMax, this.energy + (n * 6 + (n ? 4 : 0)) * this.wep.energy);
       this.burstWind(b.x, b.y, b.z + 1, 0x9ff3e0);
       return;
     }
     const heavy = kind === 'atk3';
-    const reach = heavy ? 3.1 : 2.6, cone = heavy ? 100 : 75;
+    const reach = (heavy ? 3.1 : 2.6) + this.wep.reach, cone = heavy ? 100 : 75;
     this.swing(b.x, b.y, b.z + 1.1, b.facing, heavy);
     let n = 0;
     for (const f of this.foes) {
@@ -417,7 +424,7 @@ export class Combat {
       if (!big(f)) { const k = heavy ? 1.6 : 0.6; f.x += (dx / (d || 1)) * k; f.y += (dy / (d || 1)) * k; }
       n++;
     }
-    if (n) { this.energy = Math.min(this.energyMax, this.energy + 2 * n); sfx.bump(); }
+    if (n) { this.energy = Math.min(this.energyMax, this.energy + 2 * n * this.wep.energy); sfx.bump(); }
   }
 
   private plungeHit() {
@@ -436,8 +443,10 @@ export class Combat {
   }
 
   private damage(f: Foe, raw: number, how: 'hit' | 'heavy' | 'skill' | 'burst') {
-    const crit = Math.random() < 0.15;
-    const dmg = Math.round(raw * (0.9 + Math.random() * 0.2) * (crit ? 1.8 : 1));
+    const w = this.wep;
+    const crit = Math.random() < w.crit;
+    const dmg = Math.round(raw * (0.9 + Math.random() * 0.2) * (crit ? w.critDmg : 1));
+    if (w.heal && (how === 'hit' || how === 'heavy')) this.hp = Math.min(this.maxHp, this.hp + this.maxHp * w.heal); // 바게트: 한 입
     f.hp -= dmg;
     f.flash = 0.12;
     f.seen = 4;
@@ -732,7 +741,7 @@ export class Combat {
     }
     if (T.tick <= 0) {
       T.tick = 0.5;
-      for (const f of this.foes) if (f.state !== 'dead' && Math.hypot(f.x - T.x, f.y - T.y) < (big(f) ? 5.5 : 3.8)) this.damage(f, this.atk * 1.15, 'burst');
+      for (const f of this.foes) if (f.state !== 'dead' && Math.hypot(f.x - T.x, f.y - T.y) < (big(f) ? 5.5 : 3.8)) this.damage(f, this.atk * 1.15 * this.wep.burst, 'burst');
     }
     if (T.t > 6) { this.group.remove(T.obj); this.tornado = null; for (const f of this.foes) f.lift = Math.min(f.lift, 0.01); }
   }
@@ -796,6 +805,8 @@ export class Combat {
     this.ui.classList.toggle('fight', this.inCombat || hpPct < 0.999 || this.hero.body.drawn > 0);
     (this.skillBtn.querySelector('i') as HTMLElement).style.setProperty('--p', `${(this.skillCd / this.skillMax) * 100}%`);
     this.skillBtn.classList.toggle('cool', this.skillCd > 0);
+    const we = this.c.weapon?.().emoji ?? '⚔️';
+    if (this.atkBtn.textContent !== we) this.atkBtn.textContent = we;
     (this.burstBtn.querySelector('i') as HTMLElement).style.setProperty('--p', `${(1 - this.energy / this.energyMax) * 100}%`);
     this.burstBtn.classList.toggle('ready', this.energy >= this.energyMax);
   }

@@ -177,6 +177,8 @@ export class Domain {
   }
   /** 한 곳이라도 깬 적이 있나 */
   get clearedAny() { return Object.keys(this.clears.best).length > 0; }
+  /** ★★★로 깬 적이 있나 */
+  get threeStarAny() { return Object.values(this.clears.best).some((v) => v >= 3); }
   /** 미니맵 표시 */
   marks() { return this.gates.map((g) => ({ x: g.x, y: g.y, icon: '🌀' })); }
 

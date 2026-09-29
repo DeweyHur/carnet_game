@@ -46,6 +46,8 @@ export class Figure {
   private readonly scarf = new THREE.Group();
   private readonly handR = new THREE.Group();
   private readonly items = new Map<Item, THREE.Object3D>();
+  /** 무기 모양들(옷장의 무기 칸) */
+  private readonly weapons = new Map<string, THREE.Object3D>();
   private readonly baguette = new THREE.Group();
   private readonly glider = new THREE.Group();
   private readonly wings: THREE.Mesh[] = [];
@@ -341,12 +343,46 @@ export class Figure {
     for (const [fx, fy, c] of [[0.03, 0, 0xe0436c], [-0.03, 0.02, 0xf2c14e], [0, -0.03, 0xb04ad6], [0.01, 0.04, 0xf07f3c]] as const) this.part(new THREE.SphereGeometry(0.04, 8, 6), c, flowers, fx, 0.02 + fy, 0.27, false);
     const book = item('book', new THREE.Group());
     this.part(new THREE.BoxGeometry(0.15, 0.03, 0.2), 0x2f5d8a, book, 0, 0.03, 0.04);
-    // 싸움: 접은 파리 우산(칼처럼 쥔다) — 손에서 팔 방향(-z)으로 뻗는다
-    const umb = item('umbrella', new THREE.Group());
+    // 싸움: 무기(칼처럼 쥔다) — 손에서 팔 방향(-z)으로 뻗는다. 옷장에서 고른 것 하나만 보인다
+    const wep = item('umbrella', new THREE.Group());
+    const along = (r0: number, r1: number, len: number, z0: number, seg = 8) => new THREE.CylinderGeometry(r0, r1, len, seg).rotateX(Math.PI / 2).translate(0, 0, z0 - len / 2);
+    const umb = this.group(wep, this.weapons, 'umbrella');
     this.part(new THREE.CylinderGeometry(0.012, 0.012, 0.95, 6).rotateX(Math.PI / 2).translate(0, 0, -0.42), 0x2b2b2b, umb, 0, 0.03, 0, false);
     this.part(new THREE.ConeGeometry(0.12, 0.9, 8).rotateX(-Math.PI / 2).translate(0, 0, -0.58), 0xe0393f, umb, 0, 0.03, 0);
     this.part(new THREE.TorusGeometry(0.05, 0.014, 6, 10, Math.PI).rotateY(Math.PI / 2), 0x6b4423, umb, 0, 0.08, 0.06, false); // 손잡이
     this.part(new THREE.SphereGeometry(0.016, 6, 6), 0xd9b44a, umb, 0, 0.03, -0.9, false);
+    // 바게트 검: 길쭉한 빵에 칼집(빗금)
+    const bag = this.group(wep, this.weapons, 'baguette');
+    this.part(new THREE.CapsuleGeometry(0.05, 0.78, 4, 10).rotateX(Math.PI / 2).translate(0, 0, -0.42), 0xd9a55a, bag, 0, 0.03, 0);
+    for (let i = 0; i < 4; i++) this.part(new THREE.BoxGeometry(0.07, 0.012, 0.03).rotateY(0.6), 0xa86b2c, bag, 0, 0.078, -0.16 - i * 0.18, false);
+    // 지팡이 검: 검은 막대 + 은 손잡이
+    const cane = this.group(wep, this.weapons, 'cane');
+    this.part(along(0.014, 0.012, 0.95, 0), 0x1b1a1a, cane, 0, 0.03, 0.02, false);
+    this.part(new THREE.SphereGeometry(0.035, 10, 8), 0xd8dde3, cane, 0, 0.03, 0.05);
+    this.part(new THREE.CylinderGeometry(0.018, 0.018, 0.03, 8).rotateX(Math.PI / 2), 0xd9b44a, cane, 0, 0.03, -0.9, false);
+    // 뱃사공의 노: 긴 나무 자루 + 넓은 날
+    const oar = this.group(wep, this.weapons, 'oar');
+    this.part(along(0.02, 0.02, 1.25, 0.1), 0x8a5a2e, oar, 0, 0.03, 0, false);
+    this.part(new THREE.BoxGeometry(0.2, 0.03, 0.42).translate(0, 0, -1.3), 0x9a6a38, oar, 0, 0.03, 0);
+    this.part(new THREE.BoxGeometry(0.21, 0.032, 0.05).translate(0, 0, -1.05), 0x2f5d8a, oar, 0, 0.03, 0, false); // 파란 띠
+    // 삼총사의 레이피어: 가는 은빛 날 + 금빛 잔 손잡이
+    const rap = this.group(wep, this.weapons, 'rapier');
+    this.part(new THREE.BoxGeometry(0.018, 0.01, 0.95).translate(0, 0, -0.52), 0xe3e7ec, rap, 0, 0.03, 0, false);
+    this.part(new THREE.SphereGeometry(0.07, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(-Math.PI / 2).translate(0, 0, -0.04), 0xd9b44a, rap, 0, 0.03, 0);
+    this.part(along(0.016, 0.016, 0.12, 0.08, 6), 0x5b3a20, rap, 0, 0.03, 0, false);
+    // 혁명의 깃발: 긴 깃대 + 삼색기
+    const flag = this.group(wep, this.weapons, 'flagpole');
+    this.part(along(0.016, 0.016, 1.45, 0.12), 0x6b4423, flag, 0, 0.03, 0, false);
+    this.part(new THREE.SphereGeometry(0.03, 8, 6), 0xd9b44a, flag, 0, 0.03, -1.35, false);
+    for (const [i, c] of [[0, 0x2f4c9a], [1, 0xf4f1e9], [2, 0xd9363e]] as const) this.part(new THREE.BoxGeometry(0.012, 0.16, 0.36).translate(0, 0.1 + i * 0.16, -1.1), c, flag, 0, 0.03, 0, false);
+    // 잔 다르크의 검: 넓은 은빛 날(은은히 빛난다) + 금빛 십자 가드
+    const jn = this.group(wep, this.weapons, 'jeanne');
+    const bladeM = new THREE.MeshToonMaterial({ color: 0xeef3f8, emissive: 0x3a4a66 });
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.018, 0.92).translate(0, 0, -0.55), bladeM);
+    blade.position.y = 0.03; jn.add(blade); blade.add(new THREE.Mesh(blade.geometry, this.outline));
+    this.part(new THREE.BoxGeometry(0.28, 0.035, 0.04).translate(0, 0, -0.06), 0xd9b44a, jn, 0, 0.03, 0);
+    this.part(along(0.02, 0.02, 0.14, 0.08, 6), 0x3b2616, jn, 0, 0.03, 0, false);
+    this.part(new THREE.SphereGeometry(0.03, 8, 6), 0xd9b44a, jn, 0, 0.03, 0.09, false);
     const coin = item('coin', new THREE.Group());
     this.part(new THREE.CylinderGeometry(0.025, 0.025, 0.006, 12), 0xd9b44a, coin, 0, 0.03, 0, false);
     // 겨드랑이에 낀 바게트(왼쪽)
@@ -408,6 +444,7 @@ export class Figure {
   setGear(l: Loadout) {
     this.gear = { ...l };
     const pick = (set: Map<string, THREE.Object3D>, id: string) => { for (const [k, o] of set) o.visible = k === id; };
+    pick(this.weapons, l.weapon ?? 'umbrella');
     pick(this.hats, l.head);
     this.quiff.visible = l.head === 'none';
     pick(this.tops, l.top);
