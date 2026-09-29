@@ -4,7 +4,7 @@ import { fight } from './fightlib.mjs';
 export default async (p, shot) => {
   for (let i = 0; i < 40; i++) { if (await E(p, () => window.__walk.prologue().running)) break; await p.waitForTimeout(500); }
   await E(p, () => window.__bot.stopRender());
-  const st = () => E(p, () => { const W = window.__walk, P = W.progress(); return { ar: P.ar, xp: P.xp, ore: P.ore, feats: [...P.features], wishBtn: !document.querySelector('#wish-go').hidden, banner: W.banner().showing, bannerText: document.querySelector('.banner.on .card')?.textContent?.slice(0, 80) ?? null, feed: [...document.querySelectorAll('.feed .it')].map((x) => x.textContent) }; });
+  const st = () => E(p, () => { const W = window.__walk, P = W.progress(); return { ar: P.ar, xp: P.xp, ore: P.ore, feats: [...P.features], wishBtn: !document.querySelector('#wish-go').hidden, banner: W.banner().showing, bannerText: document.querySelector('.bigcard.on .card')?.textContent?.slice(0, 80) ?? null, feed: [...document.querySelectorAll('.feed .it')].map((x) => x.textContent) }; });
   console.log('start', JSON.stringify(await st()));
   // 쥐 셋과 싸운다(진짜 공격)
   await E(p, () => { const W = window.__walk, b = W.hero().body; W.combat().spawnCamp('prog-rats', b.x + 5, b.y + 5, b.z, 0.2, ['rat', 'rat', 'rat']); });

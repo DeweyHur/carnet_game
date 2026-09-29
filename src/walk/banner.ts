@@ -13,7 +13,7 @@ export class Banner {
 
   constructor() {
     this.el = document.createElement('div');
-    this.el.className = 'banner';
+    this.el.className = 'bigcard';
     // 방금 뜬 카드는 0.4초 동안 눌러도 넘어가지 않는다(연달아 누르다 건너뛰지 않게)
     this.el.addEventListener('pointerdown', (e) => { e.stopPropagation(); if (performance.now() - this.shownAt > 400) this.next(); });
     document.body.appendChild(this.el);
@@ -40,7 +40,7 @@ export class Banner {
     if (!c) { this.el.classList.remove('on'); this.busy = false; this.onClose?.(); return; }
     this.busy = true;
     this.shownAt = performance.now();
-    this.el.className = `banner on ${c.kind}`;
+    this.el.className = `bigcard on ${c.kind}`;
     this.el.innerHTML = `<div class="card">${c.html}</div>`;
     if (c.kind === 'rank') sfx.fanfare(); else sfx.spotBig();
     this.timer = setTimeout(() => this.next(), c.secs * 1000);
