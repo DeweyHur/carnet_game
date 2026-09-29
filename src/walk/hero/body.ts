@@ -11,11 +11,11 @@ export type BodyEvent = 'jump' | 'land' | 'hurt' | 'glide' | 'unglide' | 'grab' 
 /** 제자리에서 하는 동작. dance·lie는 움직이면 끝나고, 나머지는 정해진 시간이 지나면 끝난다. */
 export type Act = 'dance' | 'photo' | 'drink' | 'eat' | 'clap' | 'lie' | 'push' | 'tip' | 'feed' | 'pet' | 'stretch' | 'think' | CombatAct;
 /** 싸움 동작(원신처럼): 세 번 이어지는 우산 공격 · 원소 스킬 · 원소 폭발 */
-export type CombatAct = 'atk1' | 'atk2' | 'atk3' | 'skill' | 'burst';
-const COMBAT = new Set<Act>(['atk1', 'atk2', 'atk3', 'skill', 'burst']);
+export type CombatAct = 'atk1' | 'atk2' | 'atk3' | 'atk4' | 'charge' | 'skill' | 'burst';
+const COMBAT = new Set<Act>(['atk1', 'atk2', 'atk3', 'atk4', 'charge', 'skill', 'burst']);
 /** 손에 든 것 */
 export type Carry = null | 'crepe' | 'baguette' | 'coffee' | 'balloon' | 'flowers' | 'book';
-const ACT_SECS: Record<Act, number> = { dance: Infinity, lie: Infinity, photo: 1.25, drink: 2.2, eat: 1.9, clap: 2.2, push: 0.7, tip: 1.1, feed: 2.4, pet: 2.2, stretch: 2.4, think: 1.8, atk1: 0.38, atk2: 0.38, atk3: 0.55, skill: 0.6, burst: 1.0 };
+const ACT_SECS: Record<Act, number> = { dance: Infinity, lie: Infinity, photo: 1.25, drink: 2.2, eat: 1.9, clap: 2.2, push: 0.7, tip: 1.1, feed: 2.4, pet: 2.2, stretch: 2.4, think: 1.8, atk1: 0.38, atk2: 0.38, atk3: 0.55, atk4: 0.62, charge: 0.6, skill: 0.6, burst: 1.0 };
 export interface Seat { x: number; y: number; z: number; facing: number }
 
 export interface Intent {
@@ -410,7 +410,9 @@ export class Body {
     this.phase += dt * (a.kind === 'dance' ? 7 : 3);
     const fight = COMBAT.has(a.kind);
     // 공격은 앞으로 반 걸음 내딛는다
-    if (fight && a.t < 0.14 && a.kind !== 'burst') { const [fx, fy] = dirOf(this.facing); const p = { x: this.x + fx * 3.2 * dt, y: this.y + fy * 3.2 * dt }; w.collide(p, this.z, R, H, STEP); this.x = p.x; this.y = p.y; }
+    // 강공격(찌르기)은 0.12~0.32초에 앞으로 확 내닫는다
+    const lunge = a.kind === 'charge' ? (a.t > 0.12 && a.t < 0.32 ? 15 : 0) : fight && a.t < 0.14 && a.kind !== 'burst' ? 3.2 : 0;
+    if (lunge) { const [fx, fy] = dirOf(this.facing); const p = { x: this.x + fx * lunge * dt, y: this.y + fy * lunge * dt }; w.collide(p, this.z, R, H, STEP); this.x = p.x; this.y = p.y; }
     const cancel = (m > 0.35 && (a.dur === Infinity || a.t > (fight ? 0.22 : 0.3))) || it.jump || (fight && it.roll);
     if (a.t >= a.dur || cancel) {
       this.mode = 'ground';

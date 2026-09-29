@@ -688,3 +688,15 @@ body.map-mode .feed, body.closet-on .feed { display:none; }
 #closet .enhance button { padding:8px 14px; font-weight:700; font-size:13px; }
 
 .hud-right button[hidden] { display:none; }
+/* 콤보(이어 맞힌 수) */
+.cbt-combo { position:absolute; right:26px; top:34%; display:none; flex-direction:column; align-items:flex-end; color:#fff; text-shadow:0 2px 0 #0008, 0 0 10px #0006; pointer-events:none; }
+.cbt-combo.on { display:flex; }
+.cbt-combo b { font-size:44px; line-height:1; font-weight:900; font-style:italic; background:linear-gradient(180deg, #fff, #ffd166); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 2px 0 #0009); }
+.cbt-combo span { font-size:14px; font-weight:900; letter-spacing:3px; color:#ffe7a8; margin-top:-2px; }
+.cbt-combo em { font-style:italic; font-weight:900; font-size:18px; color:#9ff3e0; }
+.cbt-combo small { font-size:11px; color:#ffd166; }
+.cbt-combo.pop b { animation:combo-pop .18s ease-out; }
+@keyframes combo-pop { from { scale:1.35; } }
+body.touch-play .cbt-combo { right:20px; top:24%; }
+body.touch-play .cbt-combo b { font-size:34px; }
+.cbt .atk.held { background:#ffd166 !important; }

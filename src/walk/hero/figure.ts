@@ -579,6 +579,10 @@ export class Figure {
           case 'atk1': { const q = Math.min(1, at / 0.2); Object.assign(want, { sRx: 1.45, sRy: -1.25 + 2.0 * q, eR: 0.15, twist: -0.55 + 1.0 * q, lean: 0.18, tL: 0.4, kL: -0.35, tR: -0.15, sLx: 0.3, sLy: 0.5, eL: 0.6, scarf: 1.2 }); break; }
           case 'atk2': { const q = Math.min(1, at / 0.2); Object.assign(want, { sRx: 1.35, sRy: 0.85 - 2.0 * q, eR: 0.2, twist: 0.5 - 1.0 * q, lean: 0.2, tR: 0.4, kR: -0.35, tL: -0.15, sLx: 0.3, sLy: 0.6, eL: 0.6, scarf: 1.3 }); break; }
           case 'atk3': { const q = Math.min(1, Math.max(0, (at - 0.12) / 0.18)); Object.assign(want, { sRx: 2.95 - 2.1 * q, sLx: 2.95 - 2.1 * q, sRy: -0.25, sLy: 0.25, eR: 0.15, eL: 0.4, lean: 0.05 + 0.35 * q, bob: -0.12 * q, tL: 0.55 * q, kL: -0.5 * q, tR: -0.2 * q, headX: -0.1, scarf: 1.6 }); break; }
+          // 넷째: 우산을 옆으로 쭉 뻗고 한 바퀴 도는 회오리 베기
+          case 'atk4': Object.assign(want, { sRx: 1.5, sRy: -1.35, eR: 0.08, sLx: 1.2, sLy: 1.2, eL: 0.25, lean: 0.18, bob: -0.1, tL: 0.45, kL: -0.5, tR: 0.3, kR: -0.45, scarf: 2.2 }); break;
+          // 강공격: 뒤로 당겼다가 앞으로 쭉 찌른다
+          case 'charge': if (at < 0.12) Object.assign(want, { sRx: 0.55, sRy: 0.45, eR: 1.7, lean: -0.12, tR: 0.35, kR: -0.5, sLx: 0.9, sLy: 0.6, eL: 0.9, scarf: 1.4 }); else Object.assign(want, { sRx: 1.58, sRy: 0.05, eR: 0.02, lean: 0.5, tL: 0.85, kL: -0.45, tR: -0.45, kR: -0.1, sLx: 0.1, sLy: 0.9, eL: 0.4, bob: -0.08, scarf: 2.4 }); break;
           case 'skill': Object.assign(want, { sLx: 1.5, sRx: 1.5, sLy: 1.35, sRy: -1.35, eL: 0.1, eR: 0.1, lean: 0.05, bob: 0.08 * Math.sin(at * 12), scarf: 2 }); break;
           case 'burst': if (at < 0.45) Object.assign(want, { sLx: 2.9, sRx: 2.9, sLy: 0.35, sRy: -0.35, eL: 0.1, eR: 0.1, lean: -0.25, headX: 0.4, bob: 0.05, scarf: 1.8 }); else Object.assign(want, { sLx: 1.55, sRx: 1.55, sLy: -0.2, sRy: 0.2, eL: 0.05, eR: 0.05, lean: 0.3, tL: 0.7, kL: -0.7, tR: -0.3, bob: -0.12, scarf: 2.2 }); break;
         }
@@ -667,12 +671,12 @@ export class Figure {
     this.lastFacing = b.facing;
     if (dt > 0) this.turnRate += (df / dt - this.turnRate) * Math.min(1, dt * 4);
     // 부드럽게 옮겨 간다
-    const fighting = !!act && ['atk1', 'atk2', 'atk3', 'skill', 'burst'].includes(act);
+    const fighting = !!act && ['atk1', 'atk2', 'atk3', 'atk4', 'charge', 'skill', 'burst'].includes(act);
     const k = 1 - Math.exp(-dt * (fighting ? 34 : b.mode === 'ground' ? 16 : 11));
     const p = this.pose;
     for (const key of Object.keys(p) as (keyof Pose)[]) p[key] += (want[key] - p[key]) * k;
     this.root.position.set(0, 0, p.bob);
-    this.root.rotation.z = (-b.facing * Math.PI) / 180 - (act === 'skill' ? (b.act?.t ?? 0) * 17 : 0) - (b.mode === 'ascend' && b.asc ? Math.max(0, b.asc.t - 0.5) * 5 : 0); // 스킬: 제자리 두 바퀴 반 · 상승: 천천히 돈다
+    this.root.rotation.z = (-b.facing * Math.PI) / 180 - (act === 'skill' ? (b.act?.t ?? 0) * 17 : act === 'atk4' ? Math.min(1, (b.act?.t ?? 0) / 0.34) * Math.PI * 2 : 0) - (b.mode === 'ascend' && b.asc ? Math.max(0, b.asc.t - 0.5) * 5 : 0); // 스킬: 제자리 두 바퀴 반 · 상승: 천천히 돈다
     // 상승 기운
     this.aura.visible = b.mode === 'ascend';
     if (this.aura.visible) {

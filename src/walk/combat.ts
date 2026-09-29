@@ -10,6 +10,7 @@ import type { Progress } from './progress';
 import * as sfx from './sound';
 import { weaponOf, type WeaponStats } from './gear';
 
+const FIGHT_ACTS = new Set<string>(['atk1', 'atk2', 'atk3', 'atk4', 'charge', 'skill', 'burst']);
 export interface CombatCtx {
   hero: Hero;
   progress: Progress;
@@ -113,7 +114,7 @@ export class Combat {
     this.ui = document.createElement('div');
     this.ui.className = 'cbt';
     this.ui.innerHTML = `<div class="hp"><i></i><span></span></div>
-      <button class="atk" type="button" title="공격 (마우스 톡)">⚔️</button>
+      <button class="atk" type="button" title="공격 (마우스 톡 · 길게 누르면 강공격)">⚔️</button>
       <button class="skill" type="button" title="원소 스킬 — 바람 소용돌이 (E)"><em>🌀</em><kbd>E</kbd><i></i></button>
       <button class="burst" type="button" title="원소 폭발 — 센 강의 회오리 (Q)"><em>🌪️</em><kbd>Q</kbd><i></i></button>`;
     document.body.appendChild(this.ui);
@@ -123,7 +124,14 @@ export class Combat {
     this.burstBtn = this.ui.querySelector('.burst')!;
     this.atkBtn = this.ui.querySelector('.atk')!;
     const tap = (sel: string, e: 'attack' | 'skill' | 'burst') => this.ui.querySelector(sel)!.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); c.hero.input.press(e); });
-    tap('.atk', 'attack'); tap('.skill', 'skill'); tap('.burst', 'burst');
+    tap('.skill', 'skill'); tap('.burst', 'burst');
+    // ⚔️: 톡 = 공격, 길게(0.4초) = 강공격
+    const atk = this.ui.querySelector('.atk') as HTMLElement;
+    let downAt = 0;
+    atk.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); downAt = performance.now(); atk.classList.add('held'); });
+    const up = (ev: PointerEvent) => { if (!downAt) return; ev.preventDefault(); atk.classList.remove('held'); c.hero.input.press(performance.now() - downAt >= 400 ? 'charge' : 'attack'); downAt = 0; };
+    atk.addEventListener('pointerup', up);
+    atk.addEventListener('pointercancel', () => { downAt = 0; atk.classList.remove('held'); });
     this.layer = document.createElement('div');
     this.layer.className = 'cbt-layer';
     document.body.appendChild(this.layer);
@@ -257,6 +265,7 @@ export class Combat {
     this.iframes = Math.max(0, this.iframes - dt);
     this.skillCd = Math.max(0, this.skillCd - dt);
     this.comboT = Math.max(0, this.comboT - dt);
+    this.clock += dt;
     if (!live || this.downing) { this.paintHud(); this.paintMarks(); return; }
     const fighting = this.inCombat;
     this.outT = fighting ? 0 : this.outT + dt;
@@ -266,14 +275,18 @@ export class Combat {
     // 입력
     if (f) {
       if (f.attack) this.attack();
+      if (f.charge) this.charge();
+      // 구르는 중이거나 한 박자 일찍 누른 공격은 잠깐 기억했다가 되는 순간 나간다
+      if (this.buffered > 0) { this.buffered -= dt; if (b.mode === 'ground' || (b.mode === 'act' && b.act && FIGHT_ACTS.has(b.act.kind) && b.act.t >= 0.18)) { this.buffered = 0; this.attack(); } }
       if (f.skill) this.skill();
       if (f.burst) this.burst();
-      f.attack = f.skill = f.burst = false;
+      f.attack = f.skill = f.burst = f.charge = false;
     }
     // 공격이 닿는 순간
     if (this.pending && b.act?.kind === this.pending.kind && b.act.t >= this.pending.at) { this.strike(this.pending.kind); this.pending = null; }
     else if (this.pending && b.act?.kind !== this.pending.kind) this.pending = null;
-    for (const e of this.hero.events) if (e === 'plunge') this.plungeHit();
+    for (const e of this.hero.events) { if (e === 'plunge') this.plungeHit(); else if (e === 'roll') this.rollAt = this.clock; }
+    if (this.hitT > 0) { this.hitT -= dt; if (this.hitT <= 0) { this.hits = 0; this.comboEl?.classList.remove('on'); } }
     this.stepBoss();
     this.stepKing();
     for (const foe of this.foes.slice()) this.stepFoe(foe, dt);
@@ -340,15 +353,57 @@ export class Combat {
   private attack() {
     const b = this.hero.body;
     if (b.plunge()) { b.drawn = 4; sfx.glide(); return; }
-    const kind: CombatAct = this.comboT > 0 && this.combo < 3 ? (['atk1', 'atk2', 'atk3'] as const)[this.combo] : 'atk1';
+    // 네 번 이어진다: 가로 베기 → 되베기 → 내려찍기 → 회오리 베기(한 바퀴)
+    const kind: CombatAct = this.comboT > 0 && this.combo < 4 ? (['atk1', 'atk2', 'atk3', 'atk4'] as const)[this.combo] : 'atk1';
     this.aim();
-    if (!b.combat(kind)) return;
-    this.combo = kind === 'atk1' ? 1 : kind === 'atk2' ? 2 : 3;
+    if (!b.combat(kind)) { if (b.mode === 'roll') this.buffered = 0.9; else if (b.mode === 'act' && b.act && FIGHT_ACTS.has(b.act.kind)) this.buffered = 0.45; return; }
+    this.buffered = 0;
+    this.combo = kind === 'atk1' ? 1 : kind === 'atk2' ? 2 : kind === 'atk3' ? 3 : 4;
     this.comboT = 0.95;
-    if (this.combo >= 3) this.comboT = 0;
-    this.pending = { at: kind === 'atk3' ? 0.26 : 0.12, kind };
+    if (this.combo >= 4) this.comboT = 0;
+    this.pending = { at: kind === 'atk3' ? 0.26 : kind === 'atk4' ? 0.2 : 0.12, kind };
+    this.armCounter();
     b.drawn = 4;
     sfx.roll();
+  }
+
+  /** 강공격: 끌지 않고 길게 눌렀다 뗀다 — 앞으로 내달리며 찌르고, 줄지어 선 적을 꿰뚫는다(기력 20%) */
+  private charge() {
+    const b = this.hero.body;
+    if (b.stamina < 0.2) { this.c.hint('기력이 모자라 강공격을 못 한다'); setTimeout(() => this.c.hint(''), 1500); return; }
+    this.aim(9);
+    if (!b.combat('charge')) return;
+    b.stamina -= 0.2;
+    this.chargeFrom = [b.x, b.y];
+    this.combo = 0; this.comboT = 0;
+    this.pending = { at: 0.3, kind: 'charge' };
+    b.drawn = 4;
+    sfx.vault();
+    this.armCounter();
+  }
+  /** 구르기로 피한 직후(구르기가 끝나고 0.5초 안)의 공격 = 반격: 반드시 치명타, 1.5배 */
+  private rollAt = -9;
+  private chargeFrom: [number, number] | null = null;
+  private clock = 0;
+  private buffered = 0;
+  private counterArmed = false;
+  private armCounter() {
+    if (this.clock - this.rollAt < 1.1) { this.counterArmed = true; const b = this.hero.body; this.float(b.x, b.y, b.z + 2.4, '반격!', 'crit'); sfx.spot(); }
+  }
+  /** 이어 맞힌 수(2.5초 안에 다음 타격) — 많을수록 조금 더 세다 */
+  private hits = 0;
+  private hitT = 0;
+  private comboEl: HTMLElement | null = null;
+  private get hitMul() { return 1 + Math.min(0.3, Math.floor(this.hits / 5) * 0.05); }
+  private countHit() {
+    this.hits++;
+    this.hitT = 2.5;
+    if (!this.comboEl) { this.comboEl = document.createElement('div'); this.comboEl.className = 'cbt-combo'; this.layer.appendChild(this.comboEl); }
+    const n = this.hits;
+    const rank = n >= 40 ? 'Parisien!' : n >= 25 ? 'Magnifique!' : n >= 15 ? 'Très bien!' : n >= 8 ? 'Bien!' : '';
+    const bonus = Math.round((this.hitMul - 1) * 100);
+    this.comboEl.innerHTML = `<b>${n}</b><span>HIT</span>${rank ? `<em>${rank}</em>` : ''}${bonus ? `<small>피해 +${bonus}%</small>` : ''}`;
+    this.comboEl.classList.remove('pop'); void this.comboEl.offsetWidth; this.comboEl.classList.add('pop', 'on');
   }
 
   private skill() {
@@ -413,6 +468,43 @@ export class Combat {
       this.burstWind(b.x, b.y, b.z + 1, 0x9ff3e0);
       return;
     }
+    if (kind === 'charge') {
+      // 내달리기 시작한 곳부터 앞으로 5 m(+내달린 거리), 폭 1.4 m 안의 적을 모두 꿰뚫는다
+      let n = 0;
+      const [sx, sy] = this.chargeFrom ?? [b.x, b.y];
+      const ran = Math.hypot(b.x - sx, b.y - sy);
+      this.swing(b.x, b.y, b.z + 1.1, b.facing, true);
+      for (const f of this.foes) {
+        if (f.state === 'dead') continue;
+        const dx = f.x - sx, dy = f.y - sy;
+        const along = dx * fx + dy * fy, side = Math.abs(dx * fy - dy * fx);
+        const size = big(f) ? 2.4 : 0.5;
+        if (along < -1 || along > 5 + ran + this.wep.reach + size || side > 1.4 + size || Math.abs(f.z - b.z) > (big(f) ? 4 : 2.2)) continue;
+        this.damage(f, this.atk * 2.8, 'heavy');
+        if (!big(f)) { f.x += fx * 2; f.y += fy * 2; f.lift = Math.max(f.lift, 0.3); f.vz = 3; }
+        n++;
+      }
+      if (n) { this.energy = Math.min(this.energyMax, this.energy + 4 * n * this.wep.energy); sfx.bump(); }
+      this.counterArmed = false;
+      return;
+    }
+    if (kind === 'atk4') {
+      // 한 바퀴 돌며 둘레를 모두 벤다(넷째 — 마무리)
+      let n = 0;
+      this.ring(b.x, b.y, b.z + 1, 0xfff2b0, 3.4 + this.wep.reach);
+      for (const f of this.foes) {
+        if (f.state === 'dead') continue;
+        const dx = f.x - b.x, dy = f.y - b.y, d = Math.hypot(dx, dy);
+        const size = big(f) ? 2.4 : 0.5;
+        if (d - size > 3.3 + this.wep.reach || Math.abs(f.z - b.z) > (big(f) ? 4 : 2.2)) continue;
+        this.damage(f, this.atk * 2.4, 'heavy');
+        if (!big(f)) { const k = 2.2; f.x += (dx / (d || 1)) * k; f.y += (dy / (d || 1)) * k; }
+        n++;
+      }
+      if (n) { this.energy = Math.min(this.energyMax, this.energy + 3 * n * this.wep.energy); sfx.bump(); }
+      this.counterArmed = false;
+      return;
+    }
     const heavy = kind === 'atk3';
     const reach = (heavy ? 3.1 : 2.6) + this.wep.reach, cone = heavy ? 100 : 75;
     this.swing(b.x, b.y, b.z + 1.1, b.facing, heavy);
@@ -429,6 +521,7 @@ export class Combat {
       n++;
     }
     if (n) { this.energy = Math.min(this.energyMax, this.energy + 2 * n * this.wep.energy); sfx.bump(); }
+    this.counterArmed = false;
   }
 
   private plungeHit() {
@@ -448,8 +541,12 @@ export class Combat {
 
   private damage(f: Foe, raw: number, how: 'hit' | 'heavy' | 'skill' | 'burst') {
     const w = this.wep;
-    const crit = Math.random() < w.crit;
-    const dmg = Math.round(raw * (0.9 + Math.random() * 0.2) * (crit ? w.critDmg : 1));
+    const counter = this.counterArmed && how !== 'burst';
+    const crit = counter || Math.random() < w.crit;
+    // 스킬로 띄운 적은 공중 추가타 +25% · 이어 맞힌 수만큼 +5%씩(최대 +30%) · 반격 1.5배
+    const juggle = f.lift > 0.2 && !big(f) && how !== 'skill' ? 1.25 : 1;
+    const dmg = Math.round(raw * (0.9 + Math.random() * 0.2) * (crit ? w.critDmg : 1) * juggle * this.hitMul * (counter ? 1.5 : 1));
+    this.countHit();
     if (w.heal && (how === 'hit' || how === 'heavy')) this.hp = Math.min(this.maxHp, this.hp + this.maxHp * w.heal); // 바게트: 한 입
     f.hp -= dmg;
     f.flash = 0.12;
