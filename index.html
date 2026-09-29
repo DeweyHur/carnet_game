@@ -29,6 +29,8 @@
           <button data-m="journal" type="button"><em>📖</em>파리 수첩<kbd>J</kbd></button>
           <button data-m="gear" type="button"><em>🎒</em>옷장<kbd>I</kbd></button>
           <button data-m="wish" type="button"><em>✨</em>기원</button>
+          <button data-m="growth" type="button" hidden><em>🌟</em>성장<kbd>K</kbd></button>
+          <button data-m="mode" id="m-mode" type="button"><em>🌙</em>밤 습격</button>
           <button data-m="photo" type="button"><em>📷</em>사진 찍기<kbd>3</kbd></button>
           <button data-m="sit" type="button"><em>🪑</em>앉기<kbd>4</kbd></button>
           <button data-m="wave" type="button"><em>👋</em>인사<kbd>1</kbd></button>
@@ -39,7 +41,7 @@
           <p><b>이동</b> WASD · <b>시점</b> 마우스 끌기 · <b>달리기</b> Shift · <b>점프·글라이더</b> Space · <b>구르기</b> V · <b>웅크리기</b> C</p>
           <p><b>벽</b> 밀고 가면 오른다 · X 놓기 · <b>상승</b> T (지붕 아래·벽 앞)</p>
           <p><b>공격</b> 마우스 톡(네 번 이어 치면 마지막은 회오리 베기) · <b>강공격</b> 끌지 않고 길게 눌렀다 떼기(앞으로 찌르며 꿰뚫는다) · <b>반격</b> 구르기(V) 직후 공격 = 반드시 치명타 · <b>원소 스킬</b> E(띄운 적은 추가타 +25%) · <b>원소 폭발</b> Q · 공중에서 공격 = 내려찍기 · 이어 맞힐수록 피해 +5%씩</p>
-          <p><b>행동</b> F · <b>리리</b> G · <b>지도</b> M · <b>수첩</b> J · <b>옷장</b> I · <b>메뉴</b> Esc · <b>몸짓</b> 1 인사 2 춤 3 사진 4 앉기</p>
+          <p><b>행동</b> F · <b>리리</b> G · <b>지도</b> M · <b>수첩</b> J · <b>옷장</b> I · <b>성장</b> K · <b>메뉴</b> Esc · <b>몸짓</b> 1 인사 2 춤 3 사진 4 앉기</p>
         </div>
       </div>
     </section>
@@ -49,6 +51,10 @@
         <p class="line">PARIS · 샹드마르스</p>
         <h1>에펠탑 아래에서<br />첫걸음</h1>
         <p class="sub">요정 리리가 곁에서 하나씩 알려 줍니다 — 순간이동 포인트, 보물상자, 퀴즈, 요괴 야영지, 탑 1층까지 솟아오르는 상승, 글라이더, 기원, 파리 수첩. 그다음은 파리 어디든.</p>
+        <div id="modes" role="radiogroup" aria-label="낮·밤 모드">
+          <button type="button" data-mode="day" class="on"><em>☀️</em><b>낮</b><small>파리 여행 · 사람들 · 부탁과 이벤트</small></button>
+          <button type="button" data-mode="night"><em>🌙</em><b>밤 습격</b><small>사람 대신 요괴가 물결마다 몰려온다 · 빠른 성장</small></button>
+        </div>
         <button id="go" disabled>지도를 펴는 중…</button>
         <button id="resume" hidden></button>
         <p id="status"></p>

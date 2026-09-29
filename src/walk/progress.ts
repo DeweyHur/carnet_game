@@ -6,10 +6,11 @@ export const AR_MAX = 30;
 export const START_WAYPOINTS = ['wp-eiffel', 'wp-trocadero', 'wp-marais'];
 
 /** 모험 등급에 따라 하나씩 열리는 것(원신처럼 — 처음엔 헷갈리지 않게 꼭 필요한 것만) */
-export type Feature = 'wish' | 'enhance' | 'commission' | 'domain';
+export type Feature = 'wish' | 'enhance' | 'growth' | 'commission' | 'domain';
 export const FEATURES: { id: Feature; ar: number; emoji: string; name: string; what: string }[] = [
   { id: 'wish', ar: 2, emoji: '✨', name: '기원', what: '별조각 ⭐160으로 한 번 — 새 무기·옷이 나온다. 오른쪽 위 ✨' },
   { id: 'enhance', ar: 2, emoji: '🔹', name: '무기 강화', what: '요괴·보물상자에서 나오는 🔹 연마석과 €로 무기 레벨을 올린다. 🎒 옷장 → 무기 칸' },
+  { id: 'growth', ar: 2, emoji: '🌟', name: '성장 — 특성 · 스킬 트리', what: '특성 레벨(보통 공격·E·Q — 📘 파리의 가르침)과 스킬 트리(등급마다 스킬 포인트 1). 🧚 메뉴 → 🌟 성장 · K' },
   { id: 'commission', ar: 3, emoji: '📜', name: '오늘의 의뢰', what: '날마다 네 가지 — 하나마다 ⭐10 · 경험치 250, 넷 모두면 ⭐60 더. 📖 수첩에서 본다' },
   { id: 'domain', ar: 5, emoji: '🌀', name: '비경', what: '파리 땅 밑의 도전 던전 — 하수도(알마 다리) · 카타콤(팡테옹) · 채석장(몽마르트르). 미니맵 🌀' },
 ];

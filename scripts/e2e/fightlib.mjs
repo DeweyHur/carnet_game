@@ -2,7 +2,7 @@ import { E } from './common.mjs';
 /** 가장 가까운 적과 싸운다(진짜 마우스 톡·E·Q). done()이 참이거나 시간이 다하면 끝 */
 export async function fight(p, done, ms = 120000, dodge = false) {
   const t0 = Date.now();
-  let dodges = 0, clicks = 0, skills = 0, bursts = 0, lastHp = null, deaths = 0;
+  let edges = 0, dodges = 0, clicks = 0, skills = 0, bursts = 0, lastHp = null, deaths = 0;
   while (Date.now() - t0 < ms) {
     const s = await E(p, () => {
       const W = window.__walk, C = W.combat(), b = W.hero().body;
@@ -26,7 +26,14 @@ export async function fight(p, done, ms = 120000, dodge = false) {
       continue;
     }
     const reach = s.foe.kind === 'boss' || s.foe.kind === 'ratking' ? 3.4 : 2.1;
-    if (s.foe.d > reach) {
+    // 낭떠러지 쪽이면 쫓아가지 않고 제자리에서 기다린다(가고일은 날아서 덤벼 온다)
+    const edge = s.foe.d > reach && await E(p, (f) => { const h = window.__walk.hero(), b = h.body, W = h.sceneWorld ?? h.world; const d = Math.hypot(f.x - b.x, f.y - b.y) || 1; const g = W.ground(b.x + (f.x - b.x) / d * 1.2, b.y + (f.y - b.y) / d * 1.2, b.z, 0.7); return b.z - g > 4; }, s.foe);
+    if (edge) {
+      edges++;
+      await E(p, (f) => { window.__bot.hold('KeyW', false); window.__bot.steerAt(f.x, f.y); }, s.foe);
+      if (s.skillReady && s.foe.d < 5.5) { await E(p, () => window.__bot.press('KeyE')); skills++; }
+      await p.waitForTimeout(250);
+    } else if (s.foe.d > reach) {
       await E(p, (f) => { window.__bot.steerAt(f.x, f.y); window.__bot.hold('KeyW', true); }, s.foe);
       await p.waitForTimeout(150);
     } else {
@@ -37,5 +44,5 @@ export async function fight(p, done, ms = 120000, dodge = false) {
     }
   }
   await E(p, () => { window.__bot.hold('KeyW', false); window.__bot.unsteer(); });
-  return { secs: Math.round((Date.now() - t0) / 1000), clicks, skills, bursts, deaths, dodges };
+  return { secs: Math.round((Date.now() - t0) / 1000), clicks, skills, bursts, deaths, dodges, edges };
 }

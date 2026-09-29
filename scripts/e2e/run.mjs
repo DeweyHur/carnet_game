@@ -8,6 +8,7 @@ const p = await b.newPage({ viewport: { width: 900, height: 560 } });
 p.on('pageerror', (e) => console.log('pageerror', e.stack));
 await p.goto(process.env.E2E_URL ?? 'http://localhost:5173/?debug');
 while (await p.evaluate(() => document.querySelector('#go').disabled)) await p.waitForTimeout(500);
+if (process.env.MODE) await p.click(`#modes [data-mode="${process.env.MODE}"]`);
 await p.click('#go', { timeout: 120000 });
 await p.waitForTimeout(800);
 if (!process.env.NOQUICK) await p.evaluate(async () => { await window.__walk.quick(); });

@@ -352,6 +352,15 @@ export class Crowd {
     return off;
   }
 
+  /** 밤 습격: 거리의 사람을 모두 집에 보낸다(부탁하는 사람만 남긴다) — density를 0으로 두면 다시 채우지 않는다 */
+  hush() {
+    for (let i = this.npcs.length - 1; i >= 0; i--) {
+      const n = this.npcs[i];
+      if (n.role === 'quest' || n.tag?.startsWith('quest')) continue;
+      if (n.home) this.anchorsUsed.delete(n.home);
+      this.npcs.splice(i, 1);
+    }
+  }
   /** 제자리 역할들(테라스 손님·웨이터·벤치·악사·장수·화가·마임)과 비둘기를 가까워지면 채운다 */
   private fillAnchors(hx: number, hy: number) {
     // 앉은 사람은 걷는 사람 목표치의 0.8배까지만 — 품질이 낮으면 함께 줄어든다

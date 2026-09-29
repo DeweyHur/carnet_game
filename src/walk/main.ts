@@ -25,6 +25,9 @@ import { angleDiff } from './hero/geo';
 import * as THREE from 'three';
 import { Wardrobe, modsOf } from './gear';
 import { Closet } from './closet';
+import { Growth, ARMOR_SLOTS } from './growth';
+import { GrowthPanel } from './growthui';
+import { Horde } from './horde';
 import { Minimap } from './minimap';
 import { Journal } from './journal';
 import { Progress, arNeed, COMMISSION_TEXT, FEATURES } from './progress';
@@ -87,6 +90,11 @@ let companion: Companion;
 let ascend: Ascend;
 let domain: Domain;
 let prologue: Prologue;
+let growth: Growth;
+let growthUi: GrowthPanel;
+let horde: Horde;
+/** 🌙 밤 모드(밤 습격): 사람 대신 요괴가 물결마다 몰려온다 */
+let nightMode = (() => { try { return localStorage.getItem('carnet-mode') === 'night'; } catch { return false; } })();
 let entering = false;
 let mapMode = false; // 🗺 지도 보기(위에서 내려다보며 순간이동 포인트를 누른다)
 let night01 = 0;
@@ -236,7 +244,7 @@ let wasCamOn = false;
 let lastTrail: LngLat = START;
 let splashed = false;
 let climbT = 0;
-const MODALS = ['closet', 'journal', 'wish', 'menu'];
+const MODALS = ['closet', 'journal', 'wish', 'menu', 'growth'];
 const modalOpen = () => MODALS.some((id) => document.getElementById(id)?.classList.contains('on'));
 const HANDLERS = ['dragPan', 'dragRotate', 'scrollZoom', 'boxZoom', 'doubleClickZoom', 'keyboard', 'touchZoomRotate', 'touchPitch'] as const;
 /** 직접 걷는 동안에는 지도가 끌리거나 돌지 않게 한다(카메라는 사람이 잡는다) */
@@ -299,6 +307,7 @@ const COARSE = matchMedia('(pointer: coarse)').matches;
 const Q_DPR = [Math.min(2, window.devicePixelRatio || 1), Math.min(1.5, window.devicePixelRatio || 1), 1, 0.8];
 const Q_RADIUS = [300, 240, 190, 150];
 const Q_CROWD = [46, 34, 24, 14];
+const Q_HORDE = [30, 24, 18, 12]; // 밤 습격: 한 번에 살아 있는 요괴 수
 const Q_GRASS = [30, 24, 16, 0];
 const Q_SHADOW = [2048, 2048, 1024, 0]; // 해 그림자 지도 크기(0 = 끔) // 풀이 나는 반경(m) — 가장 낮은 품질에선 풀 없이 결만
 let quality = 1; // 처음엔 한 단계 낮게 시작해 여유가 있으면 올린다(시작이 버벅이지 않게)
@@ -400,6 +409,8 @@ function heroFrame(dt: number) {
   ascend?.update(dt, r.f, exploring);
   prologue?.update(dt, live && !mapMode);
   combat?.update(dt, r.f, exploring); // 먼저: 원점이 바뀌면 싸움이 먼저 비우고, 탐험이 야영지를 다시 세운다
+  horde?.update(dt);
+  if (horde) horde.pausedNow = !exploring || !!domain?.active;
   domain?.update(dt, r.f, exploring);
   explore?.update(dt, r.f, exploring);
   hero.hud.override = exploring ? domain?.prompt2() ?? explore?.prompt() ?? null : null;
@@ -414,7 +425,7 @@ function heroFrame(dt: number) {
     if (b.mode === 'climb') climbAcc += b.lift;
   }
   // 시간: 1초 = 1분, 앉아 있으면 10배(밤을 기다릴 때)
-  if (!modal && !mapMode) S.clock += dt * (b.mode === 'sit' ? 10 : 1);
+  if (!modal && !mapMode && !nightMode) S.clock += dt * (b.mode === 'sit' ? 10 : 1); // 밤 모드는 밤에 머문다
   S.pos = hero.lnglat;
   S.heading = hero.heading;
   if (b.moved > 0) S.walked += b.moved;
@@ -516,21 +527,50 @@ const addMoney = (eur: number) => {
   paintMenu();
   if (eur >= 1) feed.push('💶', `€ +${Math.round(eur)}`, 'gold');
 };
+/** 입은 옷(모자·윗옷·가방·신발)의 강화 레벨 합(레벨 1을 뺀 것) */
+const armorSum = () => ARMOR_SLOTS.reduce((a, s) => a + wardrobe.lvOf(wardrobe.loadout[s]) - 1, 0);
+/** 🧚 단추의 빨간 점: 찍을 스킬 포인트가 남았다 */
+function paintDots() {
+  const sp = !!progress && !!growth && progress.has('growth') && growth.spFree(progress.ar) > 0;
+  $('#menu-go').classList.toggle('dot', sp);
+  document.querySelector('[data-m="growth"]')?.classList.toggle('dot', sp);
+}
+/** ☀️ 낮 / 🌙 밤 모드: 밤이면 거리의 사람을 모두 보내고 밤에 머물며 요괴가 물결마다 몰려온다 */
+function setMode(night: boolean) {
+  const was = nightMode;
+  nightMode = night;
+  try { localStorage.setItem('carnet-mode', night ? 'night' : 'day'); } catch { /* 무시 */ }
+  document.body.classList.toggle('night-mode', night);
+  for (const b of document.querySelectorAll<HTMLElement>('#modes button')) b.classList.toggle('on', (b.dataset.mode === 'night') === night);
+  if (!hero) return;
+  const day0 = Math.floor(S.clock / 1440) * 1440;
+  if (night) S.clock = day0 + 23 * 60;
+  else if (was) S.clock = day0 + 1440 + 9 * 60; // 밤을 새웠다 — 다음 날 아침
+  lastSkyMin = -99;
+  paintSky();
+  if (night) { hero.crowd.density = 0; hero.crowd.hush(); if (S.started) horde?.start(); }
+  else horde?.stop();
+  paintMenu();
+}
 /** 모험 등급에 따라 보이는 단추(원신처럼 하나씩 열린다) */
 function paintGates() {
   if (!progress) return;
   $('#wish-go').hidden = !progress.has('wish');
+  $<HTMLElement>('[data-m="growth"]').hidden = !progress.has('growth');
+  paintDots();
 }
 
 function setupAdventure() {
   progress = new Progress();
+  growth = new Growth();
   progress.onXp = (n) => feed.push('✦', `모험 경험치 +${n}`, 'blue');
   progress.onRank = (ar, rw) => {
     addMoney(rw.eur);
     combat?.heal(1);
     const next = FEATURES.find((f) => f.ar > ar);
     const line = next ? `다음 · 모험 등급 ${next.ar}에 ${next.emoji} ${next.name}이(가) 열린다` : ar < 20 ? '다음 목표 · 🐀👑 쥐왕 — 모험 등급 20쯤, 무기를 강화해서' : '🐀👑 쥐왕에게 도전할 때다!';
-    setTimeout(() => banner.rank(ar, [`⭐ ${rw.stars}`, `€ ${rw.eur}`, `🔹 ${rw.ore}`, '❤️ 체력 가득'], `${line} · 무기는 Lv.${Math.min(20, 2 + ar * 2)}까지 강화할 수 있다`), 700);
+    paintDots();
+    setTimeout(() => banner.rank(ar, [`⭐ ${rw.stars}`, `€ ${rw.eur}`, `🔹 ${rw.ore}`, ...(progress.has('growth') || ar >= 2 ? ['🌟 스킬 포인트 +1'] : []), '❤️ 체력 가득'], `${line} · 무기는 Lv.${Math.min(20, 2 + ar * 2)}까지 강화할 수 있다`), 700);
   };
   progress.onFeature = (f) => { setTimeout(() => banner.unlock(f.emoji, f.name, f.what), 800); paintGates(); };
   progress.onCommission = (c, all) => {
@@ -558,6 +598,12 @@ function setupAdventure() {
       if (g) wardrobe.unlock(g.id); else progress.addStars(120);
     },
     weapon: () => { const id = wardrobe.loadout.weapon ?? 'umbrella'; return { id, emoji: GEAR.find((q) => q.id === id)?.emoji ?? '⚔️', lv: wardrobe.lvOf(id) }; },
+    mods: () => growth.mods(armorSum()),
+    killed: (_kind, info) => {
+      const d = horde?.onKill(info);
+      if (d?.books) { growth.addBooks(d.books); feed.push('📘', `파리의 가르침 ×${d.books}`, 'blue'); }
+      if (d?.ore) { progress.addOre(d.ore); feed.push('🔹', `연마석 ×${d.ore}`, 'purple'); }
+    },
     loot: (kind) => {
       // 🔹 연마석: 쥐·가고일은 늘, 슬라임은 가끔, 우두머리는 많이
       const n = kind === 'ratking' ? 25 : kind === 'boss' ? 10 : kind === 'gargoyle' ? 2 : kind === 'rat' ? 1 : Math.random() < 0.4 ? 1 : 0;
@@ -572,6 +618,31 @@ function setupAdventure() {
     },
   });
   hero.crowd.scene.add(combat.group);
+  horde = new Horde({
+    hero, combat, toast,
+    ar: () => progress.ar,
+    cap: () => Q_HORDE[quality],
+    paused: () => horde.pausedNow,
+    reward: (r) => {
+      progress.addStars(r.stars);
+      progress.addOre(r.ore);
+      growth.addBooks(r.books);
+      if (r.sp) growth.addSp(r.sp);
+      progress.addXp(Math.round((60 + r.wave * 40) * xpMul()), `밤 습격 ${r.wave}물결`);
+      combat.heal(0.35);
+      toast(`✨ ${r.wave}물결을 넘겼다! ⭐${r.stars} · 🔹${r.ore} · 📘${r.books}${r.sp ? ' · 🌟 스킬 포인트 +1' : ''} · 체력 회복`);
+      if (r.sp) setTimeout(() => banner.unlock('🌟', '스킬 포인트 +1', `밤 습격 ${r.wave}물결을 넘겼다 — 🧚 메뉴 → 🌟 성장(K)에서 스킬 트리를 찍자`), 900);
+    },
+  });
+  growthUi = new GrowthPanel(growth);
+  growthUi.ctx = {
+    ar: () => progress.ar,
+    money: () => S.money,
+    pay: (eur) => { if (S.money < eur) return false; S.money = Math.round((S.money - eur) * 100) / 100; paintMenu(); return true; },
+    learned: (what) => { sfx.questDone(); feed.push('🌟', what, 'gold'); },
+  };
+  growthUi.onToggle = (on) => { if (on) { hint(''); menu(false); closet?.toggle(false); journal?.toggle(false); wish?.toggle(false); } paintDots(); };
+  growth.onChange = () => { growthUi.refresh(); paintDots(); paintMenu(); };
   domain = new Domain({ hero, progress, combat: () => combat ?? null, companion: () => companion ?? null, toast, hint: (s2) => hint(s2), money: addMoney, xpMul });
   hero.crowd.scene.add(domain.group);
   companion = new Companion({
@@ -667,8 +738,8 @@ function setupGear() {
     money: () => S.money,
     canEnhance: () => !!progress?.has('enhance'),
     pay: (ore, eur) => { if (!progress || progress.ore < ore || S.money < eur) return false; progress.ore -= ore; progress.save(); S.money = Math.round((S.money - eur) * 100) / 100; paintMenu(); return true; },
-    stats: () => combat?.stats() ?? { atk: 0, hp: 0, crit: 0, critDmg: 0 },
-    enhanced: (name, lv) => { sfx.questDone(); feed.push('⬆', `${name} Lv.${lv} — 공격력 +6%`, 'gold'); },
+    stats: () => combat?.stats() ?? { atk: 0, hp: 0, crit: 0, critDmg: 0, def: 0 },
+    enhanced: (name, lv) => { sfx.questDone(); feed.push('⬆', `${name} Lv.${lv}`, 'gold'); },
   };
   const apply = () => {
     const l = wardrobe.loadout;
@@ -850,7 +921,7 @@ function paintSky() {
     const scale = (hex: string, f: number) => { const c = new THREE.Color(hex); c.multiplyScalar(f); return `#${c.getHexString()}`; };
     hero.town.daylight(sun, scale(mixHex(a.sun, b.sun, k), Math.min(1, sunI)), scale(mixHex(a.amb, b.amb, k), Math.min(1, ambI)), night, mixHex(a.fog, b.fog, k));
     hero.crowd.light(mixHex(a.sun, b.sun, k), Math.max(1.2, sunI * 2.2), mixHex(a.amb, b.amb, k), Math.max(0.9, ambI * 2.4));
-    hero.crowd.density = 1 - night * 0.55;
+    hero.crowd.density = nightMode ? 0 : 1 - night * 0.55;
     night01 = night;
     // 걷기 화면의 하늘(구름·해·별)
     const u = hero.view.skyU;
@@ -887,10 +958,11 @@ function paintMenu() {
   $('#m-ore').textContent = `🔹 ${progress.ore}`;
   $('#m-time').textContent = `파리 · ${fmtClock(S.clock)}${night01 > 0.5 ? ' 🌙' : ''} · 발견 ${S.seen.size}곳 · 걸은 거리 ${(S.walked / 1000).toFixed(1)} km`;
   $('#m-sound').textContent = sfx.isMuted() ? '🔇' : '🔊';
+  $('#m-mode').innerHTML = nightMode ? '<em>☀️</em>낮으로' : '<em>🌙</em>밤 습격';
 }
 function menu(on = !$('#menu').classList.contains('on')) {
   if (on && (!S.started || domain?.active)) return;
-  if (on) { closet?.toggle(false); journal?.toggle(false); wish?.toggle(false); if (mapMode) setMapMode(false); }
+  if (on) { closet?.toggle(false); journal?.toggle(false); wish?.toggle(false); growthUi?.toggle(false); if (mapMode) setMapMode(false); }
   $('#menu').classList.toggle('on', on);
   if (on) { sfx.pageTurn(); paintMenu(); } else $<HTMLElement>('.mkeys').hidden = true;
 }
@@ -909,6 +981,8 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#menu .mgrid butto
       case 'sit': menu(false); setTimeout(() => hero.input.press('sit'), 200); break;
       case 'wave': menu(false); setTimeout(() => hero.input.press('wave'), 200); break;
       case 'sound': sfx.unlock(); sfx.setMuted(!sfx.isMuted()); paintMenu(); break;
+      case 'growth': menu(false); growthUi.toggle(true); break;
+      case 'mode': menu(false); setMode(!nightMode); break;
       case 'keys': { const k = $<HTMLElement>('.mkeys'); k.hidden = !k.hidden; break; }
     }
   });
@@ -1017,12 +1091,15 @@ async function start(resumeAt?: Waypoint) {
   // 첫걸음(아직이면) — 리리가 한 단계씩 안내한다. 끝냈으면 리리의 인사만.
   let first = true;
   try { first = !localStorage.getItem('carnet-lili'); localStorage.setItem('carnet-lili', '1'); } catch { /* 무시 */ }
-  if (!prologue.done) setTimeout(() => prologue.begin(), resumeAt ? 1200 : 2400);
+  if (nightMode) { setMode(true); setTimeout(() => companion?.line('🌙 밤 습격이야! 요괴들이 물결마다 몰려와. 쓰러뜨리면 📘 파리의 가르침이 떨어져 — 특성을 올리자. 낮으로 돌아가려면 🧚 메뉴', 8), 2500); }
+  else if (!prologue.done) setTimeout(() => prologue.begin(), resumeAt ? 1200 : 2400);
   else setTimeout(() => companion?.greet(first), resumeAt ? 1500 : 3000);
 }
 
 // ───────── 단추·키 ─────────
 $('#go').addEventListener('click', () => void start());
+for (const b of document.querySelectorAll<HTMLButtonElement>('#modes button')) b.addEventListener('click', () => { sfx.unlock(); setMode(b.dataset.mode === 'night'); });
+setMode(nightMode);
 const tap = (id: string, f: () => void) => $(id).addEventListener('click', (e) => { (e.currentTarget as HTMLElement).blur(); if (S.started) f(); });
 tap('#gear-go', () => { menu(false); journal.toggle(false); closet.toggle(); });
 tap('#wish-go', () => { menu(false); closet.toggle(false); journal.toggle(false); wish.toggle(); });
@@ -1035,9 +1112,11 @@ window.addEventListener('keydown', (e) => {
   const free = !modalOpen() && !mapMode;
   if (e.code === 'KeyI') { if (closet.open) closet.toggle(false); else if (free) closet.toggle(true); }
   else if (e.code === 'KeyJ') { if (journal.open) journal.toggle(false); else if (free) journal.toggle(true); }
+  else if (e.code === 'KeyK' && progress.has('growth')) { if (growthUi.open) growthUi.toggle(false); else if (free) growthUi.toggle(true); }
   else if (e.code === 'KeyG' && free && companion) companion.ask();
   else if (e.key === 'Escape') {
     if (wish?.open) wish.toggle(false);
+    else if (growthUi?.open) growthUi.toggle(false);
     else if (closet?.open) closet.toggle(false);
     else if (journal?.open) journal.toggle(false);
     else if (mapMode) setMapMode(false);
@@ -1053,7 +1132,7 @@ if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown
   street: () => street, DISTRICTS, places: () => places, graph: () => graph, map: () => map, sky: () => sky,
   wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal, progress: () => progress,
   explore: () => explore, wish: () => wish, combat: () => combat, companion: () => companion, ascend: () => ascend, domain: () => domain, prologue: () => prologue,
-  menu: (on?: boolean) => menu(on), banner: () => banner, feed: () => feed, mapMode: (on: boolean) => setMapMode(on),
+  menu: (on?: boolean) => menu(on), banner: () => banner, growth: () => growth, growthUi: () => growthUi, horde: () => horde, setMode: (n: boolean) => setMode(n), night: () => nightMode, feed: () => feed, mapMode: (on: boolean) => setMapMode(on),
   teleport: (id: string) => { const wp = WAYPOINTS.find((w) => w.id === id); return wp ? teleport(wp) : null; },
 };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });
