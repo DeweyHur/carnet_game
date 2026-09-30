@@ -29,6 +29,8 @@ import { Growth, ARMOR_SLOTS, type GrowthMods } from './growth';
 import { Party, type CharId } from './party';
 import { Creator, PartyPanel } from './partyui';
 import { SPEED } from './moves';
+import { Arsenal } from './skills';
+import { SkillPanel } from './skillui';
 import { GrowthPanel } from './growthui';
 import { Horde } from './horde';
 import { Tales } from './tales';
@@ -99,6 +101,8 @@ let growthUi: GrowthPanel;
 let horde: Horde;
 let tales: Tales;
 let party: Party;
+let arsenal: Arsenal;
+let skillUi: SkillPanel;
 let creator: Creator;
 let partyUi: PartyPanel;
 /** 🌙 밤 모드(밤 습격): 사람 대신 요괴가 물결마다 몰려온다 */
@@ -252,7 +256,7 @@ let wasCamOn = false;
 let lastTrail: LngLat = START;
 let splashed = false;
 let climbT = 0;
-const MODALS = ['closet', 'journal', 'wish', 'menu', 'growth', 'creator', 'party'];
+const MODALS = ['closet', 'journal', 'wish', 'menu', 'growth', 'creator', 'party', 'skills'];
 const modalOpen = () => MODALS.some((id) => document.getElementById(id)?.classList.contains('on'));
 const HANDLERS = ['dragPan', 'dragRotate', 'scrollZoom', 'boxZoom', 'doubleClickZoom', 'keyboard', 'touchZoomRotate', 'touchPitch'] as const;
 /** 직접 걷는 동안에는 지도가 끌리거나 돌지 않게 한다(카메라는 사람이 잡는다) */
@@ -422,6 +426,8 @@ function heroFrame(dt: number) {
   prologue?.update(dt, live && !mapMode);
   combat?.update(dt, r.f, exploring); // 먼저: 원점이 바뀌면 싸움이 먼저 비우고, 탐험이 야영지를 다시 세운다
   horde?.update(dt);
+  arsenal?.update(dt, exploring);
+  arsenal?.show(S.started && !mapMode);
   if (horde) horde.pausedNow = !exploring || !!domain?.active;
   domain?.update(dt, r.f, exploring);
   explore?.update(dt, r.f, exploring);
@@ -554,6 +560,20 @@ function applyKit(m: GrowthMods): GrowthMods {
     skill: m.skill * (k.skill ?? 1), burst: m.burst * (k.burst ?? 1), energy: m.energy * (k.energy ?? 1),
     eCd: m.eCd + (k.eCd ?? 0), steal: m.steal + (k.steal ?? 0), chargeCost: m.chargeCost * (k.chargeCost ?? 1),
     eHeal: k.eHeal ?? 0, tint: c?.element.color ?? m.tint,
+    ...skillBoost(m, k),
+  };
+}
+/** 📜 기술: 익히는 기술 + 켜진 강화 */
+function skillBoost(m: GrowthMods, k: { atk?: number; hp?: number; def?: number; crit?: number; critDmg?: number; steal?: number }) {
+  if (!arsenal) return {};
+  const s = arsenal.boost();
+  return {
+    atk: m.atk * (k.atk ?? 1) * (nightMode && party?.char.kit.night ? party.char.kit.night : 1) * (1 + s.atk),
+    hp: m.hp * (k.hp ?? 1) * (1 + s.hp),
+    def: Math.min(0.75, m.def + (k.def ?? 0) + s.def),
+    crit: m.crit + (k.crit ?? 0) + s.crit,
+    critDmg: m.critDmg + (k.critDmg ?? 0) + s.critDmg,
+    steal: m.steal + (k.steal ?? 0) + s.steal,
   };
 }
 const who = document.createElement('div');
@@ -572,7 +592,9 @@ function applyChar() {
   hero.figure.setLook(party.lookOf(c));
   hero.figure.setStyle(c.id);
   dress();
-  hero.body.actSpeed = SPEED[c.id];
+  hero.body.actSpeed = SPEED[c.id] * (1 + (arsenal?.boost().aspd ?? 0));
+  arsenal?.paintBar();
+  skillUi?.refresh();
   who.innerHTML = `<em>${c.element.emoji}</em><b></b><small>${c.element.name}</small>`;
   who.querySelector('b')!.textContent = party.nameOf(c);
   who.style.setProperty('--el', `#${c.element.color.toString(16).padStart(6, '0')}`);
@@ -614,7 +636,8 @@ function setupParty() {
 }
 /** 🧚 단추의 빨간 점: 찍을 스킬 포인트가 남았다 */
 function paintDots() {
-  const sp = !!progress && !!growth && progress.has('growth') && growth.spFree(progress.ar) > 0;
+  const sp = (!!progress && !!growth && progress.has('growth') && growth.spFree(progress.ar) > 0) || (!!arsenal && !!party && arsenal.spFree(party.active) > 0);
+  document.querySelector('[data-m="skills"]')?.classList.toggle('dot', !!arsenal && !!party && arsenal.spFree(party.active) > 0);
   $('#menu-go').classList.toggle('dot', sp);
   document.querySelector('[data-m="growth"]')?.classList.toggle('dot', sp);
 }
@@ -703,6 +726,25 @@ function setupAdventure() {
     },
   });
   hero.crowd.scene.add(combat.group);
+  arsenal = new Arsenal({
+    api: combat.api,
+    who: () => party.active,
+    ar: () => progress.ar,
+    live: () => !!S.started && !modalOpen() && !mapMode && !domain?.active && !street?.holding,
+    act: (big) => hero.body.combat(big ? 'burst' : 'skill'),
+    hint: (s2) => hint(s2),
+    learned: (d, first) => {
+      sfx.questDone();
+      if (first && d.eff) setTimeout(() => banner.unlock(d.emoji, `새 기술 · ${d.name}`, `${d.desc} — ${arsenal.slotsOf(d.char).indexOf(d.id) >= 0 ? `${arsenal.slotsOf(d.char).indexOf(d.id) + 5}번 키(아래 칸)로 쓴다` : '📜 기술 창에서 5~8 칸에 올리자'} · 🔷 마나 ${arsenal.cost(d)}`), 200);
+      else feed.push(d.emoji, `${d.name} Lv.${arsenal.lv(d.id)}`, 'gold');
+      applyChar();
+    },
+  });
+  arsenal.onCast = (i) => { if (S.started) arsenal.cast(i); };
+  arsenal.onChange = () => { skillUi?.refresh(); paintDots(); };
+  skillUi = new SkillPanel(arsenal);
+  skillUi.ctx = { who: () => party.active, name: () => party.nameOf(party.char), ar: () => progress.ar, atk: () => combat.stats().atk, openGrowth: () => growthUi.toggle(true) };
+  skillUi.onToggle = (on) => { if (on) { hint(''); menu(false); closet?.toggle(false); journal?.toggle(false); wish?.toggle(false); growthUi?.toggle(false); partyUi?.toggle(false); } };
   horde = new Horde({
     hero, combat, toast,
     ar: () => progress.ar,
@@ -782,8 +824,8 @@ function setupAdventure() {
     tally: () => combat.tally,
     drill: (key, [x, y], foes) => { combat.spawnCamp(key, x, y, hero.world.ground(x, y, hero.world.terrain(x, y) + 3, 6), 0.2, foes as FoeKind[]); },
     drillDone: (key) => combat.campDone(key),
-    spUsed: () => growth.spUsed(),
-    giveSp: () => { progress.open('growth'); growth.addSp(1); feed.push('🌟', '스킬 포인트 +1', 'gold'); },
+    spUsed: () => arsenal.casts,
+    giveSp: () => { progress.open('growth'); },
     night: () => nightMode,
     wavesCleared: () => horde?.clearedN ?? 0,
     unlockChar: (id) => party.unlock(id as CharId),
@@ -1083,7 +1125,7 @@ function paintMenu() {
 }
 function menu(on = !$('#menu').classList.contains('on')) {
   if (on && (!S.started || domain?.active)) return;
-  if (on) { closet?.toggle(false); journal?.toggle(false); wish?.toggle(false); growthUi?.toggle(false); partyUi?.toggle(false); if (mapMode) setMapMode(false); }
+  if (on) { closet?.toggle(false); journal?.toggle(false); wish?.toggle(false); growthUi?.toggle(false); partyUi?.toggle(false); skillUi?.toggle(false); if (mapMode) setMapMode(false); }
   $('#menu').classList.toggle('on', on);
   if (on) { sfx.pageTurn(); paintMenu(); } else $<HTMLElement>('.mkeys').hidden = true;
 }
@@ -1103,6 +1145,7 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#menu .mgrid butto
       case 'wave': menu(false); setTimeout(() => hero.input.press('wave'), 200); break;
       case 'sound': sfx.unlock(); sfx.setMuted(!sfx.isMuted()); paintMenu(); break;
       case 'growth': menu(false); growthUi.toggle(true); break;
+      case 'skills': menu(false); skillUi.toggle(true); break;
       case 'party': menu(false); partyUi.toggle(true); break;
       case 'mode': menu(false); setMode(!nightMode); break;
       case 'keys': { const k = $<HTMLElement>('.mkeys'); k.hidden = !k.hidden; break; }
@@ -1235,12 +1278,14 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyI') { if (closet.open) closet.toggle(false); else if (free) closet.toggle(true); }
   else if (e.code === 'KeyJ') { if (journal.open) journal.toggle(false); else if (free) journal.toggle(true); }
   else if (e.code === 'KeyP') { if (partyUi.open) partyUi.toggle(false); else if (free) partyUi.toggle(true); }
-  else if (e.code === 'KeyK' && progress.has('growth')) { if (growthUi.open) growthUi.toggle(false); else if (free) growthUi.toggle(true); }
+  else if (e.code === 'KeyK') { if (growthUi.open) growthUi.toggle(false); else if (skillUi.open) skillUi.toggle(false); else if (free) skillUi.toggle(true); }
+  else if (['Digit5', 'Digit6', 'Digit7', 'Digit8'].includes(e.code) && free) arsenal.cast(Number(e.code.slice(5)) - 5);
   else if (e.code === 'KeyG' && free && companion) companion.ask();
   else if (e.key === 'Escape') {
     if (creator?.open) { /* 만들기는 단추로 닫는다 */ }
     else if (wish?.open) wish.toggle(false);
     else if (growthUi?.open) growthUi.toggle(false);
+    else if (skillUi?.open) skillUi.toggle(false);
     else if (partyUi?.open) partyUi.toggle(false);
     else if (closet?.open) closet.toggle(false);
     else if (journal?.open) journal.toggle(false);
@@ -1257,7 +1302,7 @@ if (import.meta.env.DEV || location.search.includes('debug')) (window as unknown
   street: () => street, DISTRICTS, places: () => places, graph: () => graph, map: () => map, sky: () => sky,
   wardrobe: () => wardrobe, closet: () => closet, minimap: () => minimap, journal: () => journal, progress: () => progress,
   explore: () => explore, wish: () => wish, combat: () => combat, companion: () => companion, ascend: () => ascend, domain: () => domain, prologue: () => prologue,
-  menu: (on?: boolean) => menu(on), banner: () => banner, growth: () => growth, growthUi: () => growthUi, tales: () => tales, party: () => party, creator: () => creator, partyUi: () => partyUi, horde: () => horde, setMode: (n: boolean) => setMode(n), night: () => nightMode, feed: () => feed, mapMode: (on: boolean) => setMapMode(on),
+  menu: (on?: boolean) => menu(on), banner: () => banner, growth: () => growth, growthUi: () => growthUi, tales: () => tales, arsenal: () => arsenal, skillUi: () => skillUi, party: () => party, creator: () => creator, partyUi: () => partyUi, horde: () => horde, setMode: (n: boolean) => setMode(n), night: () => nightMode, feed: () => feed, mapMode: (on: boolean) => setMapMode(on),
   teleport: (id: string) => { const wp = WAYPOINTS.find((w) => w.id === id); return wp ? teleport(wp) : null; },
 };
 window.addEventListener('error', (e) => { try { localStorage.setItem('carnet-walk-lasterror', `${new Date().toISOString()} ${e.message} @${e.filename}:${e.lineno}`); } catch { /* 무시 */ } });

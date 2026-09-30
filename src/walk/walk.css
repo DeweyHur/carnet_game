@@ -825,3 +825,69 @@ body.touch-play .who { left:calc(50% - min(15vw, 120px)); bottom:calc(22px + env
 #party .act { grid-column:1 / -1; display:flex; gap:6px; }
 #party .act button { flex:1; font-size:12.5px; padding:7px; }
 #party button.primary { background:#ffd166; font-weight:800; }
+
+/* 📜 기술 칸(5·6·7·8) · 마나 · 기술 이름 */
+.skbar { position:fixed; left:50%; translate:-50% 0; bottom:calc(54px + env(safe-area-inset-bottom)); z-index:4; display:none; gap:8px; }
+.skbar.on { display:flex; }
+body:not(.hero-on) .skbar, body.closet-on .skbar, body.map-mode .skbar { display:none !important; }
+.skbar button { position:relative; width:46px; height:46px; padding:0; border-radius:12px; background:#1f1b16c8; border:2px solid #ffffff40; color:#fff; display:grid; place-items:center; box-shadow:0 2px 8px #0006; overflow:hidden; }
+.skbar button em { font-style:normal; font-size:22px; }
+.skbar button kbd { position:absolute; left:3px; top:1px; font-size:10px; font-weight:800; color:#ffe7a8; background:none; border:0; padding:0; }
+.skbar button i { position:absolute; inset:0; background:conic-gradient(#000a var(--p, 0%), transparent 0); pointer-events:none; }
+.skbar button.empty { opacity:.45; }
+.skbar button.dry { filter:saturate(.2) brightness(.7); }
+.skbar button.no { animation:sk-no .25s; }
+@keyframes sk-no { 25% { translate:-3px 0; } 75% { translate:3px 0; } }
+.mpbar { position:fixed; left:50%; bottom:calc(12px + env(safe-area-inset-bottom)); translate:-50% 0; width:min(46vw, 320px); height:6px; border-radius:4px; background:#1f1b16aa; z-index:3; }
+.mpbar i { display:block; height:100%; border-radius:4px; background:linear-gradient(90deg, #3b7bff, #7fb2ff); transition:width .15s; }
+.mpbar span { position:absolute; right:0; top:7px; font-size:10px; color:#bcd4ff; text-shadow:0 1px 2px #000a; white-space:nowrap; }
+body:not(.hero-on) .mpbar, body.closet-on .mpbar, body.map-mode .mpbar { display:none !important; }
+body.touch-play .cbt .hp { bottom:calc(16px + env(safe-area-inset-bottom)); }
+body.touch-play .mpbar { bottom:calc(6px + env(safe-area-inset-bottom)); width:min(30vw, 240px); height:5px; }
+body.touch-play .mpbar span { display:none; }
+body.touch-play .skbar { bottom:calc(40px + env(safe-area-inset-bottom)); gap:6px; }
+body.touch-play .skbar button { width:40px; height:40px; }
+body.touch-play .who { bottom:calc(30px + env(safe-area-inset-bottom)); }
+.cbt-num.skname { font-size:15px; color:#fff6c9; background:#1f1b16b0; padding:2px 9px; border-radius:999px; text-shadow:none; }
+
+/* 📜 기술 나무 */
+#skills { position:absolute; inset:0; z-index:8; display:none; place-items:center; background:#0b0a0999; padding:12px; }
+#skills.on { display:grid; }
+#skills .sheet { width:min(880px, 100%); max-height:calc(100dvh - 24px); overflow:auto; background:#1d1a24; color:#efe7d6; border-radius:20px; padding:18px; box-shadow:0 10px 40px #0008; border:1px solid #6b5a3a; }
+#skills .top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+#skills .eyebrow { color:#e0b44a; }
+#skills h2 { color:#fff3d6; }
+#skills .sub { margin:0; font-size:12px; color:#b8ab93; }
+#skills .tr { display:flex; gap:6px; }
+#skills .tr button { padding:6px 11px; font-size:12.5px; background:#2d2838; color:#efe7d6; }
+#skills .stats { display:flex; flex-wrap:wrap; gap:6px 16px; margin:12px 0; font-size:13px; color:#c9bda6; }
+#skills .stats .sp b { color:#ffd166; font-size:17px; }
+#skills .trees { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+#skills .tree { display:flex; flex-direction:column; gap:8px; background:#141119; border-radius:14px; padding:10px; border:1px solid #3a3246; }
+#skills .tree h4 { margin:0 0 2px; text-align:center; font-size:14px; color:#e0b44a; }
+#skills .sk { position:relative; display:grid; grid-template-columns:34px 1fr; column-gap:8px; text-align:left; padding:8px; border-radius:12px; background:#26212f; color:#efe7d6; border:2px solid #3a3246; }
+#skills .sk em { grid-row:1 / 3; font-style:normal; font-size:24px; align-self:center; }
+#skills .sk b { font-size:13px; }
+#skills .sk small { font-size:10.5px; color:#9d917c; }
+#skills .sk .lv { position:absolute; right:7px; top:6px; font-weight:900; color:#ffd166; font-size:14px; }
+#skills .sk.pas { border-style:dashed; }
+#skills .sk.got { border-color:#8a6d2e; background:#2e2618; }
+#skills .sk.can { box-shadow:0 0 0 2px #ffd16666; }
+#skills .sk.sel { border-color:#ffd166; box-shadow:0 0 0 3px #ffd16699; }
+#skills .sk.locked { opacity:.45; }
+#skills .sk + .sk::before { content:''; position:absolute; left:50%; top:-10px; width:2px; height:9px; background:#6b5a3a; }
+#skills .detail { margin-top:12px; background:#141119; border-radius:14px; padding:12px 14px; border:1px solid #3a3246; }
+#skills .dh { display:flex; gap:10px; align-items:center; }
+#skills .dh em { font-style:normal; font-size:32px; }
+#skills .dh b { font-size:17px; color:#fff3d6; display:block; }
+#skills .dh small { font-size:11.5px; color:#9d917c; }
+#skills .ds { margin:8px 0 4px; font-size:13.5px; }
+#skills .nw, #skills .nx, #skills .syn { margin:3px 0; font-size:12.5px; }
+#skills .nw { color:#a9f07e; } #skills .nx { color:#ffd166; } #skills .syn { color:#b79bff; }
+#skills .act { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:10px; }
+#skills .act .learn { padding:9px 16px; font-weight:800; background:#2d2838; color:#efe7d6; }
+#skills .act .learn.primary { background:#ffd166; color:#1f1b16; }
+#skills .bind { display:flex; gap:5px; align-items:center; font-size:12.5px; color:#c9bda6; }
+#skills .bind button { width:34px; padding:6px 0; background:#2d2838; color:#efe7d6; font-weight:800; }
+#skills .bind button.on { background:#8a6d2e; color:#fff; }
+@media (max-width:640px) { #skills .trees { grid-template-columns:1fr; } }

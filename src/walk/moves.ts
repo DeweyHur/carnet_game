@@ -333,10 +333,15 @@ export class Moves {
     for (const e of this.timed.slice()) { e.t -= dt; if (e.t <= 0) { this.timed.splice(this.timed.indexOf(e), 1); e.fn(); } }
     // 던진 액자
     for (const s of this.shots.slice()) {
-      const step = 22 * dt;
-      s.x += s.dx * step; s.y += s.dy * step; s.left -= step;
+      // 0.5 m씩 나눠 가며 본다(빠르면 가까운 적을 건너뛴다)
+      const total = 22 * dt, parts = Math.max(1, Math.ceil(total / 0.5));
+      let f: FoeLike | undefined;
+      for (let q2 = 0; q2 < parts && !f && s.left > 0; q2++) {
+        const step = total / parts;
+        s.x += s.dx * step; s.y += s.dy * step; s.left -= step;
+        f = this.alive().find((q) => Math.hypot(q.x - s.x, q.y - s.y) < (this.m.big(q) ? 2.6 : 1) && Math.abs(q.z + q.lift + 0.8 - s.z) < (this.m.big(q) ? 4 : 1.8));
+      }
       s.obj.position.set(s.x, s.y, s.z); s.obj.rotation.z += dt * 14;
-      const f = this.alive().find((q) => Math.hypot(q.x - s.x, q.y - s.y) < (this.m.big(q) ? 2.6 : 1) && Math.abs(q.z + q.lift + 0.8 - s.z) < (this.m.big(q) ? 4 : 1.8));
       if (f || s.left <= 0) {
         if (f) { this.m.hit(f, this.m.atk() * s.dmg, s.how); this.m.energy(2); }
         this.m.group.remove(s.obj); this.shots.splice(this.shots.indexOf(s), 1);

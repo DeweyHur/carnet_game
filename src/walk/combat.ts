@@ -10,7 +10,7 @@ import type { Progress } from './progress';
 import * as sfx from './sound';
 import { weaponOf, type WeaponStats } from './gear';
 import { NO_MODS, type GrowthMods } from './growth';
-import { Moves } from './moves';
+import { Moves, type MoveApi, type FoeLike } from './moves';
 import type { CharId } from './party';
 
 const FIGHT_ACTS = new Set<string>(['atk1', 'atk2', 'atk3', 'atk4', 'charge', 'skill', 'burst']);
@@ -70,6 +70,7 @@ interface Foe {
   dash?: [number, number]; slam?: THREE.Mesh; wander: number; bar: HTMLElement | null; seen: number;
   /** 밤 습격: 끝까지 쫓아온다 */ hunter?: boolean;
   /** 기절(남은 초) */ stunT?: number;
+  /** 느려짐(남은 초) */ slowT?: number;
   /** 맞아서 밀려나는 속도 · 움찔 · 쓰러질 때 도는 쪽 */ kbx?: number; kby?: number; hurtT?: number; spin?: number;
   /** 정예(크고 세다) */ elite?: boolean;
 }
@@ -164,7 +165,8 @@ export class Combat {
     this.bossBar.innerHTML = '<b></b><span><i></i></span>';
     document.body.appendChild(this.bossBar);
     this.recalc(true);
-    this.moves = new Moves({
+    this.api = {
+      slow: (f: FoeLike, secs: number) => { const q = f as Foe; if (!big(q)) q.slowT = Math.max(q.slowT ?? 0, secs); },
       hero: c.hero, W: () => this.W, group: this.group,
       foes: () => this.foes, big: (f) => big(f as Foe),
       hit: (f, raw, how) => { if ((f as Foe).state !== 'dead') this.damage(f as Foe, raw, how); },
@@ -180,8 +182,11 @@ export class Combat {
       heal: (frac) => this.heal(frac),
       energy: (n) => { this.energy = Math.min(this.energyMax, this.energy + n * this.energyK); },
       iframes: (s2) => { this.iframes = Math.max(this.iframes, s2); },
-    });
+    };
+    this.moves = new Moves(this.api);
   }
+  /** 기술(skills.ts)이 쓰는 좁은 창 */
+  readonly api: MoveApi & { slow(f: FoeLike, secs: number): void };
   /** 캐릭터마다 다른 보통 공격 · E · Q */
   private readonly moves: Moves;
   private get who(): CharId { return this.c.who?.() ?? 'traveler'; }
@@ -830,7 +835,7 @@ export class Combat {
       const ex = tx - f.x, ey = ty - f.y, L = Math.hypot(ex, ey);
       if (L < 0.05) return;
       f.facing = bearing(ex, ey);
-      const s = Math.min(L, sp * dt);
+      const s = Math.min(L, sp * (f.slowT && f.slowT > 0 ? 0.4 : 1) * dt);
       const p = { x: f.x + (ex / L) * s, y: f.y + (ey / L) * s };
       if (!S.fly) w.collide(p, f.z, 0.45, 1.2, 0.6);
       f.x = p.x; f.y = p.y;
@@ -897,8 +902,9 @@ export class Combat {
     if (f.kind === 'slime') { body.rotation.x = 0; const hop = f.state === 'chase' || f.state === 'return' ? Math.abs(Math.sin(f.t * 7)) : 0.3 * Math.abs(Math.sin(f.t * 2)); body.position.z = hop * 0.35 + wind * 0.2; body.scale.set(1 + wind * 0.25, 1 + wind * 0.25, 1 - wind * 0.35 + hop * 0.1); }
     else if (f.kind === 'rat' || f.kind === 'ratking') { const arm = body.userData.arm as THREE.Object3D; arm.rotation.x = f.state === 'windup' ? -1.4 * wind : f.state === 'recover' ? 1.2 : Math.sin(f.t * 8) * 0.2; body.rotation.x = f.state === 'chase' ? 0.15 : 0; body.position.z = f.state === 'chase' ? Math.abs(Math.sin(f.t * 10)) * 0.08 : 0; }
     else { const wings = f.obj.userData.wings as THREE.Object3D[]; const fl = Math.sin(f.t * (f.state === 'dash' ? 20 : 8)) * 0.6; wings[0].rotation.y = fl; wings[1].rotation.y = -fl; body.rotation.x = f.state === 'windup' ? -0.5 * wind : f.state === 'dash' ? 0.7 : 0; }
+    if (f.slowT && f.slowT > 0) f.slowT -= dt;
     if (f.hurtT && f.hurtT > 0) { f.hurtT -= dt; const k = Math.max(0, f.hurtT / 0.22); body.rotation.x -= 0.55 * k * (big(f) ? 0.3 : 1); body.position.z += 0.12 * k; }
-    for (const m of f.mats) m.emissive.setHex(f.flash > 0 ? 0xffffff : wind > 0.6 ? 0x661100 : f.elite ? 0x3a1450 : 0x000000);
+    for (const m of f.mats) m.emissive.setHex(f.flash > 0 ? 0xffffff : wind > 0.6 ? 0x661100 : f.slowT && f.slowT > 0 ? 0x183a5a : f.elite ? 0x3a1450 : 0x000000);
     if (f.flash > 0) f.flash -= dt;
     if (f.slam) { const s = f.slam.material as THREE.MeshBasicMaterial; s.opacity = 0.25 + 0.35 * wind; }
   }
