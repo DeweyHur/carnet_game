@@ -11,7 +11,7 @@ export default async (p, shot) => {
   const summary = [];
   for (const id of ['traveler', 'julie', 'gustave', 'marcel', 'amelie', 'quentin', 'elodie', 'lune']) {
     await close();
-    if (id !== 'traveler') { await p.keyboard.press('KeyP'); await p.waitForTimeout(300); await p.click(`#party .pc[data-char="${id}"] button.primary`); await p.waitForTimeout(300); }
+    if (id !== 'traveler') { await p.keyboard.press('KeyP'); await p.waitForTimeout(300); (await p.click(`#party .pt-av[data-char="${id}"]`), await p.click(`#party .pt-go .go`), await p.keyboard.press(`KeyP`)); await p.waitForTimeout(300); }
     await close();
     // K → 칸마다 눌러 배우기(위에서부터)
     await p.keyboard.press('KeyK'); await p.waitForTimeout(400);

@@ -26,7 +26,7 @@ import * as THREE from 'three';
 import { Wardrobe, modsOf } from './gear';
 import { Closet } from './closet';
 import { Growth, ARMOR_SLOTS, type GrowthMods } from './growth';
-import { Party, type CharId } from './party';
+import { Party, CHARS, type CharId } from './party';
 import { Creator, PartyPanel } from './partyui';
 import { SPEED } from './moves';
 import { Arsenal } from './skills';
@@ -158,6 +158,7 @@ async function boot() {
       street = makeStreet();
       setupGear();
       setupAdventure();
+      $<HTMLButtonElement>('#fresh').hidden = !hasSave();
       const last = WAYPOINTS.find((w) => w.id === progress.last);
       if (last) {
         const rb = $<HTMLButtonElement>('#resume');
@@ -547,6 +548,22 @@ const addMoney = (eur: number) => {
   paintMenu();
   if (eur >= 1) feed.push('💶', `€ +${Math.round(eur)}`, 'gold');
 };
+/** ↺ 새로 시작: 이 게임의 저장(carnet-로 시작하는 것)을 모두 지우고 다시 연다. 소리 끔 설정만 남긴다 */
+function hasSave() { try { return ['carnet-prologue-v1', 'carnet-party-v1', 'carnet-skills-v1', 'carnet-lili'].some((k) => localStorage.getItem(k) !== null); } catch { return false; } }
+function wipe() {
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith('carnet-') && k !== 'carnet-walk-muted') localStorage.removeItem(k); } catch { /* 무시 */ }
+  location.reload();
+}
+/** 한 번 누르면 묻고, 3초 안에 한 번 더 누르면 지운다 */
+function askFresh(btn: HTMLElement) {
+  if (btn.dataset.armed === '1') { wipe(); return; }
+  btn.dataset.armed = '1';
+  const old = btn.innerHTML;
+  btn.innerHTML = '<em>⚠️</em>한 번 더 누르면 모두 지운다';
+  btn.classList.add('armed');
+  setTimeout(() => { btn.dataset.armed = ''; btn.innerHTML = old; btn.classList.remove('armed'); }, 3000);
+}
+$('#fresh').addEventListener('click', (e) => askFresh(e.currentTarget as HTMLElement));
 /** 입은 옷(모자·윗옷·가방·신발)의 강화 레벨 합(레벨 1을 뺀 것) */
 const armorSum = () => ARMOR_SLOTS.reduce((a, s) => a + wardrobe.lvOf(wardrobe.loadout[s]) - 1, 0);
 /** 👥 캐릭터: 지금 캐릭터의 싸움 성격을 성장 mods에 곱한다 */
@@ -580,8 +597,8 @@ const who = document.createElement('div');
 who.className = 'who';
 document.body.appendChild(who);
 /** 옷: 여행자는 옷장대로, 동료는 늘 입는 옷(무기 능력·옷 능력은 옷장을 따른다) */
-function dress() {
-  const c = party?.char, l = wardrobe.loadout;
+function dress(c = party?.char) {
+  const l = wardrobe.loadout;
   hero.figure.setGear(c?.wear ? { ...l, head: c.wear.head, top: c.wear.top } : l);
   hero.figure.setOutfit(c?.wear?.colors ?? null);
   hero.figure.setStyle(c?.id ?? 'traveler');
@@ -618,14 +635,15 @@ function setupParty() {
     sfx.questDone();
     toast(`👤 ${party.name} — 파리에 온 걸 환영해!`);
   };
-  partyUi.onToggle = (on) => { if (on) { hint(''); menu(false); closet?.toggle(false); journal?.toggle(false); wish?.toggle(false); growthUi?.toggle(false); } };
+  partyUi.onToggle = (on) => { if (on) { hint(''); menu(false); closet?.toggle(false); journal?.toggle(false); wish?.toggle(false); growthUi?.toggle(false); skillUi?.toggle(false); } portrait(on); if (!on) applyChar(); };
+  partyUi.onPreview = (id) => { const c = CHARS.find((q) => q.id === id) ?? party.char; hero.figure.setLook(party.lookOf(c)); dress(c); };
   partyUi.onSelect = () => {
     applyChar();
     const c = party.char;
     sfx.enter();
     hero.body.drawn = 3;
     toast(`👥 ${party.nameOf(c)}(으)로 바꿨다 — ${c.element.emoji} ${c.element.name} · ${c.perk}`);
-    partyUi.toggle(false);
+    partyUi.refresh();
   };
   partyUi.onEdit = () => creator.show(party.name, party.look, false);
   party.onUnlock = (c) => {
@@ -743,7 +761,7 @@ function setupAdventure() {
   arsenal.onCast = (i) => { if (S.started) arsenal.cast(i); };
   arsenal.onChange = () => { skillUi?.refresh(); paintDots(); };
   skillUi = new SkillPanel(arsenal);
-  skillUi.ctx = { who: () => party.active, name: () => party.nameOf(party.char), ar: () => progress.ar, atk: () => combat.stats().atk, openGrowth: () => growthUi.toggle(true) };
+  skillUi.ctx = { who: () => party.active, name: () => party.nameOf(party.char), ar: () => progress.ar, atk: () => combat.stats().atk, element: () => party.char.element, openGrowth: () => growthUi.toggle(true) };
   skillUi.onToggle = (on) => { if (on) { hint(''); menu(false); closet?.toggle(false); journal?.toggle(false); wish?.toggle(false); growthUi?.toggle(false); partyUi?.toggle(false); } };
   horde = new Horde({
     hero, combat, toast,
@@ -1148,6 +1166,7 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#menu .mgrid butto
       case 'skills': menu(false); skillUi.toggle(true); break;
       case 'party': menu(false); partyUi.toggle(true); break;
       case 'mode': menu(false); setMode(!nightMode); break;
+      case 'fresh': askFresh(b); break;
       case 'keys': { const k = $<HTMLElement>('.mkeys'); k.hidden = !k.hidden; break; }
     }
   });

@@ -147,11 +147,73 @@ export class Figure {
   }
 
   /** 세로(z축)로 선 캡슐, 윗끝이 원점(관절)에 오게 */
-  private limb(r: number, len: number) {
-    return new THREE.CapsuleGeometry(r, len, 4, 10).rotateX(Math.PI / 2).translate(0, 0, -len / 2);
+  /** 팔다리: 위가 굵고 아래로 가늘어지며(종아리·팔뚝은 살짝 부푼다) 두 끝이 둥근 선반 모양 — 통 모양 로봇 팔다리가 아니게 */
+  private limb(r: number, len: number, bottom = 0.78, bulge = 0.08) {
+    const pts: THREE.Vector2[] = [];
+    const cap = 6;
+    for (let i = 0; i <= cap; i++) { const a = (i / cap) * (Math.PI / 2); pts.push(new THREE.Vector2(Math.sin(a) * r, Math.cos(a) * r * 0.8)); }
+    const N = 10;
+    for (let i = 1; i < N; i++) {
+      const t = i / N;
+      const rr = r * (1 + (bottom - 1) * t) * (1 + bulge * Math.sin(Math.min(1, t / 0.7) * Math.PI));
+      pts.push(new THREE.Vector2(rr, -len * t));
+    }
+    const rb = r * bottom;
+    for (let i = 0; i <= cap; i++) { const a = (i / cap) * (Math.PI / 2); pts.push(new THREE.Vector2(Math.cos(a) * rb, -len - Math.sin(a) * rb * 0.8)); }
+    return new THREE.LatheGeometry(pts.reverse(), 14).rotateX(Math.PI / 2); // 아래→위 순서여야 겉면이 바깥을 본다
+  }
+  /** 몸통: 엉덩이 → 잘록한 허리 → 가슴 → 어깨 → 목으로 이어지는 매끈한 선 */
+  private torso() {
+    const prof: [number, number][] = [[0.0, -0.02], [0.13, -0.01], [0.155, 0.04], [0.14, 0.1], [0.125, 0.15], [0.14, 0.22], [0.165, 0.3], [0.17, 0.36], [0.155, 0.42], [0.11, 0.47], [0.06, 0.5], [0.0, 0.51]];
+    return new THREE.LatheGeometry(prof.map(([r, z]) => new THREE.Vector2(r, z)), 20).rotateX(Math.PI / 2);
+  }
+  /** 얼굴(그린 눈 · 눈썹 · 볼 · 입): 캔버스에 그려 머리 앞쪽에 입힌다 — 뜬 눈 / 감은 눈 둘 */
+  private faceTex: [THREE.CanvasTexture, THREE.CanvasTexture] | null = null;
+  private faceM: THREE.MeshToonMaterial | null = null;
+  private blinkT = 2.5;
+  private drawFace(eyes: number, hair: number, closed: boolean) {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const g = c.getContext('2d')!;
+    const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
+    const mix = (n: number, k: number) => { const r = (n >> 16) & 255, gg = (n >> 8) & 255, b = n & 255; const f = (v: number) => Math.round(v + (255 - v) * k); return `rgb(${f(r)},${f(gg)},${f(b)})`; };
+    // 볼
+    for (const sx of [-1, 1]) { const gr = g.createRadialGradient(128 + sx * 68, 172, 2, 128 + sx * 68, 172, 22); gr.addColorStop(0, 'rgba(240,120,110,0.55)'); gr.addColorStop(1, 'rgba(240,120,110,0)'); g.fillStyle = gr; g.fillRect(128 + sx * 68 - 24, 148, 48, 48); }
+    for (const sx of [-1, 1]) {
+      const cx = 128 + sx * 42, cy = 132;
+      g.save(); g.translate(cx, cy); g.scale(1.3, 1.3); g.translate(-cx, -cy);
+      if (closed) {
+        g.strokeStyle = '#2a1c16'; g.lineWidth = 5; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(cx - 17, cy + 2); g.quadraticCurveTo(cx, cy + 12, cx + 17, cy + 2); g.stroke();
+      } else {
+        // 흰자
+        g.fillStyle = '#fbf7f2'; g.beginPath(); g.ellipse(cx, cy + 2, 17, 22, 0, 0, Math.PI * 2); g.fill();
+        // 홍채(위가 짙고 아래가 밝다)
+        const ir = g.createLinearGradient(cx, cy - 18, cx, cy + 22); ir.addColorStop(0, `rgb(${((eyes >> 16) & 255) * 0.45 | 0},${((eyes >> 8) & 255) * 0.45 | 0},${(eyes & 255) * 0.45 | 0})`); ir.addColorStop(0.55, hex(eyes)); ir.addColorStop(1, mix(eyes, 0.55));
+        g.fillStyle = ir; g.beginPath(); g.ellipse(cx + sx * 1, cy + 4, 13, 18, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#140d0a'; g.beginPath(); g.ellipse(cx + sx * 1, cy + 5, 6, 9, 0, 0, Math.PI * 2); g.fill();
+        // 반짝임
+        g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(cx - 5, cy - 5, 5, 6.5, -0.3, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.arc(cx + 6, cy + 12, 2.6, 0, Math.PI * 2); g.fill();
+        // 윗속눈썹(두껍게, 끝이 올라간다) · 아랫속눈썹
+        g.strokeStyle = '#1e1411'; g.lineCap = 'round'; g.lineWidth = 6;
+        g.beginPath(); g.moveTo(cx - sx * 18, cy - 9); g.quadraticCurveTo(cx, cy - 27, cx + sx * 19, cy - 9); g.quadraticCurveTo(cx + sx * 22, cy - 7, cx + sx * 24, cy - 3); g.stroke(); // 둥근 윗속눈썹 · 바깥 끝이 살짝 내려간다(순한 눈)
+        g.lineWidth = 2.2; g.beginPath(); g.moveTo(cx - 10, cy + 25); g.quadraticCurveTo(cx, cy + 27, cx + 11, cy + 23); g.stroke();
+      }
+      g.restore();
+      // 눈썹
+      g.strokeStyle = hex(hair); g.lineWidth = 5; g.lineCap = 'round';
+      g.lineWidth = 4; g.beginPath(); g.moveTo(cx - sx * 15, cy - 44); g.quadraticCurveTo(cx, cy - 52, cx + sx * 17, cy - 45); g.stroke();
+    }
+    // 코(작은 그림자) · 입
+    g.fillStyle = 'rgba(190,110,90,0.5)'; g.beginPath(); g.ellipse(128, 166, 3, 2, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#8a3a2a'; g.lineWidth = 3.4; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(119, 184); g.quadraticCurveTo(128, 192, 138, 183); g.stroke();
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    return t;
   }
 
-  private basic(color: number) { return new THREE.MeshBasicMaterial({ color }); }
   /** 바꿔 칠할 수 있는 재질을 나눠 쓰는 조각(옷 색) */
   private partM(geo: THREE.BufferGeometry, m: THREE.Material, parent: THREE.Object3D, x = 0, y = 0, z = 0, lined = true): THREE.Mesh {
     const o = new THREE.Mesh(geo, m);
@@ -197,7 +259,7 @@ export class Figure {
     this.root.add(this.tilt);
     this.tilt.position.z = 0.92;
     // 골반·허리띠
-    this.partM(new THREE.BoxGeometry(0.3, 0.19, 0.16), this.pantsM, this.tilt, 0, 0, -0.02);
+    this.partM(new THREE.SphereGeometry(0.15, 18, 12), this.pantsM, this.tilt, 0, 0, -0.02).scale.set(1.05, 0.72, 0.62); // 골반(둥글게)
     // 옷자락: 재킷(짧게)·트렌치(무릎까지)
     const skirt = (id: string, len: number, flare: number) => {
       const g = this.group(this.tilt, this.skirts, id);
@@ -208,9 +270,9 @@ export class Figure {
     this.topDM.side = THREE.DoubleSide;
     // 몸통: 어깨가 넓고 허리가 잘록하게
     this.tilt.add(this.spine);
-    this.partM(new THREE.CapsuleGeometry(0.165, 0.26, 6, 16).rotateX(Math.PI / 2), this.topM, this.spine, 0, 0, 0.25).scale.set(1.1, 0.82, 1);
-    this.partM(new THREE.CapsuleGeometry(0.085, 0.3, 4, 10).rotateY(Math.PI / 2), this.topM, this.spine, 0, -0.005, 0.43).scale.set(1, 0.95, 0.8); // 어깨
-    this.partM(new THREE.CylinderGeometry(0.06, 0.07, 0.1, 12).rotateX(Math.PI / 2), this.skinM, this.spine, 0, 0, 0.52, false); // 목
+    this.partM(this.torso(), this.topM, this.spine, 0, 0, 0.02).scale.set(1.08, 0.78, 1);
+    for (const sx of [-1, 1]) this.partM(new THREE.SphereGeometry(0.075, 14, 10), this.topM, this.spine, sx * 0.2, -0.005, 0.42).scale.set(1, 0.95, 0.85); // 둥근 어깨
+    this.partM(new THREE.CylinderGeometry(0.045, 0.055, 0.12, 12).rotateX(Math.PI / 2), this.skinM, this.spine, 0, 0, 0.53, false); // 목(가늘게)
 
     // 윗옷마다 붙는 것
     const jacket = this.group(this.spine, this.tops, 'jacket');
@@ -270,7 +332,8 @@ export class Figure {
     this.part(new THREE.BoxGeometry(0.08, 0.04, 0.03), 0xd9b44a, satchel, -0.22, 0, 0.0, false); // 잠금쇠
 
     // 머리
-    this.head.position.z = 0.56;
+    this.head.position.z = 0.55;
+    this.head.scale.setScalar(1.2); // 원신처럼 머리를 조금 크게
     this.spine.add(this.head);
     this.partM(new THREE.SphereGeometry(0.145, 22, 16), this.skinM, this.head, 0, 0.005, 0.16).scale.set(1, 0.95, 1.05);
     for (const sx of [-1, 1]) this.partM(new THREE.SphereGeometry(0.034, 10, 8), this.skinM, this.head, sx * 0.142, -0.005, 0.15).scale.set(0.55, 0.9, 1.2); // 귀
@@ -307,17 +370,34 @@ export class Figure {
     this.part(new THREE.BoxGeometry(0.03, 0.006, 0.006), 0x2a2a2a, gl, 0, 0.158, 0.178, false);
     const beard = this.group(this.head, this.extras, 'beard');
     this.partM(new THREE.SphereGeometry(0.09, 12, 10), this.hairM, beard, 0, 0.09, 0.07).scale.set(1.05, 0.7, 0.8);
-    // 얼굴: 흰자·눈동자·반짝임, 눈썹, 웃는 입, 볼
-    for (const sx of [-1, 1]) {
-      this.partM(new THREE.SphereGeometry(0.03, 12, 10), this.basic(0xfbf8f2), this.head, sx * 0.052, 0.122, 0.172, false).scale.set(1, 0.55, 1.2);
-      this.partM(new THREE.SphereGeometry(0.02, 10, 8), this.eyeM, this.head, sx * 0.05, 0.138, 0.17, false).scale.set(1, 0.6, 1.15);
-      this.partM(new THREE.SphereGeometry(0.0065, 6, 6), this.basic(0xffffff), this.head, sx * 0.05 + 0.007, 0.151, 0.18, false);
-      this.partM(new THREE.BoxGeometry(0.048, 0.012, 0.012).rotateY(-sx * 0.18), this.hairM, this.head, sx * 0.054, 0.13, 0.215, false);
-      const blush = this.partM(new THREE.SphereGeometry(0.02, 8, 6), new THREE.MeshBasicMaterial({ color: 0xf08f7d, transparent: true, opacity: 0.45, depthWrite: false }), this.head, sx * 0.088, 0.118, 0.125, false);
-      blush.scale.set(1, 0.4, 0.6);
+    // 얼굴: 그린 얼굴(눈 · 눈썹 · 볼 · 입)을 머리 앞쪽 둥근 조각에 입힌다
+    {
+      const geo = new THREE.SphereGeometry(0.1462, 36, 18, 0, TAU, 0, 1.15);
+      const pos = geo.attributes.position as THREE.BufferAttribute, uv = geo.attributes.uv as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) uv.setXY(i, 0.5 + pos.getX(i) / 0.29, 0.5 + pos.getZ(i) / 0.29);
+      this.faceTex = [this.drawFace(DEFAULT_LOOK.eyes, DEFAULT_LOOK.hair, false), this.drawFace(DEFAULT_LOOK.eyes, DEFAULT_LOOK.hair, true)];
+      this.faceM = new THREE.MeshToonMaterial({ map: this.faceTex[0], transparent: true, gradientMap: this.ramp, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+      const face = new THREE.Mesh(geo, this.faceM);
+      face.position.set(0, 0.005, 0.16);
+      face.scale.set(1, 0.95, 1.05);
+      face.renderOrder = 1;
+      this.head.add(face);
     }
-    this.partM(new THREE.SphereGeometry(0.022, 8, 8), this.skinM, this.head, 0, 0.148, 0.14, false); // 코
-    this.part(new THREE.TorusGeometry(0.024, 0.006, 4, 10, Math.PI).rotateZ(Math.PI).rotateX(Math.PI / 2), 0x8a3a2a, this.head, 0, 0.135, 0.108, false); // 입
+    // 앞머리 가닥(이마를 덮고 옆으로 쓸린다) · 옆머리 · 정수리의 삐침
+    for (let i = 0; i < 9; i++) {
+      const u = (i - 4) / 4; // -1..1
+      const strand = this.partM(new THREE.ConeGeometry(0.036 - Math.abs(u) * 0.006, 0.15 + (1 - Math.abs(u)) * 0.03, 6).rotateX(Math.PI), this.hairM, this.head, u * 0.105, 0.11 + (1 - Math.abs(u)) * 0.02, 0.245 - Math.abs(u) * 0.03, false);
+      strand.rotation.set(-0.35 - Math.abs(u) * 0.2, u * 0.5 + 0.18, 0);
+      strand.scale.set(1, 0.55, 1);
+    }
+    for (const sx of [-1, 1]) {
+      const side = this.partM(new THREE.ConeGeometry(0.04, 0.2, 6).rotateX(Math.PI), this.hairM, this.head, sx * 0.14, 0.05, 0.12, false);
+      side.rotation.set(-0.1, sx * 0.25, 0); side.scale.set(0.8, 0.7, 1);
+    }
+    for (const [x, y, z, rx, ry] of [[0.02, -0.06, 0.31, -0.9, 0.3], [-0.05, -0.1, 0.29, -1.3, -0.4], [0.07, -0.12, 0.27, -1.5, 0.6]] as const) {
+      const spk = this.partM(new THREE.ConeGeometry(0.04, 0.12, 6), this.hairM, this.head, x, y, z, false);
+      spk.rotation.set(rx, ry, 0);
+    }
 
     // 모자
     const beret = this.group(this.head, this.hats, 'beret');
@@ -522,6 +602,7 @@ export class Figure {
     this.skinM.color.setHex(l.skin);
     this.hairM.color.setHex(l.hair);
     this.eyeM.color.setHex(l.eyes);
+    if (this.faceM) { this.faceTex?.forEach((t) => t.dispose()); this.faceTex = [this.drawFace(l.eyes, l.hair, false), this.drawFace(l.eyes, l.hair, true)]; this.faceM.map = this.faceTex[0]; this.faceM.needsUpdate = true; }
     this.scarfM.color.setHex(l.accent);
     for (const [k, o] of this.styles) o.visible = k === l.style;
     for (const [k, o] of this.extras) o.visible = k === l.extra;
@@ -632,6 +713,14 @@ export class Figure {
   /** 몸 상태를 받아 자세를 잡는다. groundZ는 발밑(그림자 자리). */
   update(b: Body, dt: number, groundZ: number, beacon: [number, number] | null) {
     this.t += dt;
+    // 눈 깜빡임: 3~5초마다 0.12초
+    this.blinkT -= dt;
+    if (this.faceM && this.faceTex) {
+      const shut = this.blinkT < 0.12;
+      const want = shut ? this.faceTex[1] : this.faceTex[0];
+      if (this.faceM.map !== want) { this.faceM.map = want; this.faceM.needsUpdate = true; }
+      if (this.blinkT < 0) this.blinkT = 3 + Math.random() * 2;
+    }
     const t = this.t;
     const ph = b.phase;
     const want: Pose = { ...ZERO };

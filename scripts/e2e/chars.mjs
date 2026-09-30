@@ -10,7 +10,7 @@ export default async (p, shot) => {
   for (const id of ['traveler', 'julie', 'gustave', 'marcel', 'amelie', 'quentin', 'elodie', 'lune']) {
     await close();
     await p.keyboard.press('KeyP'); await p.waitForTimeout(500);
-    await p.click(`#party .pc[data-char="${id}"] button.primary`).catch(() => p.keyboard.press('KeyP'));
+    (await p.click(`#party .pt-av[data-char="${id}"]`), await p.click(`#party .pt-go .go`), await p.keyboard.press(`KeyP`)).catch(() => p.keyboard.press('KeyP'));
     await p.waitForTimeout(400);
     const who = await E(p, () => ({ active: window.__walk.party().active, speed: window.__walk.hero().body.actSpeed, style: window.__walk.hero().figure.style, tag: document.querySelector('.who')?.textContent }));
     // 쥐 다섯(튼튼하게) — 앞 3~6 m

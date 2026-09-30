@@ -13,7 +13,7 @@ export default async (p, shot) => {
   for (const id of ['julie', 'gustave', 'marcel', 'amelie', 'quentin', 'elodie', 'lune']) {
     await E(p, () => { const B = window.__walk.banner(); for (let i = 0; i < 30 && B.showing; i++) B.next(); });
     await p.keyboard.press('KeyP'); await p.waitForTimeout(300);
-    await p.click(`#party .pc[data-char="${id}"] button.primary`);
+    (await p.click(`#party .pt-av[data-char="${id}"]`), await p.click(`#party .pt-go .go`), await p.keyboard.press(`KeyP`));
     await E(p, () => { const h = window.__walk.hero(); h.cam.portrait = true; h.cam.portraitShift = [0, 0, 3.4]; h.body.facing = (h.cam.yaw + 180) % 360; h.body.drawn = 6; });
     await p.waitForTimeout(300);
     if (['julie', 'gustave', 'marcel', 'quentin', 'elodie', 'lune'].includes(id)) await shot(`g_${id}`);

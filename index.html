@@ -9,6 +9,9 @@
     <meta property="og:description" content="에펠탑 아래에서 첫걸음. 순간이동 포인트·보물상자·비경·기원, 그리고 요정 리리와 함께." />
     <meta name="theme-color" content="#0b0a09" />
     <title>Carnet — 파리 모험</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Noto+Serif+KR:wght@600;900&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="map"></div>
@@ -38,6 +41,7 @@
           <button data-m="wave" type="button"><em>👋</em>인사<kbd>1</kbd></button>
           <button data-m="sound" type="button"><em id="m-sound">🔊</em>소리</button>
           <button data-m="keys" type="button"><em>⌨️</em>조작 안내</button>
+          <button data-m="fresh" type="button" class="danger"><em>↺</em>새로 시작</button>
         </div>
         <div class="mkeys" hidden>
           <p><b>이동</b> WASD · <b>시점</b> 마우스 끌기 · <b>달리기</b> Shift · <b>점프·글라이더</b> Space · <b>구르기</b> V · <b>웅크리기</b> C</p>
@@ -59,6 +63,7 @@
         </div>
         <button id="go" disabled>지도를 펴는 중…</button>
         <button id="resume" hidden></button>
+        <button id="fresh" type="button" hidden>↺ 처음부터 새로 시작</button>
         <p id="status"></p>
       </div>
     </section>
