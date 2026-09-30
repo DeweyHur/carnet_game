@@ -891,3 +891,5 @@ body.touch-play .who { bottom:calc(30px + env(safe-area-inset-bottom)); }
 #skills .bind button { width:34px; padding:6px 0; background:#2d2838; color:#efe7d6; font-weight:800; }
 #skills .bind button.on { background:#8a6d2e; color:#fff; }
 @media (max-width:640px) { #skills .trees { grid-template-columns:1fr; } }
+/* 휴대폰: 이름표는 피 막대 왼쪽 옆으로(기술 칸과 겹치지 않게) */
+body.touch-play .who { left:auto; right:calc(50% + min(15vw, 120px) + 8px); bottom:calc(12px + env(safe-area-inset-bottom)); }

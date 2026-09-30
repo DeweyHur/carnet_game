@@ -15,7 +15,7 @@ await p.waitForTimeout(8000);
 if (mobile) await p.evaluate(() => document.body.classList.add('touch-play'));
 const scan = (tag) => p.evaluate((tag) => {
   const vis = (el) => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e); if (c.display === 'none' || c.visibility === 'hidden' || +c.opacity < 0.05) return false; } return true; };
-  const sel = ['.hud-right button', '.minimap', '.pro.on', '.questline.on', '.hprompt.on', '.hpad button', '.cbt button', '.cbt .hp', '.asc-btn', '#toast.on', '#hint.on', '.dom-hud.on', '.xpgain.on', '.horde.on'];
+  const sel = ['.hud-right button', '.minimap', '.pro.on', '.questline.on', '.hprompt.on', '.hpad button', '.cbt button', '.cbt .hp', '.asc-btn', '#toast.on', '#hint.on', '.dom-hud.on', '.xpgain.on', '.horde.on', '.skbar.on button', '.mpbar', '.who'];
   const out = [];
   for (const s of sel) for (const el of document.querySelectorAll(s)) {
     if (!vis(el)) continue;
@@ -33,11 +33,12 @@ const scan = (tag) => p.evaluate((tag) => {
   }
   return { tag, n: out.length, list: out.map((o) => `${o.s}"${o.t}"@${Math.round(o.x)},${Math.round(o.y)}-${Math.round(o.r)},${Math.round(o.b)}`), issues, docW: document.documentElement.scrollWidth, docH: document.documentElement.scrollHeight };
 }, tag);
-const show = async (tag) => { const r = await scan(tag); console.log(`== ${tag}: ${r.n} els, doc ${r.docW}x${r.docH}`); for (const l of r.list) console.log('   ', l); for (const i of r.issues) console.log('  !!', i); };
+const show = async (tag) => { if (await p.evaluate(() => document.querySelector('#creator')?.classList.contains('on'))) await p.click('#creator .ok');
+  const r = await scan(tag); console.log(`== ${tag}: ${r.n} els, doc ${r.docW}x${r.docH}`); for (const l of r.list) console.log('   ', l); for (const i of r.issues) console.log('  !!', i); };
 await show('walk');
 await p.screenshot({ path: `ui2_${mobile ? 'm' : 'd'}_walk.png`, timeout: 120000 }).catch(() => {});
 // 싸움 중 · 상승 가능 · 행동 안내 · 할 일 한 줄
-await p.evaluate(() => { const W = window.__walk; const C = W.combat(); const b = W.hero().body; C.spawnCamp('ui-test', b.x + 6, b.y + 6, b.z, 0.2, ['slime']); W.hero().hud.setPrompt({ verb: '열기', what: '🎁 정교한 보물상자' }); document.querySelector('.asc-btn').classList.add('on', 'ready'); document.querySelector('#hint').textContent = '🧚 리리: 테스트 한 줄입니다'; document.querySelector('#hint').classList.add('on'); document.querySelector('#toast').textContent = '🔷 샹드마르스(에펠탑)'; document.querySelector('#toast').classList.add('on'); document.querySelector('.cbt').classList.add('fight'); W.horde().start(); });
+await p.evaluate(() => { const W = window.__walk; const C = W.combat(); const b = W.hero().body; C.spawnCamp('ui-test', b.x + 6, b.y + 6, b.z, 0.2, ['slime']); W.hero().hud.setPrompt({ verb: '열기', what: '🎁 정교한 보물상자' }); document.querySelector('.asc-btn').classList.add('on', 'ready'); document.querySelector('#hint').textContent = '🧚 리리: 테스트 한 줄입니다'; document.querySelector('#hint').classList.add('on'); document.querySelector('#toast').textContent = '🔷 샹드마르스(에펠탑)'; document.querySelector('#toast').classList.add('on'); document.querySelector('.cbt').classList.add('fight'); W.horde().start(); const A = W.arsenal(); A.ranks['traveler.00'] = 1; A.ranks['traveler.10'] = 1; A.bind('traveler', 0, 'traveler.00'); A.bind('traveler', 1, 'traveler.10'); A.paintBar(); });
 await p.waitForTimeout(400);
 await show('busy');
 await p.screenshot({ path: `ui2_${mobile ? 'm' : 'd'}_busy.png`, timeout: 120000 }).catch(() => {});

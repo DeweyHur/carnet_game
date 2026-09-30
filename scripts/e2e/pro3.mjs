@@ -29,14 +29,20 @@ export default async (p, shot) => {
   await shot('pro_7_wish');
   await p.click('#wish .x', { force: true });
   s = await wait('wish'); lap(s);
-  // 🌟 성장: K → 스킬 트리 한 칸
+  // 📜 첫 기술: K → 배울 수 있는 칸 → ✨ 배우기 → 닫고 5번 키
   await clearBanner();
   await p.keyboard.press('KeyK');
   await p.waitForTimeout(600);
-  await p.click('#growth .node.can');
+  await p.click('#skills .sk.can');
+  await p.click('#skills .detail .learn.primary');
   await p.waitForTimeout(400);
-  await shot('pro_growth');
-  await p.keyboard.press('KeyK');
+  await shot('pro_skill');
+  await clearBanner();
+  if (await E(p, () => document.querySelector('#skills')?.classList.contains('on'))) await p.keyboard.press('KeyK');
+  await E(p, () => { const W = window.__walk, b = W.hero().body, C = W.combat(); const [fx, fy] = [Math.sin(b.facing * Math.PI / 180), Math.cos(b.facing * Math.PI / 180)]; C.spawnCamp('pro:sk', b.x + fx * 4, b.y + fy * 4, b.z, 0.2, ['slime', 'slime']); });
+  await p.waitForTimeout(600);
+  for (let k = 0; k < 4 && (await info()).step === 'growth'; k++) { await p.keyboard.press('Digit5'); await p.waitForTimeout(1500); }
+  console.log('slots', JSON.stringify(await E(p, () => ({ slots: window.__walk.arsenal().slotsOf('traveler'), casts: window.__walk.arsenal().casts }))));
   s = await wait('growth'); lap(s);
   // 8) 수첩
   await clearBanner();
