@@ -33,6 +33,8 @@ export class Horde {
   private spawnT = 0;
   private restT = 0;
   kills = 0;
+  /** 넘긴 물결 수(모두 합쳐) */
+  clearedN = 0;
   best = 0;
   private downsSeen = 0;
   private readonly el: HTMLElement;
@@ -122,6 +124,7 @@ export class Horde {
 
   private cleared() {
     const w = this.wave;
+    this.clearedN++;
     if (w > this.best) { this.best = w; try { localStorage.setItem(KEY, JSON.stringify({ best: this.best })); } catch { /* 무시 */ } }
     const r = { wave: w, stars: 5 * w, ore: 1 + Math.floor(w / 2), books: 1 + Math.floor(w / 3), sp: w % 5 === 0 ? 1 : 0 };
     this.c.reward(r);

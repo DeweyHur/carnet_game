@@ -148,6 +148,8 @@ export class Body {
   }
   /** 내려찍기: 공중(글라이더 포함)에서 곧장 떨어져 땅을 친다 — 떨어져도 다치지 않는다 */
   plunging = false;
+  /** 공격 동작 빠르기(캐릭터) */
+  actSpeed = 1;
   plunge(): boolean {
     if ((this.mode !== 'air' && this.mode !== 'glide') || this.freefall) return false;
     this.mode = 'air'; this.parachute = false;
@@ -407,7 +409,7 @@ export class Body {
     const a = this.act;
     this.speed = 0;
     if (!a) { this.mode = 'ground'; return; }
-    a.t += dt;
+    a.t += dt * (COMBAT.has(a.kind) && a.kind !== 'charge' ? this.actSpeed : 1); // 캐릭터마다 공격 빠르기가 다르다
     if (a.kind === 'photo' && a.t - dt < 0.7 && a.t >= 0.7) this.events.push('shutter');
     if (a.kind === 'lie') { this.restT = 1; this.stamina = Math.min(this.maxStamina, this.stamina + dt * 0.8); } else this.rest(dt);
     this.phase += dt * (a.kind === 'dance' ? 7 : 3);

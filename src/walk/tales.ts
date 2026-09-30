@@ -90,6 +90,8 @@ export class Tales {
   private hintT = 0;
   private readonly el: HTMLElement;
   onChange?: () => void;
+  /** 첫걸음 동안은 한 줄을 숨긴다 */
+  hidden = false;
 
   constructor(c: TalesCtx) {
     this.c = c;
@@ -191,7 +193,7 @@ export class Tales {
     if (this.paintAcc > 0) return;
     this.paintAcc = 20;
     const s = this.current;
-    if (!s) { this.el.classList.remove('on'); return; }
+    if (!s || this.hidden) { this.el.classList.remove('on'); return; }
     const ok = this.ready(s);
     this.el.classList.add('on');
     this.el.classList.toggle('wait', !ok);

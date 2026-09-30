@@ -54,8 +54,10 @@ export interface GrowthMods {
   crit: number; critDmg: number; hp: number; def: number; steal: number;
   eCd: number; eRange: number; energy: number; counter: number;
   chargeCost: number; charge: number; finisher: number; second: boolean; tail: boolean;
+  /** 캐릭터: 원소 스킬을 쓰면 체력 회복(몫) · 원소 색 */
+  eHeal: number; tint: number;
 }
-export const NO_MODS: GrowthMods = { atk: 1, normal: 1, skill: 1, burst: 1, crit: 0, critDmg: 0, hp: 1, def: 0, steal: 0, eCd: 0, eRange: 0, energy: 1, counter: 0, chargeCost: 1, charge: 1, finisher: 1, second: false, tail: false };
+export const NO_MODS: GrowthMods = { atk: 1, normal: 1, skill: 1, burst: 1, crit: 0, critDmg: 0, hp: 1, def: 0, steal: 0, eCd: 0, eRange: 0, energy: 1, counter: 0, chargeCost: 1, charge: 1, finisher: 1, second: false, tail: false, eHeal: 0, tint: 0x9ff3e0 };
 
 interface Save { talents?: Partial<Record<Talent, number>>; ranks?: Record<string, number>; books?: number; bonusSp?: number }
 const KEY = 'carnet-growth-v1';
@@ -148,6 +150,7 @@ export class Growth {
       finisher: r('finisher') ? 1.5 : 1,
       second: r('second') > 0,
       tail: r('tail') > 0,
+      eHeal: 0, tint: 0x9ff3e0,
     };
   }
 }

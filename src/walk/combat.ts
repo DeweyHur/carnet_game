@@ -10,6 +10,8 @@ import type { Progress } from './progress';
 import * as sfx from './sound';
 import { weaponOf, type WeaponStats } from './gear';
 import { NO_MODS, type GrowthMods } from './growth';
+import { Moves } from './moves';
+import type { CharId } from './party';
 
 const FIGHT_ACTS = new Set<string>(['atk1', 'atk2', 'atk3', 'atk4', 'charge', 'skill', 'burst']);
 export interface CombatCtx {
@@ -39,6 +41,8 @@ export interface CombatCtx {
   loot?(kind: Kind): void;
   /** 성장(특성·스킬 트리·옷 강화)이 주는 것 */
   mods?(): GrowthMods;
+  /** 지금 캐릭터(싸움 모양이 다르다) */
+  who?(): CharId;
   /** 적을 쓰러뜨렸다(밤 습격이 센다) */
   killed?(kind: Kind, info: { hunter: boolean; elite: boolean; lv: number; x: number; y: number; z: number }): void;
 }
@@ -65,6 +69,7 @@ interface Foe {
   t: number; cd: number; flash: number; home: [number, number, number]; camp: Camp | null;
   dash?: [number, number]; slam?: THREE.Mesh; wander: number; bar: HTMLElement | null; seen: number;
   /** 밤 습격: 끝까지 쫓아온다 */ hunter?: boolean;
+  /** 기절(남은 초) */ stunT?: number;
   /** 맞아서 밀려나는 속도 · 움찔 · 쓰러질 때 도는 쪽 */ kbx?: number; kby?: number; hurtT?: number; spin?: number;
   /** 정예(크고 세다) */ elite?: boolean;
 }
@@ -109,6 +114,8 @@ export class Combat {
   kingProvoked = false;
   /** 쓰러진 횟수 */
   downs = 0;
+  /** 맞힌 회오리 베기 · 강공격 · 반격 수(첫걸음 연습) */
+  readonly tally = { atk4: 0, charge: 0, counter: 0 };
   // 화면
   private readonly ui: HTMLElement;
   private readonly hpBar: HTMLElement;
@@ -157,7 +164,27 @@ export class Combat {
     this.bossBar.innerHTML = '<b></b><span><i></i></span>';
     document.body.appendChild(this.bossBar);
     this.recalc(true);
+    this.moves = new Moves({
+      hero: c.hero, W: () => this.W, group: this.group,
+      foes: () => this.foes, big: (f) => big(f as Foe),
+      hit: (f, raw, how) => { if ((f as Foe).state !== 'dead') this.damage(f as Foe, raw, how); },
+      atk: () => this.atk,
+      ring: (x, y, z, col, r) => this.ring(x, y, z, col, r),
+      burst: (x, y, z, col) => this.burstWind(x, y, z, col),
+      float: (x, y, z, t, cls) => this.float(x, y, z, t, cls),
+      fx: (obj, life, step) => this.fx.push({ obj, t: 0, life, step }),
+      shake: (a) => this.hero.cam.shake(a),
+      stun: (f, secs) => { const q = f as Foe; if (big(q) || q.state === 'dead') return; q.stunT = Math.max(q.stunT ?? 0, secs); if (q.state === 'windup' || q.state === 'dash') { q.state = 'recover'; q.t = 0; } },
+      push: (f, dx, dy, v) => { const q = f as Foe; if (big(q)) return; const L = Math.hypot(dx, dy) || 1; q.kbx = (dx / L) * v; q.kby = (dy / L) * v; },
+      pull: (f, x, y, k) => { f.x += (x - f.x) * Math.min(1, k); f.y += (y - f.y) * Math.min(1, k); },
+      heal: (frac) => this.heal(frac),
+      energy: (n) => { this.energy = Math.min(this.energyMax, this.energy + n * this.energyK); },
+      iframes: (s2) => { this.iframes = Math.max(this.iframes, s2); },
+    });
   }
+  /** 캐릭터마다 다른 보통 공격 · E · Q */
+  private readonly moves: Moves;
+  private get who(): CharId { return this.c.who?.() ?? 'traveler'; }
 
   /** 적의 힘: 보통은 적 레벨로, 쥐왕은 고정 — 대신 모험 등급이 오를수록 덜 아프다(방어, 최대 절반) */
   private lvMul(f: Foe) { return (f.kind === 'ratking' ? 1 - Math.min(0.5, this.ar * 0.025) : 1 + 0.2 * (f.lv - 1)) * (f.elite ? 1.5 : 1); }
@@ -170,7 +197,7 @@ export class Combat {
   /** 화면에 보일 능력(옷장) */
   stats() { this.gm = this.c.mods?.() ?? NO_MODS; this.recalc(); const w = this.wep; return { atk: Math.round(this.atk), hp: this.maxHp, crit: Math.round((w.crit + this.gm.crit) * 100), critDmg: +(w.critDmg + this.gm.critDmg).toFixed(1), def: Math.round(this.gm.def * 100) }; }
   /** 모험 등급 × 무기 */
-  private get atk() { return (16 + this.ar * 3) * this.wep.atk * this.gm.atk * (this.tailT > 0 ? 1.2 : 1); }
+  private get atk() { return (16 + this.ar * 3) * this.wep.atk * this.gm.atk * (this.tailT > 0 ? 1.2 : 1) * (this.moves?.fireT > 0 ? 1.2 : 1); }
   /** 원소 에너지를 얻는 배율(무기 × 스킬 트리) */
   private get energyK() { return this.wep.energy * this.gm.energy; }
   private recalc(full = false) {
@@ -330,6 +357,7 @@ export class Combat {
     this.stepKing();
     for (const foe of this.foes.slice()) this.stepFoe(foe, dt);
     this.stepTornado(dt);
+    this.moves.update(dt);
     this.stepFx(dt);
     this.paintHud();
     this.paintMarks();
@@ -372,6 +400,7 @@ export class Combat {
   }
 
   private clearAll() {
+    this.moves?.clear();
     for (const f of this.foes) { this.drop(f.obj); f.bar?.remove(); if (f.slam) this.group.remove(f.slam); }
     this.foes = []; this.camps.clear(); this.boss = null; this.king = null;
     if (this.kingRing) this.kingRing.visible = false;
@@ -453,7 +482,8 @@ export class Combat {
     b.drawn = 4;
     sfx.glide();
     this.pending = { at: 0.22, kind: 'skill' };
-    this.ring(b.x, b.y, b.z + 0.4, 0x9ff3e0, 5.5 + this.gm.eRange);
+    if (this.who === 'traveler') this.ring(b.x, b.y, b.z + 0.4, this.gm.tint, 5.5 + this.gm.eRange);
+    if (this.gm.eHeal && this.hp < this.maxHp) { this.heal(this.gm.eHeal); this.float(b.x, b.y, b.z + 2.2, `+${Math.round(this.maxHp * this.gm.eHeal)}`, 'heal'); }
   }
 
   private burst() {
@@ -481,6 +511,19 @@ export class Combat {
   private strike(kind: CombatAct) {
     const b = this.hero.body;
     const [fx, fy] = [Math.sin((b.facing * Math.PI) / 180), Math.cos((b.facing * Math.PI) / 180)];
+    // 여행자가 아니면 그 사람의 싸움으로
+    if (this.who !== 'traveler') {
+      if (kind === 'skill' && this.moves.skill(this.who)) return;
+      if (kind === 'burst' && this.moves.burst(this.who)) { if (this.gm.tail) this.tailT = 6; return; }
+      if (kind === 'atk1' || kind === 'atk2' || kind === 'atk3' || kind === 'atk4') {
+        const n = this.moves.normal(this.who, kind);
+        if (n !== null) {
+          if (n) { this.energy = Math.min(this.energyMax, this.energy + 2 * n * this.energyK); if (kind === 'atk4') this.tally.atk4++; }
+          this.counterArmed = false;
+          return;
+        }
+      }
+    }
     if (kind === 'burst') {
       const obj = this.tornadoModel();
       const x = b.x + fx * 3, y = b.y + fy * 3;
@@ -507,7 +550,7 @@ export class Combat {
         n++;
       }
       this.energy = Math.min(this.energyMax, this.energy + (n * 6 + (n ? 4 : 0)) * this.energyK);
-      this.burstWind(b.x, b.y, b.z + 1, 0x9ff3e0);
+      this.burstWind(b.x, b.y, b.z + 1, this.gm.tint);
       return;
     }
     if (kind === 'charge') {
@@ -526,7 +569,7 @@ export class Combat {
         if (!big(f)) { f.lift = Math.max(f.lift, 0.3); f.vz = 3; }
         n++;
       }
-      if (n) { this.energy = Math.min(this.energyMax, this.energy + 4 * n * this.energyK); }
+      if (n) { this.energy = Math.min(this.energyMax, this.energy + 4 * n * this.energyK); this.tally.charge++; }
       this.counterArmed = false;
       return;
     }
@@ -543,7 +586,7 @@ export class Combat {
         this.damage(f, this.atk * 2.4 * this.gm.finisher, 'heavy');
         n++;
       }
-      if (n) { this.energy = Math.min(this.energyMax, this.energy + 3 * n * this.energyK); }
+      if (n) { this.energy = Math.min(this.energyMax, this.energy + 3 * n * this.energyK); this.tally.atk4++; }
       this.counterArmed = false;
       return;
     }
@@ -584,12 +627,15 @@ export class Combat {
     const w = this.wep;
     const counter = this.counterArmed && how !== 'burst';
     const g = this.gm;
-    const crit = counter || Math.random() < w.crit + g.crit;
+    const crit = counter || Math.random() < w.crit + g.crit + (this.moves.paintT > 0 ? 0.3 : 0);
+    const mark = this.moves.marks > 0 && how !== 'burst' ? 1.5 : 1;
+    if (mark > 1) this.moves.marks--;
     const talent = how === 'skill' ? g.skill : how === 'burst' ? g.burst : g.normal;
     // 스킬로 띄운 적은 공중 추가타 +25% · 이어 맞힌 수만큼 +5%씩(최대 +30%) · 반격 1.5배
     const juggle = f.lift > 0.2 && !big(f) && how !== 'skill' ? 1.25 : 1;
-    const dmg = Math.round(raw * talent * (0.9 + Math.random() * 0.2) * (crit ? w.critDmg + g.critDmg : 1) * juggle * this.hitMul * (counter ? 1.5 : 1));
+    const dmg = Math.round(raw * talent * mark * (0.9 + Math.random() * 0.2) * (crit ? w.critDmg + g.critDmg : 1) * juggle * this.hitMul * (counter ? 1.5 : 1));
     this.countHit();
+    if (counter) this.tally.counter++;
     this.juice(f, how, crit);
     if ((w.heal || g.steal) && (how === 'hit' || how === 'heavy')) this.hp = Math.min(this.maxHp, this.hp + this.maxHp * (w.heal + g.steal)); // 바게트·크루아상: 한 입
     f.hp -= dmg;
@@ -613,7 +659,7 @@ export class Combat {
     this.stop(how === 'burst' ? 0.03 : crit ? 0.09 : heavy ? 0.07 : 0.05, 0.05);
     this.hero.cam.shake(crit ? 0.13 : heavy ? 0.1 : how === 'burst' ? 0.04 : 0.055);
     const hz = f.z + (big(f) ? 2.4 : 0.8) + f.lift;
-    this.spark(f.x, f.y, hz, crit ? 0xffd166 : how === 'skill' || how === 'burst' ? 0x9ff3e0 : 0xffffff, crit);
+    this.spark(f.x, f.y, hz, crit ? 0xffd166 : how === 'skill' || how === 'burst' ? this.gm.tint : 0xffffff, crit);
     if (crit) this.flash();
     if (this.touch) navigator.vibrate?.(crit ? 28 : heavy ? 18 : 10);
     // 밀려나고 움찔한다(큰 녀석은 안 밀린다)
@@ -731,6 +777,7 @@ export class Combat {
       const k = camp.key;
       if (k.startsWith('dom:')) this.c.cleared(k); // 비경의 물결 — 알림은 비경이
       else if (k.startsWith('story:') || k.startsWith('tale:')) { sfx.questDone(); this.c.cleared(k); }
+      else if (k.startsWith('drill:')) { /* 첫걸음 연습 — 조용히 */ }
       else if (k.startsWith('pack:')) setTimeout(() => { sfx.questDone(); this.c.toast(`⚔️ ${camp.foes.some((q) => q.kind === 'rat') ? '🐀 쥐 떼를' : '요괴 무리를'} 쫓아냈다`); this.c.cleared(k); }, 500);
       else setTimeout(() => { sfx.questDone(); this.c.toast('⚔️ 적을 모두 물리쳤다 — 보물상자의 봉인이 풀렸다'); this.c.cleared(k); }, 600);
     }
@@ -788,6 +835,16 @@ export class Combat {
       if (!S.fly) w.collide(p, f.z, 0.45, 1.2, 0.6);
       f.x = p.x; f.y = p.y;
     };
+    if (f.stunT && f.stunT > 0) {
+      // 기절: 제자리에서 비틀거린다
+      f.stunT -= dt;
+      (f.obj.userData.body as THREE.Object3D).rotation.y = Math.sin(f.t * 14) * 0.25;
+      if (f.stunT <= 0) (f.obj.userData.body as THREE.Object3D).rotation.y = 0;
+      for (const m of f.mats) m.emissive.setHex(f.flash > 0 ? 0xffffff : 0x1c2a4a);
+      if (f.flash > 0) f.flash -= dt;
+      f.obj.position.set(f.x, f.y, f.z + f.lift);
+      return;
+    }
     switch (f.state) {
       case 'idle':
         if (f.hunter) { this.aggro(f); break; }
@@ -871,7 +928,7 @@ export class Combat {
   private hurt(dmg: number, from: Foe | null) {
     const b = this.hero.body;
     if (this.iframes > 0 || b.mode === 'roll' || this.downing) { if (b.mode === 'roll' && from) this.float(b.x, b.y, b.z + 2.2, '회피!', 'heal'); return; }
-    const d = Math.max(1, Math.round(dmg * (1 - this.gm.def)));
+    const d = Math.max(1, Math.round(dmg * (1 - this.gm.def) * (this.moves.shieldT > 0 ? 0.4 : 1)));
     this.hp -= d;
     // 두 번째 숨(스킬 트리): 90초에 한 번, 쓰러질 뻔하면 버틴다
     if (this.hp <= 0 && this.gm.second && this.clock - this.secondAt > 90) { this.secondAt = this.clock; this.hp = Math.round(this.maxHp * 0.3); this.iframes = 1.5; this.float(b.x, b.y, b.z + 2.6, '🔥 두 번째 숨!', 'heal'); }

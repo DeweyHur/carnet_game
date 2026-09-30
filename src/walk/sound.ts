@@ -545,3 +545,21 @@ export const skillBlast = () => { hiss(0.5, 0.9, 250, 2600); sweep(90, 260, 0, 0
 export const burstRoar = () => { hiss(1.1, 1, 180, 3200, 'bandpass'); sweep(60, 180, 0, 0.9, 0.2, 'sawtooth'); [392, 523, 659, 784].forEach((f, i) => tone(f, 0.1 + i * 0.08, 0.5, 0.05, 'triangle')); };
 /** 적의 공격을 끊었다 */
 export const parry = () => { tone(1480, 0, 0.12, 0.08, 'square'); tone(2217, 0.02, 0.2, 0.05, 'triangle'); };
+
+// ───────── 캐릭터마다 다른 소리 ─────────
+/** 물채찍: 휙 + 찰싹 */
+export const whip = () => { hiss(0.1, 0.6, 1500, 5200, 'bandpass'); sweep(1200, 400, 0.06, 0.06, 0.08, 'triangle'); hiss(0.08, 0.35, 2500, 900, 'bandpass', 0.07); };
+/** 불꽃: 화르륵 */
+export const fire = () => { hiss(0.45, 0.9, 400, 2200, 'bandpass'); hiss(0.3, 0.6, 1800, 300, 'lowpass', 0.12); sweep(110, 60, 0, 0.3, 0.2); };
+/** 액자 던지기: 휘잉 도는 소리 */
+export const throwFrame = () => { for (let i = 0; i < 3; i++) hiss(0.06, 0.4, 2200, 3600, 'bandpass', i * 0.05); tone(660, 0, 0.05, 0.03, 'square'); };
+/** 종: 단계마다 높아지는 종소리 */
+export const bell = (step = 0) => { const f = [523, 587, 659, 784, 392][Math.min(4, step)]; tone(f, 0, 1.2, 0.09, 'sine'); tone(f * 2.76, 0, 0.6, 0.03, 'sine'); tone(f * 5.4, 0, 0.25, 0.015, 'sine'); };
+/** 순간 이동(달그림자) */
+export const blink = () => { sweep(1800, 300, 0, 0.14, 0.06, 'sine'); hiss(0.12, 0.4, 6000, 2000, 'highpass'); };
+/** 리벳 방패: 쇠 울림 */
+export const shield = () => { tone(220, 0, 0.5, 0.12, 'square'); tone(330, 0.02, 0.4, 0.06, 'triangle'); hiss(0.2, 0.5, 3000, 1200, 'bandpass'); };
+/** 번쩍(액자 · 모나리자) */
+export const flash = () => { sweep(800, 2400, 0, 0.2, 0.06, 'triangle'); hiss(0.25, 0.4, 5000, 8000, 'highpass'); tone(1760, 0.1, 0.4, 0.04); };
+/** 별똥별이 떨어진다 */
+export const meteor = () => { sweep(2400, 200, 0, 0.3, 0.06, 'sine'); hiss(0.2, 0.7, 1500, 200, 'lowpass', 0.22); sweep(120, 40, 0.24, 0.25, 0.3); };

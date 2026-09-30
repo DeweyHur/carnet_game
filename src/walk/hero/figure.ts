@@ -32,6 +32,11 @@ type Pose = {
 const ZERO: Pose = { bob: 0, pitch: 0, lean: 0, twist: 0, side: 0, headX: 0, headY: 0, sLx: 0, sLy: 0, sRx: 0, sRy: 0, eL: 0, eR: 0, tL: 0, tR: 0, kL: 0, kR: 0, scarf: 0 };
 type Item = 'camera' | 'crepe' | 'coffee' | 'balloon' | 'flowers' | 'book' | 'coin' | 'umbrella';
 
+export type HairStyle = 'short' | 'bob' | 'ponytail' | 'bun' | 'long';
+export type Extra = '' | 'mustache' | 'glasses' | 'beard';
+export interface Look { skin: number; hair: number; style: HairStyle; eyes: number; height: number; accent: number; extra: Extra }
+export const DEFAULT_LOOK: Look = { skin: 0xf2c9a0, hair: 0x3b2a1e, style: 'short', eyes: 0x2d2016, height: 1, accent: 0xe0493a, extra: '' };
+
 export class Figure {
   readonly scene = new THREE.Scene();
   private readonly flip = new THREE.Group(); // 이 세계(x 동·y 북·z 위). 메르카토르로의 뒤집기는 레이어의 행렬이 한다.
@@ -163,6 +168,13 @@ export class Figure {
   }
 
   // 옷(장비) — 칸마다 갈아 끼우는 조각들
+  // 생김새(캐릭터 · 캐릭터 만들기) — 바꿔 칠할 수 있게 재질을 나눠 쓴다
+  private readonly skinM = this.mat(DEFAULT_LOOK.skin);
+  private readonly hairM = this.mat(DEFAULT_LOOK.hair);
+  private readonly eyeM = this.mat(DEFAULT_LOOK.eyes);
+  private readonly scarfM = this.mat(DEFAULT_LOOK.accent);
+  private readonly styles = new Map<string, THREE.Object3D>();
+  private readonly extras = new Map<string, THREE.Object3D>();
   private readonly topM = this.mat(0x2f6db5);
   private readonly topDM = this.mat(0x24558f);
   private readonly pantsM = this.mat(0xe9dcc0);
@@ -176,9 +188,12 @@ export class Figure {
   private gliderId = 'tricolore';
   private wingsAs = '';
   private gear: Loadout = { ...DEFAULT_LOADOUT };
+  /** 지금 캐릭터(싸움 모양 · 무기) */
+  style = 'traveler';
+  private charWeapon: string | null = null;
 
   private build() {
-    const SKIN = 0xf2c9a0, HAIR = 0x3b2a1e, SCARF = 0xe0493a, INK = 0x1d1a17;
+    const INK = 0x1d1a17;
     this.root.add(this.tilt);
     this.tilt.position.z = 0.92;
     // 골반·허리띠
@@ -195,7 +210,7 @@ export class Figure {
     this.tilt.add(this.spine);
     this.partM(new THREE.CapsuleGeometry(0.165, 0.26, 6, 16).rotateX(Math.PI / 2), this.topM, this.spine, 0, 0, 0.25).scale.set(1.1, 0.82, 1);
     this.partM(new THREE.CapsuleGeometry(0.085, 0.3, 4, 10).rotateY(Math.PI / 2), this.topM, this.spine, 0, -0.005, 0.43).scale.set(1, 0.95, 0.8); // 어깨
-    this.part(new THREE.CylinderGeometry(0.06, 0.07, 0.1, 12).rotateX(Math.PI / 2), SKIN, this.spine, 0, 0, 0.52, false); // 목
+    this.partM(new THREE.CylinderGeometry(0.06, 0.07, 0.1, 12).rotateX(Math.PI / 2), this.skinM, this.spine, 0, 0, 0.52, false); // 목
 
     // 윗옷마다 붙는 것
     const jacket = this.group(this.spine, this.tops, 'jacket');
@@ -225,10 +240,10 @@ export class Figure {
     this.part(new THREE.BoxGeometry(0.3, 0.02, 0.012), 0xc9ccd0, lea, 0, 0.135, 0.0, false);
 
     // 목도리(모두 두른다 — 이 여행자의 표시)
-    this.part(new THREE.TorusGeometry(0.105, 0.05, 8, 16), SCARF, this.spine, 0, 0, 0.49);
+    this.partM(new THREE.TorusGeometry(0.105, 0.05, 8, 16), this.scarfM, this.spine, 0, 0, 0.49);
     this.scarf.position.set(0.06, -0.1, 0.48);
     this.spine.add(this.scarf);
-    this.part(new THREE.BoxGeometry(0.07, 0.03, 0.3).translate(0, 0, -0.15), SCARF, this.scarf);
+    this.partM(new THREE.BoxGeometry(0.07, 0.03, 0.3).translate(0, 0, -0.15), this.scarfM, this.scarf);
     this.part(new THREE.BoxGeometry(0.075, 0.035, 0.03), 0xf4ead2, this.scarf, 0, 0, -0.29, false); // 술 장식
 
     // 가방
@@ -257,30 +272,51 @@ export class Figure {
     // 머리
     this.head.position.z = 0.56;
     this.spine.add(this.head);
-    this.part(new THREE.SphereGeometry(0.145, 22, 16), SKIN, this.head, 0, 0.005, 0.16).scale.set(1, 0.95, 1.05);
-    for (const sx of [-1, 1]) this.part(new THREE.SphereGeometry(0.034, 10, 8), SKIN, this.head, sx * 0.142, -0.005, 0.15).scale.set(0.55, 0.9, 1.2); // 귀
+    this.partM(new THREE.SphereGeometry(0.145, 22, 16), this.skinM, this.head, 0, 0.005, 0.16).scale.set(1, 0.95, 1.05);
+    for (const sx of [-1, 1]) this.partM(new THREE.SphereGeometry(0.034, 10, 8), this.skinM, this.head, sx * 0.142, -0.005, 0.15).scale.set(0.55, 0.9, 1.2); // 귀
     // 머리카락: 뒤통수 + 앞머리 + 구레나룻
-    this.part(new THREE.SphereGeometry(0.153, 20, 14, 0, TAU, 0, Math.PI * 0.6).rotateX(Math.PI / 2), HAIR, this.head, 0, -0.012, 0.172).rotation.x = 0.55;
+    this.partM(new THREE.SphereGeometry(0.153, 20, 14, 0, TAU, 0, Math.PI * 0.6).rotateX(Math.PI / 2), this.hairM, this.head, 0, -0.012, 0.172).rotation.x = 0.55;
     for (const [fx, fz, r] of [[-0.075, 0.245, 0.05], [-0.025, 0.26, 0.055], [0.03, 0.258, 0.052], [0.08, 0.24, 0.045]] as const) {
-      const f = this.part(new THREE.SphereGeometry(r, 10, 8), HAIR, this.head, fx, 0.095, fz, false);
+      const f = this.partM(new THREE.SphereGeometry(r, 10, 8), this.hairM, this.head, fx, 0.095, fz, false);
       f.scale.set(1, 0.7, 0.8);
     }
-    for (const sx of [-1, 1]) this.part(new THREE.BoxGeometry(0.02, 0.05, 0.08), HAIR, this.head, sx * 0.138, 0.04, 0.15, false);
+    for (const sx of [-1, 1]) this.partM(new THREE.BoxGeometry(0.02, 0.05, 0.08), this.hairM, this.head, sx * 0.138, 0.04, 0.15, false);
     // 맨머리일 때만: 바람에 날리는 앞머리 한 줌
     this.quiff = new THREE.Group();
     this.head.add(this.quiff);
-    this.part(new THREE.ConeGeometry(0.06, 0.16, 8).rotateX(-1.1), HAIR, this.quiff, 0.02, 0.05, 0.3);
-    this.part(new THREE.ConeGeometry(0.05, 0.14, 8).rotateX(-1.6), HAIR, this.quiff, -0.05, -0.02, 0.31);
+    this.partM(new THREE.ConeGeometry(0.06, 0.16, 8).rotateX(-1.1), this.hairM, this.quiff, 0.02, 0.05, 0.3);
+    this.partM(new THREE.ConeGeometry(0.05, 0.14, 8).rotateX(-1.6), this.hairM, this.quiff, -0.05, -0.02, 0.31);
+    // 머리 모양(짧게는 기본 그대로): 단발 · 포니테일 · 올림머리 · 긴 머리
+    const bob = this.group(this.head, this.styles, 'bob');
+    for (const sx of [-1, 1]) this.partM(new THREE.CapsuleGeometry(0.06, 0.12, 4, 10).rotateX(Math.PI / 2), this.hairM, bob, sx * 0.125, -0.03, 0.1).scale.set(0.8, 1.2, 1);
+    this.partM(new THREE.CapsuleGeometry(0.1, 0.1, 4, 12).rotateX(Math.PI / 2), this.hairM, bob, 0, -0.1, 0.1).scale.set(1.35, 0.7, 1);
+    const pony = this.group(this.head, this.styles, 'ponytail');
+    this.partM(new THREE.SphereGeometry(0.05, 10, 8), this.hairM, pony, 0, -0.15, 0.2);
+    this.partM(new THREE.CapsuleGeometry(0.045, 0.2, 4, 10).rotateX(Math.PI / 2 - 0.35), this.hairM, pony, 0, -0.19, 0.07);
+    const bun = this.group(this.head, this.styles, 'bun');
+    this.partM(new THREE.SphereGeometry(0.075, 12, 10), this.hairM, bun, 0, -0.09, 0.3);
+    const long = this.group(this.head, this.styles, 'long');
+    this.partM(new THREE.CapsuleGeometry(0.12, 0.2, 4, 12).rotateX(Math.PI / 2), this.hairM, long, 0, -0.08, 0.02).scale.set(1.2, 0.6, 1);
+    for (const sx of [-1, 1]) this.partM(new THREE.CapsuleGeometry(0.045, 0.16, 4, 8).rotateX(Math.PI / 2), this.hairM, long, sx * 0.13, 0, 0.05);
+    this.group(this.head, this.styles, 'short');
+    // 덧붙이는 것: 콧수염 · 둥근 안경 · 턱수염
+    const mus = this.group(this.head, this.extras, 'mustache');
+    for (const sx of [-1, 1]) this.partM(new THREE.CapsuleGeometry(0.014, 0.04, 3, 6).rotateY(Math.PI / 2 + sx * 0.3), this.hairM, mus, sx * 0.025, 0.145, 0.122, false);
+    const gl = this.group(this.head, this.extras, 'glasses');
+    for (const sx of [-1, 1]) this.part(new THREE.TorusGeometry(0.03, 0.006, 5, 14).rotateX(Math.PI / 2), 0x2a2a2a, gl, sx * 0.052, 0.155, 0.172, false);
+    this.part(new THREE.BoxGeometry(0.03, 0.006, 0.006), 0x2a2a2a, gl, 0, 0.158, 0.178, false);
+    const beard = this.group(this.head, this.extras, 'beard');
+    this.partM(new THREE.SphereGeometry(0.09, 12, 10), this.hairM, beard, 0, 0.09, 0.07).scale.set(1.05, 0.7, 0.8);
     // 얼굴: 흰자·눈동자·반짝임, 눈썹, 웃는 입, 볼
     for (const sx of [-1, 1]) {
       this.partM(new THREE.SphereGeometry(0.03, 12, 10), this.basic(0xfbf8f2), this.head, sx * 0.052, 0.122, 0.172, false).scale.set(1, 0.55, 1.2);
-      this.part(new THREE.SphereGeometry(0.02, 10, 8), 0x2d2016, this.head, sx * 0.05, 0.138, 0.17, false).scale.set(1, 0.6, 1.15);
+      this.partM(new THREE.SphereGeometry(0.02, 10, 8), this.eyeM, this.head, sx * 0.05, 0.138, 0.17, false).scale.set(1, 0.6, 1.15);
       this.partM(new THREE.SphereGeometry(0.0065, 6, 6), this.basic(0xffffff), this.head, sx * 0.05 + 0.007, 0.151, 0.18, false);
-      this.part(new THREE.BoxGeometry(0.048, 0.012, 0.012).rotateY(-sx * 0.18), HAIR, this.head, sx * 0.054, 0.13, 0.215, false);
+      this.partM(new THREE.BoxGeometry(0.048, 0.012, 0.012).rotateY(-sx * 0.18), this.hairM, this.head, sx * 0.054, 0.13, 0.215, false);
       const blush = this.partM(new THREE.SphereGeometry(0.02, 8, 6), new THREE.MeshBasicMaterial({ color: 0xf08f7d, transparent: true, opacity: 0.45, depthWrite: false }), this.head, sx * 0.088, 0.118, 0.125, false);
       blush.scale.set(1, 0.4, 0.6);
     }
-    this.part(new THREE.SphereGeometry(0.022, 8, 8), 0xf0b58c, this.head, 0, 0.148, 0.14, false); // 코
+    this.partM(new THREE.SphereGeometry(0.022, 8, 8), this.skinM, this.head, 0, 0.148, 0.14, false); // 코
     this.part(new THREE.TorusGeometry(0.024, 0.006, 4, 10, Math.PI).rotateZ(Math.PI).rotateX(Math.PI / 2), 0x8a3a2a, this.head, 0, 0.135, 0.108, false); // 입
 
     // 모자
@@ -318,8 +354,8 @@ export class Figure {
       sh.add(el);
       this.partM(this.limb(0.054, 0.17), this.topM, el);
       this.partM(new THREE.CylinderGeometry(0.06, 0.06, 0.04, 12).rotateX(Math.PI / 2), this.topDM, el, 0, 0, -0.22, false);
-      this.part(new THREE.SphereGeometry(0.056, 10, 8), SKIN, el, 0, 0.005, -0.27);
-      this.part(new THREE.SphereGeometry(0.022, 6, 6), SKIN, el, sx * -0.03, 0.04, -0.25, false); // 엄지
+      this.partM(new THREE.SphereGeometry(0.056, 10, 8), this.skinM, el, 0, 0.005, -0.27);
+      this.partM(new THREE.SphereGeometry(0.022, 6, 6), this.skinM, el, sx * -0.03, 0.04, -0.25, false); // 엄지
     }
     // 손에 드는 것들(오른손)
     this.handR.position.z = -0.29;
@@ -383,6 +419,32 @@ export class Figure {
     this.part(new THREE.BoxGeometry(0.28, 0.035, 0.04).translate(0, 0, -0.06), 0xd9b44a, jn, 0, 0.03, 0);
     this.part(along(0.02, 0.02, 0.14, 0.08, 6), 0x3b2616, jn, 0, 0.03, 0, false);
     this.part(new THREE.SphereGeometry(0.03, 8, 6), 0xd9b44a, jn, 0, 0.03, 0.09, false);
+    // 동료들의 무기(캐릭터마다 하나 — 옷장 무기 대신 보인다, 능력은 옷장 무기를 따른다)
+    const glow = (color: number, opacity = 0.75) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
+    const whip = this.group(wep, this.weapons, 'c:julie'); // 물채찍: 손잡이 + 물줄기
+    this.part(along(0.02, 0.02, 0.16, 0.06, 6), 0x2f5d8a, whip, 0, 0.03, 0, false);
+    for (let i = 0; i < 7; i++) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.045 - i * 0.004, 8, 6), glow(0x6fc3ff, 0.8 - i * 0.07)); m.position.set(Math.sin(i * 0.8) * 0.05, 0.03 + i * 0.012, -0.12 - i * 0.16); whip.add(m); }
+    const ham = this.group(wep, this.weapons, 'c:gustave'); // 리벳 망치
+    this.part(along(0.022, 0.022, 0.8, 0.1), 0x5b3a20, ham, 0, 0.03, 0, false);
+    this.part(new THREE.BoxGeometry(0.26, 0.16, 0.16).translate(0, 0, -0.75), 0x8a8f98, ham, 0, 0.03, 0);
+    for (const sx of [-1, 1]) this.part(new THREE.SphereGeometry(0.022, 6, 6), 0xd9b44a, ham, sx * 0.1, 0.12, -0.75, false);
+    const bay = this.group(wep, this.weapons, 'c:marcel'); // 총검 달린 옛 소총
+    this.part(new THREE.BoxGeometry(0.05, 0.07, 0.75).translate(0, 0, -0.25), 0x6b4423, bay, 0, 0.03, 0);
+    this.part(along(0.012, 0.012, 0.35, -0.55, 6), 0x3a3a3a, bay, 0, 0.05, 0, false);
+    this.part(new THREE.ConeGeometry(0.018, 0.3, 4).rotateX(-Math.PI / 2).translate(0, 0, -1.02), 0xe3e7ec, bay, 0, 0.05, 0, false);
+    const frame = this.group(wep, this.weapons, 'c:amelie'); // 금빛 액자
+    for (const [w, h, x, z] of [[0.36, 0.04, 0, -0.08], [0.36, 0.04, 0, -0.38], [0.04, 0.3, -0.16, -0.23], [0.04, 0.3, 0.16, -0.23]] as const) this.part(new THREE.BoxGeometry(w, 0.03, h), 0xe6c35a, frame, x, 0.05, z, false);
+    this.partM(new THREE.PlaneGeometry(0.28, 0.26).rotateX(Math.PI / 2).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x3f6e8f, side: THREE.DoubleSide }), frame, 0, 0.05, -0.23, false);
+    const bell = this.group(wep, this.weapons, 'c:quentin'); // 손종
+    this.part(along(0.018, 0.018, 0.2, 0.06, 6), 0x3b2616, bell, 0, 0.03, 0, false);
+    this.part(new THREE.CylinderGeometry(0.05, 0.13, 0.18, 16, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -0.2), 0xd9b44a, bell, 0, 0.03, 0);
+    const brush = this.group(wep, this.weapons, 'c:elodie'); // 큰 붓
+    this.part(along(0.014, 0.018, 0.7, 0.05), 0xe8d9b8, brush, 0, 0.03, 0, false);
+    this.part(new THREE.ConeGeometry(0.05, 0.2, 10).rotateX(-Math.PI / 2).translate(0, 0, -0.75), 0xff6fb0, brush, 0, 0.03, 0);
+    const moon = this.group(wep, this.weapons, 'c:lune'); // 초승달 칼
+    const cres = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.03, 6, 20, Math.PI).rotateY(Math.PI / 2).translate(0, 0, -0.35), new THREE.MeshToonMaterial({ color: 0xe9e4ff, emissive: 0x3a2a80 }));
+    cres.position.y = 0.03; moon.add(cres); cres.add(new THREE.Mesh(cres.geometry, this.outline));
+    this.part(along(0.016, 0.016, 0.12, 0.06, 6), 0x3a2a60, moon, 0, 0.03, 0, false);
     const coin = item('coin', new THREE.Group());
     this.part(new THREE.CylinderGeometry(0.025, 0.025, 0.006, 12), 0xd9b44a, coin, 0, 0.03, 0, false);
     // 겨드랑이에 낀 바게트(왼쪽)
@@ -438,13 +500,39 @@ export class Figure {
     this.root.add(this.glider);
     void INK;
     this.setGear(this.gear);
+    this.setLook(DEFAULT_LOOK);
+  }
+
+  /** 캐릭터의 옷 색(윗옷 · 옷자락 · 바지) — setGear 뒤에 덮어쓴다 */
+  setOutfit(c: [number, number, number] | null) {
+    if (!c) return;
+    this.topM.color.setHex(c[0]); this.topDM.color.setHex(c[1]); this.pantsM.color.setHex(c[2]);
+    if (this.topM.map) { this.topM.map = null; this.topM.needsUpdate = true; }
+  }
+
+  /** 캐릭터: 싸움 자세와 무기가 달라진다 */
+  setStyle(id: string) {
+    this.style = id;
+    this.charWeapon = id === 'traveler' ? null : `c:${id}`;
+    for (const [k, o] of this.weapons) o.visible = k === (this.charWeapon ?? this.gear.weapon ?? 'umbrella');
+  }
+
+  /** 생김새(피부 · 머리색 · 머리 모양 · 눈 · 키 · 목도리 색 · 덧붙이는 것) */
+  setLook(l: Look) {
+    this.skinM.color.setHex(l.skin);
+    this.hairM.color.setHex(l.hair);
+    this.eyeM.color.setHex(l.eyes);
+    this.scarfM.color.setHex(l.accent);
+    for (const [k, o] of this.styles) o.visible = k === l.style;
+    for (const [k, o] of this.extras) o.visible = k === l.extra;
+    this.root.scale.setScalar(l.height);
   }
 
   /** 입은 장비대로 겉모습을 바꾼다 */
   setGear(l: Loadout) {
     this.gear = { ...l };
     const pick = (set: Map<string, THREE.Object3D>, id: string) => { for (const [k, o] of set) o.visible = k === id; };
-    pick(this.weapons, l.weapon ?? 'umbrella');
+    pick(this.weapons, this.charWeapon ?? l.weapon ?? 'umbrella');
     pick(this.hats, l.head);
     this.quiff.visible = l.head === 'none';
     pick(this.tops, l.top);
@@ -497,6 +585,48 @@ export class Figure {
       m.color.setHex(col);
       m.emissive.setHex(em);
     });
+  }
+
+  /** 동료들의 싸움 자세(여행자의 우산 검술 위에 덮어쓴다) */
+  private stylePose(act: string, at: number, want: Pose) {
+    const q = (a: number, b: number) => Math.min(1, Math.max(0, (at - a) / (b - a)));
+    const alt = act === 'atk2' ? -1 : 1;
+    switch (this.style) {
+      case 'julie': // 물채찍: 팔을 높이 들어 옆으로 휘갈긴다, 넷째는 앞으로 쭉
+        if (act === 'atk4') Object.assign(want, { sRx: 1.6, sRy: 0, eR: 0.05, lean: 0.35, tL: 0.6, kL: -0.4, twist: 0 });
+        else if (act === 'atk3') Object.assign(want, { sRx: 3.0 - 2.3 * q(0.05, 0.25), sRy: -0.2, eR: 0.3, lean: 0.25 * q(0.05, 0.25), twist: 0 });
+        else if (act.startsWith('atk')) Object.assign(want, { sRx: 2.2, sRy: alt * (1.3 - 2.6 * q(0, 0.18)), eR: 0.5, twist: alt * (-0.5 + q(0, 0.18)), lean: 0.12, sLx: 0.5, eL: 1.0 });
+        else if (act === 'skill') Object.assign(want, { sLx: 2.4, sRx: 2.4, sLy: 0.9, sRy: -0.9, eL: 0.3, eR: 0.3, bob: 0.1 * Math.sin(at * 10) });
+        break;
+      case 'gustave': { // 망치: 두 손으로 크게 들었다 내리친다, 넷째는 뛰어올라 쾅
+        const k = q(0.1, 0.32);
+        if (act.startsWith('atk')) Object.assign(want, { sRx: 2.9 - 2.0 * k, sLx: 2.9 - 2.0 * k, sRy: -0.15, sLy: 0.15, eR: 0.2, eL: 0.2, lean: -0.1 + 0.55 * k, twist: 0, tL: 0.5 * k, kL: -0.6 * k, bob: act === 'atk4' ? 0.35 * Math.sin(Math.min(1, at / 0.35) * Math.PI) - 0.15 * k : -0.12 * k });
+        else if (act === 'skill') Object.assign(want, { sLx: 1.4, sRx: 1.4, sLy: -0.6, sRy: 0.6, eL: 1.2, eR: 1.2, tL: 0.6, tR: 0.6, kL: -1.0, kR: -1.0, bob: -0.25, lean: 0.2 });
+        break;
+      }
+      case 'marcel': // 총검: 뒤로 당겼다가 쭉 찌른다(발을 번갈아)
+        if (act.startsWith('atk')) { const k = q(0.02, 0.12); Object.assign(want, { sRx: 0.6 + 1.0 * k, sRy: 0.1, eR: 1.6 - 1.58 * k, sLx: 1.2, sLy: 0.5, eL: 1.0, lean: 0.1 + (act === 'atk4' ? 0.5 : 0.35) * k, twist: -0.3 + 0.3 * k, tL: alt > 0 ? 0.7 * k : -0.3, kL: alt > 0 ? -0.4 : -0.1, tR: alt > 0 ? -0.3 : 0.7 * k, kR: alt > 0 ? -0.1 : -0.4 }); }
+        else if (act === 'skill') Object.assign(want, { sRx: 1.58, eR: 0.02, sLx: 0.9, eL: 0.9, lean: 0.6, tL: 0.9, kL: -0.5, tR: -0.5, bob: -0.1 });
+        break;
+      case 'amelie': // 던지기: 팔을 뒤로 젖혔다 앞으로, 넷째는 두 팔로 부채
+        if (act === 'atk4') Object.assign(want, { sLx: 1.5, sRx: 1.5, sLy: 1.2 - 1.2 * q(0, 0.2), sRy: -1.2 + 1.2 * q(0, 0.2), eL: 0.2, eR: 0.2, lean: 0.2 });
+        else if (act.startsWith('atk')) { const k = q(0, 0.16); Object.assign(want, { sRx: 2.7 - 1.5 * k, sRy: -0.5 + 0.3 * k, eR: 1.3 - 1.1 * k, twist: 0.6 - 1.0 * k, lean: -0.1 + 0.35 * k, sLx: 1.0, sLy: 0.6, eL: 0.4, tL: 0.4 * k, kL: -0.3 }); }
+        else if (act === 'skill') Object.assign(want, { sRx: 1.6, sLx: 1.6, sRy: -0.3, sLy: 0.3, eR: 0.1, eL: 0.1, headX: 0.1 });
+        break;
+      case 'quentin': // 종: 들어 올려 흔든다, 넷째는 두 손으로 크게
+        if (act === 'atk4') Object.assign(want, { sRx: 2.9 - 1.5 * q(0.1, 0.3), sLx: 2.9 - 1.5 * q(0.1, 0.3), eR: 0.2, eL: 0.2, bob: -0.15 * q(0.1, 0.3), lean: 0.1 });
+        else if (act.startsWith('atk')) Object.assign(want, { sRx: 2.4 + 0.35 * Math.sin(at * 45), sRy: -0.3, eR: 0.5, sLx: 0.4, sLy: 0.4, eL: 0.8, lean: -0.05, headX: 0.15 });
+        else if (act === 'skill') Object.assign(want, { sRx: 1.2, eR: 0.3, lean: 0.3, tL: 0.4, kL: -0.4 });
+        break;
+      case 'elodie': // 붓: 손목으로 빠르게 휘날린다
+        if (act.startsWith('atk') && act !== 'atk4') Object.assign(want, { sRx: 1.35, sRy: Math.sin(at * 26) * 1.3 * alt, eR: 0.6 + 0.3 * Math.sin(at * 30), twist: Math.sin(at * 26) * 0.45, lean: 0.15, sLx: 0.6, sLy: 0.9, eL: 0.9, headX: -0.1 });
+        else if (act === 'skill' || act === 'burst') Object.assign(want, { sRx: 2.6, sLx: 2.6, sRy: -0.8 + Math.sin(at * 20) * 0.5, sLy: 0.8 - Math.sin(at * 20) * 0.5, eR: 0.4, eL: 0.4, bob: 0.06 * Math.sin(at * 14) });
+        break;
+      case 'lune': // 달그림자: 낮게 웅크려 베어 든다
+        if (act.startsWith('atk')) Object.assign(want, { sRx: 1.3, sRy: alt * (-1.3 + 2.4 * q(0, 0.14)), eR: 0.1, twist: alt * (-0.6 + 1.1 * q(0, 0.14)), lean: 0.55, bob: -0.2, tL: 0.85, kL: -1.1, tR: -0.3, kR: -0.3, sLx: -0.4, sLy: 0.9, eL: 0.2, headX: -0.3 });
+        else if (act === 'skill') Object.assign(want, { lean: 0.7, bob: -0.3, tL: 1.0, kL: -1.2, tR: -0.5, sRx: -0.5, sLx: -0.5, eR: 0.2, eL: 0.2 });
+        break;
+    }
   }
 
   /** 몸 상태를 받아 자세를 잡는다. groundZ는 발밑(그림자 자리). */
@@ -586,6 +716,7 @@ export class Figure {
           case 'skill': Object.assign(want, { sLx: 1.5, sRx: 1.5, sLy: 1.35, sRy: -1.35, eL: 0.1, eR: 0.1, lean: 0.05, bob: 0.08 * Math.sin(at * 12), scarf: 2 }); break;
           case 'burst': if (at < 0.45) Object.assign(want, { sLx: 2.9, sRx: 2.9, sLy: 0.35, sRy: -0.35, eL: 0.1, eR: 0.1, lean: -0.25, headX: 0.4, bob: 0.05, scarf: 1.8 }); else Object.assign(want, { sLx: 1.55, sRx: 1.55, sLy: -0.2, sRy: 0.2, eL: 0.05, eR: 0.05, lean: 0.3, tL: 0.7, kL: -0.7, tR: -0.3, bob: -0.12, scarf: 2.2 }); break;
         }
+        if (this.style !== 'traveler' && act && ['atk1', 'atk2', 'atk3', 'atk4', 'skill', 'burst'].includes(act)) this.stylePose(act, at, want);
         break;
       }
       case 'air': {
@@ -676,7 +807,7 @@ export class Figure {
     const p = this.pose;
     for (const key of Object.keys(p) as (keyof Pose)[]) p[key] += (want[key] - p[key]) * k;
     this.root.position.set(0, 0, p.bob);
-    this.root.rotation.z = (-b.facing * Math.PI) / 180 - (act === 'skill' ? (b.act?.t ?? 0) * 17 : act === 'atk4' ? Math.min(1, (b.act?.t ?? 0) / 0.34) * Math.PI * 2 : 0) - (b.mode === 'ascend' && b.asc ? Math.max(0, b.asc.t - 0.5) * 5 : 0); // 스킬: 제자리 두 바퀴 반 · 상승: 천천히 돈다
+    this.root.rotation.z = (-b.facing * Math.PI) / 180 - (act === 'skill' && this.style === 'traveler' ? (b.act?.t ?? 0) * 17 : act === 'atk4' && (this.style === 'traveler' || this.style === 'elodie') ? Math.min(1, (b.act?.t ?? 0) / 0.34) * Math.PI * 2 : act === 'atk4' && this.style === 'lune' ? Math.min(1, (b.act?.t ?? 0) / 0.2) * Math.PI : 0) - (b.mode === 'ascend' && b.asc ? Math.max(0, b.asc.t - 0.5) * 5 : 0); // 스킬: 제자리 두 바퀴 반 · 상승: 천천히 돈다
     // 상승 기운
     this.aura.visible = b.mode === 'ascend';
     if (this.aura.visible) {
