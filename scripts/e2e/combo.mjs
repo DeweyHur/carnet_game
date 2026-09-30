@@ -3,6 +3,8 @@ import { E } from './common.mjs';
 // swiftshader는 느려서 벽시계 대신 게임 상태(동작 진행 t)를 보고 누른다
 export default async (p, shot) => {
   await E(p, () => window.__bot.stopRender());
+  await p.waitForSelector('#creator.on', { timeout: 20000 }).catch(() => null);
+  if (await E(p, () => document.querySelector('#creator')?.classList.contains('on'))) await p.click('#creator .ok');
   await E(p, () => {
     const W = window.__walk; W.prologue().finish(true);
     window.__floats = []; const lay = document.querySelector('.cbt-layer'); new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.classList?.contains('cbt-num')) window.__floats.push(n.textContent); }).observe(lay, { childList: true });
