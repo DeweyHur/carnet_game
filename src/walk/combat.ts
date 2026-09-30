@@ -12,6 +12,7 @@ import { weaponOf, type WeaponStats } from './gear';
 import { NO_MODS, type GrowthMods } from './growth';
 import { Moves, type MoveApi, type FoeLike } from './moves';
 import { AFFIX, AFFIX_POOL, AURA, CHAR_ELEM, ELEM, react, type Affix, type Elem, type Reaction } from './elements';
+import { arcGeo, buildFoe, glowTex, shockTex, slashTex } from './foemodels';
 import type { CharId } from './party';
 
 const FIGHT_ACTS = new Set<string>(['atk1', 'atk2', 'atk3', 'atk4', 'charge', 'skill', 'burst']);
@@ -266,67 +267,7 @@ export class Combat {
     return f;
   }
 
-  private model(kind: Kind): { obj: THREE.Group; mats: THREE.MeshToonMaterial[] } {
-    const g = new THREE.Group(), body = new THREE.Group();
-    g.add(body);
-    g.userData.body = body;
-    const mats: THREE.MeshToonMaterial[] = [];
-    const M = (color: number, extra: Partial<THREE.MeshToonMaterialParameters> = {}) => { const m = new THREE.MeshToonMaterial({ color, ...extra }); mats.push(m); return m; };
-    const eye = new THREE.MeshBasicMaterial({ color: kind === 'slime' ? 0x10202c : 0xff3b2f });
-    if (kind === 'slime') {
-      const gel = new THREE.Mesh(new THREE.SphereGeometry(0.55, 18, 14).scale(1, 1, 0.8).translate(0, 0, 0.45), M(0x9fc9ea, { transparent: true, opacity: 0.88 }));
-      const core = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8).translate(0, -0.05, 0.45), M(0xe8f6ff, { emissive: 0x335577 }));
-      body.add(gel, core);
-      for (const sx of [-1, 1]) body.add(new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6).translate(sx * 0.17, 0.46, 0.55), eye));
-      const wisp = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 8).rotateX(Math.PI / 2).translate(0, 0, 0.95), M(0xcfe6f7, { transparent: true, opacity: 0.7 }));
-      body.add(wisp);
-    } else if (kind === 'rat' || kind === 'ratking') {
-      const king = kind === 'ratking';
-      const fur = M(king ? 0x3a322d : 0x6e6258), pink = M(0xe8a7a0), steel = M(king ? 0xe6c35a : 0xc9ccd0), red = M(0xb3262c);
-      body.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.45, 4, 10).rotateX(Math.PI / 2).translate(0, 0, 0.62), fur));
-      const head = new THREE.Group(); head.position.set(0, 0.12, 1.12); body.add(head);
-      head.add(new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), fur));
-      head.add(new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 10).rotateX(-Math.PI / 2).translate(0, 0.26, -0.03), fur));
-      head.add(new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6).translate(0, 0.39, -0.03), pink));
-      for (const sx of [-1, 1]) { head.add(new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6).scale(1, 0.4, 1).translate(sx * 0.15, -0.02, 0.17), pink)); head.add(new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 6).translate(sx * 0.08, 0.17, 0.06), eye)); }
-      head.add(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.19, 0.05, 14).rotateX(Math.PI / 2).translate(0.03, -0.02, 0.2), red)); // 베레모
-      body.add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.01, 0.8, 5).rotateX(-0.9).translate(0, -0.45, 0.3), pink)); // 꼬리
-      const arm = new THREE.Group(); arm.position.set(0.3, 0.05, 0.8); body.add(arm);
-      arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.75).translate(0, 0.12, -0.25).rotateX(-1.1), steel)); // 칼
-      body.userData.arm = arm;
-      for (const sx of [-1, 1]) body.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.3, 3, 6).rotateX(Math.PI / 2).translate(sx * 0.13, 0, 0.2), fur));
-      if (king) {
-        // 쥐왕: 세 배 덩치, 금관, 붉은 망토, 빛나는 눈
-        const gold = M(0xe6b422, { emissive: 0x3a2a00 });
-        for (let i = 0; i < 6; i++) { const a = (i / 6) * TAU; head.add(new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.12, 5).rotateX(Math.PI / 2).translate(Math.cos(a) * 0.13, Math.sin(a) * 0.13, 0.33), gold)); }
-        head.add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.06, 14, 1, true).rotateX(Math.PI / 2).translate(0, 0, 0.27), gold));
-        const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.9).rotateX(Math.PI / 2 - 0.25).translate(0, -0.3, 0.65), M(0x8e1a22, { side: THREE.DoubleSide }));
-        body.add(cape);
-        body.scale.setScalar(3.1);
-      }
-    } else {
-      const big = kind === 'boss' ? 3.2 : 1;
-      const stone = M(kind === 'boss' ? 0x5c5f66 : 0x8a8d93), dark = M(kind === 'boss' ? 0x3b3d42 : 0x6c6f75);
-      const inner = new THREE.Group(); inner.scale.setScalar(big); body.add(inner);
-      inner.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.4, 4, 10).rotateX(Math.PI / 2).translate(0, 0, 0.5), stone));
-      const head = new THREE.Group(); head.position.set(0, 0.1, 0.98); inner.add(head);
-      head.add(new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8).scale(1, 1.2, 0.9), stone));
-      head.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.1).translate(0, 0.2, -0.08), dark)); // 주둥이
-      for (const sx of [-1, 1]) { head.add(new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 6).rotateY(sx * 0.4).translate(sx * 0.12, -0.02, 0.22), dark)); head.add(new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6).translate(sx * 0.08, 0.22, 0.04), eye)); }
-      const wings: THREE.Object3D[] = [];
-      for (const sx of [-1, 1]) {
-        const w = new THREE.Group(); w.position.set(sx * 0.2, -0.1, 0.72); inner.add(w);
-        const shape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0.9, 0.35), new THREE.Vector2(0.75, -0.1), new THREE.Vector2(0.55, 0.05), new THREE.Vector2(0.35, -0.2)]);
-        const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape).rotateX(Math.PI / 2).scale(sx, 1, 1), new THREE.MeshToonMaterial({ color: kind === 'boss' ? 0x46494f : 0x74777d, side: THREE.DoubleSide }));
-        mats.push(mesh.material as THREE.MeshToonMaterial);
-        w.add(mesh);
-        wings.push(w);
-      }
-      g.userData.wings = wings;
-      for (const sx of [-1, 1]) inner.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.25, 3, 6).rotateX(Math.PI / 2).translate(sx * 0.14, 0.05, 0.12), dark));
-    }
-    return { obj: g, mats };
-  }
+  private model(kind: Kind): { obj: THREE.Group; mats: THREE.MeshToonMaterial[] } { return buildFoe(kind); }
 
   // ───────── 매 프레임 ─────────
   update(dt: number, f: InputFrame | null, live: boolean) {
@@ -789,7 +730,7 @@ export class Combat {
     for (let i = 0; i < N; i++) { pos.set([x, y, z], i * 3); const a = Math.random() * TAU, s = 4 + Math.random() * 5; vel.set([Math.cos(a) * s, Math.sin(a) * s, 1 + Math.random() * 4], i * 3); }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color, size: 0.14, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ map: glowTex(), color, size: 0.3, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     pts.frustumCulled = false;
     this.group.add(pts);
     this.fx.push({ obj: pts, t: 0, life: 0.3, step: (o, t, dt) => { const a = (o as THREE.Points).geometry.attributes.position as THREE.BufferAttribute; for (let i = 0; i < a.count; i++) { vel[i * 3 + 2] -= 14 * dt; a.setXYZ(i, a.getX(i) + vel[i * 3] * dt, a.getY(i) + vel[i * 3 + 1] * dt, a.getZ(i) + vel[i * 3 + 2] * dt); } a.needsUpdate = true; ((o as THREE.Points).material as THREE.PointsMaterial).opacity = 1 - t / 0.3; } });
@@ -986,7 +927,7 @@ export class Combat {
     // 몸짓
     const wind = f.state === 'windup' ? Math.min(1, f.t / S.windup) : 0;
     if (f.kind === 'slime') { body.rotation.x = 0; const hop = f.state === 'chase' || f.state === 'return' ? Math.abs(Math.sin(f.t * 7)) : 0.3 * Math.abs(Math.sin(f.t * 2)); body.position.z = hop * 0.35 + wind * 0.2; body.scale.set(1 + wind * 0.25, 1 + wind * 0.25, 1 - wind * 0.35 + hop * 0.1); }
-    else if (f.kind === 'rat' || f.kind === 'ratking') { const arm = body.userData.arm as THREE.Object3D; arm.rotation.x = f.state === 'windup' ? -1.4 * wind : f.state === 'recover' ? 1.2 : Math.sin(f.t * 8) * 0.2; body.rotation.x = f.state === 'chase' ? 0.15 : 0; body.position.z = f.state === 'chase' ? Math.abs(Math.sin(f.t * 10)) * 0.08 : 0; }
+    else if (f.kind === 'rat' || f.kind === 'ratking') { const arm = body.userData.arm as THREE.Object3D; arm.rotation.x = f.state === 'windup' ? 1.5 * wind : f.state === 'recover' ? -0.9 : 0.25 + Math.sin(f.t * 8) * 0.15; body.rotation.x = f.state === 'chase' ? 0.15 : 0; body.position.z = f.state === 'chase' ? Math.abs(Math.sin(f.t * 10)) * 0.08 : 0; }
     else { const wings = f.obj.userData.wings as THREE.Object3D[]; const fl = Math.sin(f.t * (f.state === 'dash' ? 20 : 8)) * 0.6; wings[0].rotation.y = fl; wings[1].rotation.y = -fl; body.rotation.x = f.state === 'windup' ? -0.5 * wind : f.state === 'dash' ? 0.7 : 0; }
     if (f.slowT && f.slowT > 0) f.slowT -= dt;
     if (f.auraT && f.auraT > 0) { f.auraT -= dt; if (f.auraT <= 0) f.aura = undefined; }
@@ -1161,26 +1102,31 @@ export class Combat {
 
   // ───────── 효과 ─────────
   private swing(x: number, y: number, z: number, facing: number, heavy: boolean, back = false) {
-    const a0 = ((90 - facing) * Math.PI) / 180;
-    const geo = new THREE.RingGeometry(1.2, heavy ? 3 : 2.6, 24, 1, a0 - 0.75, 1.5);
-    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: heavy ? 0xfff2b0 : 0xe8f6ff, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    // 손으로 그린 베기 궤적: 휘두르는 방향으로 짙어지고 꼬리는 사라진다(원소 색 + 흰 날)
+    const a0 = ((90 - facing) * Math.PI) / 180, len = heavy ? 2.4 : 1.9;
+    const dir = back ? -1 : 1;
+    const geo = arcGeo(heavy ? 0.9 : 1.1, heavy ? 3.2 : 2.7, dir > 0 ? a0 + len / 2 : a0 - len / 2, -dir * len);
+    const col = heavy ? 0xffe7a0 : ELEM[CHAR_ELEM[this.who] ?? 'wind'].color;
+    const mk = (c: number, o: number) => new THREE.MeshBasicMaterial({ map: slashTex(), color: c, transparent: true, opacity: o, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+    const m = new THREE.Mesh(geo, mk(col, 1));
+    m.add(new THREE.Mesh(geo, mk(0xffffff, 0.55)).translateZ(0.02));
     m.position.set(x, y, z);
     m.rotation.x = heavy ? 0.35 : back ? -0.28 : 0.18; // 되베기는 반대로 기울어진 호
     this.group.add(m);
-    this.fx.push({ obj: m, t: 0, life: 0.2, step: (o, t) => { o.scale.setScalar(1 + t * 1.2); ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - t / 0.2); } });
+    this.fx.push({ obj: m, t: 0, life: 0.22, step: (o, t) => { o.scale.setScalar(1 + t * 0.9); o.rotation.z = dir * -t * 1.6; const k = 1 - t / 0.22; ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = k; (((o.children[0] as THREE.Mesh).material) as THREE.MeshBasicMaterial).opacity = 0.55 * k; } });
   }
   private ring(x: number, y: number, z: number, color: number, r: number) {
-    const m = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 40), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: shockTex(), color, transparent: true, opacity: 1, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
     m.position.set(x, y, z);
     this.group.add(m);
-    this.fx.push({ obj: m, t: 0, life: 0.45, step: (o, t) => { o.scale.setScalar(1 + (r - 1) * (t / 0.45)); ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.8 * (1 - t / 0.45); } });
+    this.fx.push({ obj: m, t: 0, life: 0.45, step: (o, t) => { const k = t / 0.45; o.scale.setScalar(1 + (r - 1) * (1 - (1 - k) * (1 - k))); ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 1 - k; } });
   }
   private burstWind(x: number, y: number, z: number, color: number) {
     const N = 40, pos = new Float32Array(N * 3), vel = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) { pos.set([x, y, z], i * 3); const a = Math.random() * TAU, s = 2 + Math.random() * 3; vel.set([Math.cos(a) * s, Math.sin(a) * s, 1 + Math.random() * 3], i * 3); }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color, size: 0.25, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ map: glowTex(), color, size: 0.5, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     pts.frustumCulled = false;
     this.group.add(pts);
     this.fx.push({ obj: pts, t: 0, life: 0.9, step: (o, t, dt) => { const a = (o as THREE.Points).geometry.attributes.position as THREE.BufferAttribute; for (let i = 0; i < a.count; i++) { vel[i * 3 + 2] -= 6 * dt; a.setXYZ(i, a.getX(i) + vel[i * 3] * dt, a.getY(i) + vel[i * 3 + 1] * dt, a.getZ(i) + vel[i * 3 + 2] * dt); } a.needsUpdate = true; ((o as THREE.Points).material as THREE.PointsMaterial).opacity = 1 - t / 0.9; } });

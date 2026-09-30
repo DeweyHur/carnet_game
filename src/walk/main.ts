@@ -30,6 +30,7 @@ import { Party, CHARS, type CharId } from './party';
 import { Creator, PartyPanel } from './partyui';
 import { SPEED } from './moves';
 import { Arsenal } from './skills';
+import { iconImg } from './icons';
 import { SkillPanel } from './skillui';
 import { GrowthPanel } from './growthui';
 import { Horde } from './horde';
@@ -753,7 +754,7 @@ function setupAdventure() {
     hint: (s2) => hint(s2),
     learned: (d, first) => {
       sfx.questDone();
-      if (first && d.eff) setTimeout(() => banner.unlock(d.emoji, `새 기술 · ${d.name}`, `${d.desc} — ${arsenal.slotsOf(d.char).indexOf(d.id) >= 0 ? `${arsenal.slotsOf(d.char).indexOf(d.id) + 5}번 키(아래 칸)로 쓴다` : '📜 기술 창에서 5~8 칸에 올리자'} · 🔷 마나 ${arsenal.cost(d)}`), 200);
+      if (first && d.eff) setTimeout(() => banner.unlock(iconImg(d, 96), `새 기술 · ${d.name}`, `${d.desc} — ${arsenal.slotsOf(d.char).indexOf(d.id) >= 0 ? `${arsenal.slotsOf(d.char).indexOf(d.id) + 5}번 키(아래 칸)로 쓴다` : '📜 기술 창에서 5~8 칸에 올리자'} · 🔷 마나 ${arsenal.cost(d)}`), 200);
       else feed.push(d.emoji, `${d.name} Lv.${arsenal.lv(d.id)}`, 'gold');
       applyChar();
     },

@@ -2,6 +2,7 @@
 // 왼쪽: 세 갈래(열)에 네 단계(행) — 다이아몬드 칸이 금속 테를 두르고, 배운 칸 사이 줄에 빛이 흐른다.
 // 오른쪽: 마우스를 올린(또는 누른) 기술의 카드 — 지금 · 다음 레벨 숫자, 시너지, "배우기", 5~8 칸 소켓.
 // 두 번 누르면 바로 배운다. 기술을 고른 채로 5 · 6 · 7 · 8을 누르면 그 칸에 올린다.
+import { iconImg } from './icons';
 import { AWAKE, MAX_LV, TIER_AR, TREES, skillOf, skillsOf, type Arsenal, type SkillDef } from './skills';
 import type { CharId } from './party';
 
@@ -71,7 +72,7 @@ export class SkillPanel {
     const box = this.el.querySelector('.st-card')!;
     box.className = `st-card${d.eff ? '' : ' pas'}`;
     box.innerHTML = `
-      <div class="cd-top"><div class="cd-gem"><i>${d.emoji}</i></div>
+      <div class="cd-top"><div class="cd-gem"><i>${iconImg(d, 160)}</i></div>
         <div class="cd-name"><b></b><div class="chips"><span>${TREES[ch][d.tree]}</span><span>${ROMAN[d.tier]} · 등급 ${TIER_AR[d.tier]}</span><span class="${d.eff ? 'act' : 'pas'}">${d.eff ? `쓰는 기술 · ${KIND[d.eff.k]}` : '익히는 기술'}</span></div></div></div>
       <div class="cd-lv"><div class="bar"><i style="width:${(lv / MAX_LV) * 100}%"></i></div><span>Lv <b>${lv}</b> / ${MAX_LV}</span></div>
       <p class="cd-desc"></p>
@@ -84,7 +85,7 @@ export class SkillPanel {
       ${d.eff ? `<div class="cd-aw"><h4>✦ 각성 <small>레벨이 닿으면 둘 중 하나 — 언제든 바꿀 수 있다</small></h4>${([0, 1] as const).map((t) => `<div class="awr${lv >= (t ? 10 : 5) ? '' : ' lock'}"><em>Lv ${t ? 10 : 5}</em>${AWAKE[d.eff!.k][t].map((o, i) => `<button type="button" data-t="${t}" data-i="${i}" class="${A.awake[d.id]?.[t] === i ? 'on' : ''}" ${lv >= (t ? 10 : 5) ? '' : 'disabled'}><b>${o.name}</b><span>${o.what}</span></button>`).join('')}</div>`).join('')}</div>` : ''}
       ${d.dmg ? `<p class="cd-syn"><b>시너지 +${A.synergy(d)}%</b> — 같은 갈래 다른 기술 레벨마다 +6%</p>` : ''}
       <button type="button" class="cd-learn${why ? '' : ' go'}" ${why ? 'disabled' : ''}>${why ? `🔒 ${why}` : lv ? `레벨 올리기 <kbd>Lv ${lv + 1}</kbd>` : '배우기'}</button>
-      ${d.eff ? `<div class="cd-sock"><small>${lv ? '칸에 올리기 — 누르거나 5~8 키' : '배우면 빈 칸에 저절로 올라간다'}</small><div>${[0, 1, 2, 3].map((i) => { const on = A.slotsOf(ch)[i]; const od = on ? skillOf(on) : null; return `<button type="button" data-i="${i}" class="${on === d.id ? 'on' : ''}" ${lv ? '' : 'disabled'}><i>${od?.emoji ?? ''}</i><kbd>${i + 5}</kbd></button>`; }).join('')}</div></div>` : ''}`;
+      ${d.eff ? `<div class="cd-sock"><small>${lv ? '칸에 올리기 — 누르거나 5~8 키' : '배우면 빈 칸에 저절로 올라간다'}</small><div>${[0, 1, 2, 3].map((i) => { const on = A.slotsOf(ch)[i]; const od = on ? skillOf(on) : null; return `<button type="button" data-i="${i}" class="${on === d.id ? 'on' : ''}" ${lv ? '' : 'disabled'}><i>${od ? iconImg(od, 64) : ''}</i><kbd>${i + 5}</kbd></button>`; }).join('')}</div></div>` : ''}`;
     box.querySelector('.cd-name b')!.textContent = d.name;
     box.querySelector('.cd-desc')!.textContent = d.desc;
     box.querySelector('.cd-learn')!.addEventListener('click', () => this.learn(d.id));
@@ -111,7 +112,7 @@ export class SkillPanel {
         <div class="st-acts"><button class="gro" type="button">🌟 특성 · 재능</button><button class="x" type="button" title="닫기 (K)">✕</button></div>
       </header>
       <main class="st-main"><div class="st-trees"><div class="st-rows">${ROMAN.map((r, i) => `<div class="${ar >= TIER_AR[i] ? 'open' : ''}"><b>${r}</b><small>등급 ${TIER_AR[i]}</small></div>`).join('')}</div></div><aside class="st-card"></aside></main>
-      <footer class="st-foot"><span>누르기 <kbd>자세히</kbd></span><span>두 번 누르기 <kbd>배우기</kbd></span><span>고른 채로 <kbd>5</kbd><kbd>6</kbd><kbd>7</kbd><kbd>8</kbd> <kbd>칸에 올리기</kbd></span><span class="slots">${A.slotsOf(ch).map((id, i) => `<i title="${i + 5}">${id ? skillOf(id)!.emoji : ''}<kbd>${i + 5}</kbd></i>`).join('')}</span></footer>`;
+      <footer class="st-foot"><span>누르기 <kbd>자세히</kbd></span><span>두 번 누르기 <kbd>배우기</kbd></span><span>고른 채로 <kbd>5</kbd><kbd>6</kbd><kbd>7</kbd><kbd>8</kbd> <kbd>칸에 올리기</kbd></span><span class="slots">${A.slotsOf(ch).map((id, i) => `<i title="${i + 5}">${id ? iconImg(skillOf(id)!, 64) : ''}<kbd>${i + 5}</kbd></i>`).join('')}</span></footer>`;
     this.el.querySelector('.st-title h1')!.textContent = c.name();
     this.el.querySelector('.x')!.addEventListener('click', () => this.toggle(false));
     this.el.querySelector('.gro')!.addEventListener('click', () => { this.toggle(false); c.openGrowth(); });
@@ -133,7 +134,7 @@ export class SkillPanel {
         b.dataset.skill = d.id;
         b.className = `node${lv ? ' got' : ''}${lv >= MAX_LV ? ' max' : ''}${locked ? ' locked' : ''}${!why ? ' can' : ''}${this.sel === d.id ? ' sel' : ''}${d.eff ? '' : ' pas'}${this.pop === d.id ? ' pop' : ''}`;
         const awk = A.awake[d.id];
-        b.innerHTML = `<span class="dia"></span><i>${locked ? '🔒' : d.emoji}</i><span class="lvp">${lv}<small>/${MAX_LV}</small></span>${awk && (awk[0] !== null || awk[1] !== null) ? '<b class="awk">✦</b>' : d.eff && lv >= 5 ? '<b class="awk ready">✦</b>' : ''}`;
+        b.innerHTML = `<span class="dia"></span><i>${iconImg(d, 96)}${locked ? '<b class="lk">🔒</b>' : ''}</i><span class="lvp">${lv}<small>/${MAX_LV}</small></span>${awk && (awk[0] !== null || awk[1] !== null) ? '<b class="awk">✦</b>' : d.eff && lv >= 5 ? '<b class="awk ready">✦</b>' : ''}`;
         b.title = d.name;
         const nm = document.createElement('p');
         nm.className = 'nm';

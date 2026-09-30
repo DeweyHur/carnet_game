@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import type { MoveApi, FoeLike } from './moves';
 import type { CharId } from './party';
 import * as sfx from './sound';
+import { iconImg } from './icons';
+import { arcGeo, areaTex, glowTex, slashTex } from './foemodels';
 import { CHAR_ELEM, type Elem } from './elements';
 
 export type Status = 'burn' | 'poison' | 'slow' | 'stun' | 'knock' | 'pull' | 'drain';
@@ -417,7 +419,7 @@ export class Arsenal {
     this.mark(m);
   }
   private disc(x: number, y: number, r: number, color: number, opacity = 0.35) {
-    const m = new THREE.Mesh(new THREE.CircleGeometry(r, 28), new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2), new THREE.MeshBasicMaterial({ map: areaTex(), color, transparent: true, opacity: Math.min(1, opacity * 2.2), depthWrite: false, blending: THREE.AdditiveBlending }));
     m.position.set(x, y, this.ground(x, y) + 0.06);
     this.mark(m);
     return m;
@@ -425,7 +427,9 @@ export class Arsenal {
   private orb(color: number, size = 0.28) {
     const g = new THREE.Group();
     g.add(new THREE.Mesh(new THREE.SphereGeometry(size, 12, 10), new THREE.MeshBasicMaterial({ color })));
-    g.add(new THREE.Mesh(new THREE.SphereGeometry(size * 2.2, 12, 10), glow(color, 0.3)));
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    halo.scale.setScalar(size * 7);
+    g.add(halo);
     return g;
   }
   private dash(tx: number, ty: number) {
@@ -471,7 +475,7 @@ export class Arsenal {
         const hits = e.hits ?? 1;
         for (let h = 0; h < hits; h++) this.after(h * 0.14, () => {
           const a0 = ((90 - b.facing) * Math.PI) / 180, span = (e.deg * Math.PI) / 180;
-          const m = new THREE.Mesh(new THREE.RingGeometry(0.6, e.r, 24, 1, a0 - span / 2, span), glow(col, 0.7));
+          const m = new THREE.Mesh(arcGeo(0.6, e.r, h % 2 ? a0 - span / 2 : a0 + span / 2, h % 2 ? span : -span), new THREE.MeshBasicMaterial({ map: slashTex(), color: col, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
           m.position.set(b.x, b.y, b.z + 1); m.rotation.x = h % 2 ? -0.25 : 0.25;
           A.fx(m, 0.22, (o, t) => { o.scale.setScalar(1 + t); ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.7 * (1 - t / 0.22); });
           this.mark(m);
@@ -715,7 +719,7 @@ export class Arsenal {
     const ch = this.c.who(), s = this.slotsOf(ch);
     this.el.innerHTML = s.map((id, i) => {
       const d = id ? skillOf(id) : null;
-      return `<button type="button" data-slot="${i}" class="${d ? '' : 'empty'}" title="${d ? `${d.name} Lv.${this.lv(d.id)} · 🔷${this.cost(d)}` : '빈 칸 — 📜 기술(K)'}"><em>${d?.emoji ?? '＋'}</em><kbd>${i + 5}</kbd><i></i></button>`;
+      return `<button type="button" data-slot="${i}" class="${d ? '' : 'empty'}" title="${d ? `${d.name} Lv.${this.lv(d.id)} · 🔷${this.cost(d)}` : '빈 칸 — 📜 기술(K)'}"><em>${d ? iconImg(d, 96) : '＋'}</em><kbd>${i + 5}</kbd><i></i></button>`;
     }).join('');
     this.el.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => btn.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); this.onCast?.(Number(btn.dataset.slot)); }));
     this.el.classList.toggle('on', s.some((x) => x));
@@ -731,11 +735,16 @@ export class Arsenal {
     const r = atk.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     const R = Math.max(170, r.width * 2.2);
     this.el.classList.add('arc');
+    const bars = ['.cbt .hp', '.mpbar', '.cbt .who'].map((q) => document.querySelector(q)?.getBoundingClientRect()).filter((q): q is DOMRect => !!q && q.width > 0);
     btns.forEach((b, i) => {
       const ang = ([190, 160, 130, 105][i] * Math.PI) / 180; // 왼쪽 아래(190°)에서 위(105°)로 — 행동 안내(F)와 E·Q를 비켜 간다
       const w = b.offsetWidth || 42;
-      b.style.left = `${Math.round(cx + Math.cos(ang) * R - w / 2)}px`;
-      b.style.top = `${Math.round(cy - Math.sin(ang) * R - w / 2)}px`;
+      const x = Math.round(cx + Math.cos(ang) * R - w / 2);
+      let y = Math.round(cy - Math.sin(ang) * R - w / 2);
+      // 피·마나 막대(가운데 아래)와 겹치면 그 위로 올린다
+      for (const bar of bars) if (x < bar.right && x + w > bar.left && y < bar.bottom + 4 && y + w > bar.top - 4) y = Math.round(bar.top - w - 6);
+      b.style.left = `${x}px`;
+      b.style.top = `${y}px`;
     });
   }
   private paintCd() {

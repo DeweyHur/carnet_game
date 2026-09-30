@@ -1064,3 +1064,21 @@ body.touch-play .skbar.arc button { position:fixed; pointer-events:auto; }
 #skills .awr.lock { opacity:.45; }
 #skills .node .awk { position:absolute; top:2px; right:6px; font-size:14px; color:#ffd166; text-shadow:0 0 8px #ffd166; }
 #skills .node .awk.ready { color:#fff; opacity:.8; animation:st-can 1.4s ease-in-out infinite; }
+/* 직접 그린 기술 아이콘(icons.ts) */
+img.skic { display:block; pointer-events:none; user-select:none; }
+#skills .node i { display:grid; place-items:center; filter:none; }
+#skills .node i img.skic { width:60px; height:60px; clip-path:polygon(50% 3%, 97% 50%, 50% 97%, 3% 50%); }
+#skills .node.pas i img.skic { width:50px; height:50px; clip-path:circle(50%); }
+#skills .node.locked i img.skic { filter:grayscale(1) brightness(.45); }
+#skills .node i .lk { position:absolute; font-size:16px; font-weight:400; filter:drop-shadow(0 1px 2px #000); }
+#skills .node.got i img.skic { filter:saturate(1.15) brightness(1.08); }
+#skills .node:not(.got):not(.locked) i img.skic { filter:saturate(.75) brightness(.8); }
+#skills .cd-gem { overflow:visible; }
+#skills .cd-gem i img.skic { width:70px; height:70px; clip-path:polygon(50% 4%, 96% 50%, 50% 96%, 4% 50%); }
+#skills .st-card.pas .cd-gem i img.skic { width:60px; height:60px; clip-path:circle(50%); }
+#skills .cd-sock button i img.skic { width:34px; height:34px; border-radius:8px; }
+#skills .st-foot .slots i img.skic { width:100%; height:100%; border-radius:9px; }
+.skbar button em img.skic { width:100%; height:100%; position:absolute; inset:0; border-radius:10px; }
+.skbar button em { display:contents; }
+.bigcard .nm em img.skic { width:64px; height:64px; border-radius:16px; display:inline-block; vertical-align:middle; margin-right:10px; box-shadow:0 0 0 2px #b58a2e, 0 0 20px #ffd16666; }
+@media (max-width:620px) { #skills .node i img.skic { width:48px; height:48px; } #skills .node.pas i img.skic { width:40px; height:40px; } }
