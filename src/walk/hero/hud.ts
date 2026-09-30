@@ -63,7 +63,7 @@ export class HeroHud {
     run.addEventListener('pointerup', release);
     run.addEventListener('pointercancel', () => { input.hold(false); run.classList.remove('held'); });
     document.body.appendChild(this.pad);
-    input.onTouchMode = () => document.body.classList.add('touch-play');
+    input.onTouchMode = () => { document.body.classList.add('touch-play'); setTimeout(() => window.dispatchEvent(new Event('resize')), 50); }; // 기술 칸 등 자리를 다시 잡게
   }
 
   /** 레이어가 그린 머리 위치(화면 좌표) */

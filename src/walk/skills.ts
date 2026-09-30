@@ -620,7 +620,24 @@ export class Arsenal {
     }).join('');
     this.el.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => btn.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); this.onCast?.(Number(btn.dataset.slot)); }));
     this.el.classList.toggle('on', s.some((x) => x));
+    this.layoutTouch();
     this.paintCd();
+  }
+  /** 휴대폰: 공격 단추(⚔️)를 둘러싼 호 위에 네 칸을 놓는다(원신처럼) — E · Q · 달리기 단추와 겹치지 않는 각도 */
+  layoutTouch() {
+    const touch = document.body.classList.contains('touch-play');
+    const atk = document.querySelector('.cbt .atk') as HTMLElement | null;
+    const btns = [...this.el.querySelectorAll<HTMLElement>('button')];
+    if (!touch || !atk || !atk.getBoundingClientRect().width) { for (const b of btns) { b.style.left = ''; b.style.top = ''; } this.el.classList.remove('arc'); return; }
+    const r = atk.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const R = Math.max(170, r.width * 2.2);
+    this.el.classList.add('arc');
+    btns.forEach((b, i) => {
+      const ang = ([190, 160, 130, 105][i] * Math.PI) / 180; // 왼쪽 아래(190°)에서 위(105°)로 — 행동 안내(F)와 E·Q를 비켜 간다
+      const w = b.offsetWidth || 42;
+      b.style.left = `${Math.round(cx + Math.cos(ang) * R - w / 2)}px`;
+      b.style.top = `${Math.round(cy - Math.sin(ang) * R - w / 2)}px`;
+    });
   }
   private paintCd() {
     const ch = this.c.who(), s = this.slotsOf(ch);

@@ -759,6 +759,7 @@ function setupAdventure() {
     },
   });
   arsenal.onCast = (i) => { if (S.started) arsenal.cast(i); };
+  addEventListener('resize', () => arsenal.layoutTouch());
   arsenal.onChange = () => { skillUi?.refresh(); paintDots(); };
   skillUi = new SkillPanel(arsenal);
   skillUi.ctx = { who: () => party.active, name: () => party.nameOf(party.char), ar: () => progress.ar, atk: () => combat.stats().atk, element: () => party.char.element, openGrowth: () => growthUi.toggle(true) };
@@ -1272,6 +1273,7 @@ async function start(resumeAt?: Waypoint) {
   if (resumeAt) await teleport(resumeAt); // 원신처럼: 지난번 순간이동 포인트에서 바로
   const touch = hero.input.touched || matchMedia('(pointer: coarse)').matches;
   if (touch) document.body.classList.add('touch-play');
+  setTimeout(() => arsenal?.layoutTouch(), 300);
   // 첫걸음(아직이면) — 리리가 한 단계씩 안내한다. 끝냈으면 리리의 인사만.
   let first = true;
   try { first = !localStorage.getItem('carnet-lili'); localStorage.setItem('carnet-lili', '1'); } catch { /* 무시 */ }
