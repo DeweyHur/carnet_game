@@ -2,7 +2,7 @@
 // 왼쪽: 세 갈래(열)에 네 단계(행) — 다이아몬드 칸이 금속 테를 두르고, 배운 칸 사이 줄에 빛이 흐른다.
 // 오른쪽: 마우스를 올린(또는 누른) 기술의 카드 — 지금 · 다음 레벨 숫자, 시너지, "배우기", 5~8 칸 소켓.
 // 두 번 누르면 바로 배운다. 기술을 고른 채로 5 · 6 · 7 · 8을 누르면 그 칸에 올린다.
-import { MAX_LV, TIER_AR, TREES, skillOf, skillsOf, type Arsenal, type SkillDef } from './skills';
+import { AWAKE, MAX_LV, TIER_AR, TREES, skillOf, skillsOf, type Arsenal, type SkillDef } from './skills';
 import type { CharId } from './party';
 
 export interface SkillUiCtx {
@@ -81,12 +81,14 @@ export class SkillPanel {
         ${d.cost ? `<tr><td>🔷 마나</td><td>${lv ? A.cost(d, lv) : '—'}</td><td>${lv < MAX_LV ? A.cost(d, lv + 1) : '—'}</td></tr>` : ''}
         ${d.cd ? `<tr><td>⏱ 재사용</td><td colspan="2">${d.cd}초</td></tr>` : ''}
       </tbody></table>
+      ${d.eff ? `<div class="cd-aw"><h4>✦ 각성 <small>레벨이 닿으면 둘 중 하나 — 언제든 바꿀 수 있다</small></h4>${([0, 1] as const).map((t) => `<div class="awr${lv >= (t ? 10 : 5) ? '' : ' lock'}"><em>Lv ${t ? 10 : 5}</em>${AWAKE[d.eff!.k][t].map((o, i) => `<button type="button" data-t="${t}" data-i="${i}" class="${A.awake[d.id]?.[t] === i ? 'on' : ''}" ${lv >= (t ? 10 : 5) ? '' : 'disabled'}><b>${o.name}</b><span>${o.what}</span></button>`).join('')}</div>`).join('')}</div>` : ''}
       ${d.dmg ? `<p class="cd-syn"><b>시너지 +${A.synergy(d)}%</b> — 같은 갈래 다른 기술 레벨마다 +6%</p>` : ''}
       <button type="button" class="cd-learn${why ? '' : ' go'}" ${why ? 'disabled' : ''}>${why ? `🔒 ${why}` : lv ? `레벨 올리기 <kbd>Lv ${lv + 1}</kbd>` : '배우기'}</button>
       ${d.eff ? `<div class="cd-sock"><small>${lv ? '칸에 올리기 — 누르거나 5~8 키' : '배우면 빈 칸에 저절로 올라간다'}</small><div>${[0, 1, 2, 3].map((i) => { const on = A.slotsOf(ch)[i]; const od = on ? skillOf(on) : null; return `<button type="button" data-i="${i}" class="${on === d.id ? 'on' : ''}" ${lv ? '' : 'disabled'}><i>${od?.emoji ?? ''}</i><kbd>${i + 5}</kbd></button>`; }).join('')}</div></div>` : ''}`;
     box.querySelector('.cd-name b')!.textContent = d.name;
     box.querySelector('.cd-desc')!.textContent = d.desc;
     box.querySelector('.cd-learn')!.addEventListener('click', () => this.learn(d.id));
+    box.querySelectorAll<HTMLButtonElement>('.cd-aw button').forEach((btn) => btn.addEventListener('click', () => { if (A.choose(d.id, Number(btn.dataset.t) as 0 | 1, Number(btn.dataset.i) as 0 | 1)) { this.pop = d.id; this.paint(); } }));
     box.querySelectorAll<HTMLButtonElement>('.cd-sock button').forEach((btn) => btn.addEventListener('click', () => { A.bind(ch, Number(btn.dataset.i), d.id); this.paint(); }));
   }
 
@@ -130,7 +132,8 @@ export class SkillPanel {
         b.type = 'button';
         b.dataset.skill = d.id;
         b.className = `node${lv ? ' got' : ''}${lv >= MAX_LV ? ' max' : ''}${locked ? ' locked' : ''}${!why ? ' can' : ''}${this.sel === d.id ? ' sel' : ''}${d.eff ? '' : ' pas'}${this.pop === d.id ? ' pop' : ''}`;
-        b.innerHTML = `<span class="dia"></span><i>${locked ? '🔒' : d.emoji}</i><span class="lvp">${lv}<small>/${MAX_LV}</small></span>`;
+        const awk = A.awake[d.id];
+        b.innerHTML = `<span class="dia"></span><i>${locked ? '🔒' : d.emoji}</i><span class="lvp">${lv}<small>/${MAX_LV}</small></span>${awk && (awk[0] !== null || awk[1] !== null) ? '<b class="awk">✦</b>' : d.eff && lv >= 5 ? '<b class="awk ready">✦</b>' : ''}`;
         b.title = d.name;
         const nm = document.createElement('p');
         nm.className = 'nm';

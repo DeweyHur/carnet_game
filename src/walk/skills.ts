@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import type { MoveApi, FoeLike } from './moves';
 import type { CharId } from './party';
 import * as sfx from './sound';
+import { CHAR_ELEM, type Elem } from './elements';
 
 export type Status = 'burn' | 'poison' | 'slow' | 'stun' | 'knock' | 'pull' | 'drain';
 export type Eff =
@@ -165,10 +166,29 @@ put('lune', [
     { emoji: '🌕', name: '만월', desc: '12초 동안 공격력 +30% · 치명타 +25%', eff: { k: 'buff', secs: 12 }, buff: { atk: 0.3, crit: 0.25 }, cost: 38, cd: 34 }],
 ]);
 export const SKILLS = defs;
+
+/** ✦ 각성(디아블로 4 · PoE처럼): 쓰는 기술은 Lv5 · Lv10에 둘 중 하나를 고른다 — 기술의 모양이 바뀐다(언제든 바꿀 수 있다) */
+export interface Awake { id: string; name: string; what: string }
+type K = Eff['k'];
+export const AWAKE: Record<K, [[Awake, Awake], [Awake, Awake]]> = {
+  bolt: [[{ id: 'split', name: '갈래', what: '두 발 더 · 한 발 피해 −25%' }, { id: 'big', name: '거대화', what: '꿰뚫고 터진다(폭발 +1.5 m)' }], [{ id: 'shards', name: '파편', what: '맞으면 작은 파편 셋이 사방으로' }, { id: 'return', name: '부메랑', what: '끝까지 가면 되돌아온다' }]],
+  nova: [[{ id: 'twice', name: '메아리', what: '0.5초 뒤 한 번 더' }, { id: 'implode', name: '끌어모으기', what: '가운데로 끌어모은 뒤 터진다' }], [{ id: 'wide', name: '확장', what: '반경 +50%' }, { id: 'weaken', name: '약점 노출', what: '맞은 적이 6초 동안 받는 피해 +30%' }]],
+  cone: [[{ id: 'again', name: '연타', what: '한 번 더 휘두른다' }, { id: 'wide', name: '넓은 휘두르기', what: '각도 +60°' }], [{ id: 'crit', name: '급소 노리기', what: '피해 +30%' }, { id: 'mana', name: '마나 흡수', what: '맞힌 적마다 마나 +2' }]],
+  line: [[{ id: 'long', name: '긴 궤적', what: '길이 +50%' }, { id: 'trail', name: '남은 자국', what: '지나간 자리에 3초 동안 원소가 남는다' }], [{ id: 'return', name: '왕복', what: '0.4초 뒤 거꾸로 한 번 더' }, { id: 'boom', name: '끝 폭발', what: '끝에서 터진다' }]],
+  leap: [[{ id: 'wide', name: '큰 착지', what: '착지 반경 +60%' }, { id: 'double', name: '이단 도약', what: '다음 적에게 한 번 더 뛴다' }], [{ id: 'guard', name: '불굴의 착지', what: '착지 뒤 1.5초 무적' }, { id: 'quake', name: '여진', what: '충격파가 두 번 더 퍼진다' }]],
+  rain: [[{ id: 'more', name: '폭우', what: '개수 +50%' }, { id: 'big', name: '거대한 낙하', what: '반경 +40%' }], [{ id: 'finale', name: '마지막 한 방', what: '끝에 커다란 한 방' }, { id: 'slowall', name: '짓누름', what: '맞은 적이 느려진다' }]],
+  orbit: [[{ id: 'more', name: '더 많은 궤도', what: '두 개 더' }, { id: 'long', name: '긴 궤도', what: '지속 +50%' }], [{ id: 'burst', name: '흩뿌리기', what: '끝나면 사방으로 날아간다' }, { id: 'mana', name: '마나 궤도', what: '맞힐 때마다 마나 +1' }]],
+  chain: [[{ id: 'more', name: '긴 사슬', what: '세 번 더 튄다' }, { id: 'fork', name: '갈라지는 사슬', what: '첫 적에서 둘로 갈라진다' }], [{ id: 'grow', name: '증폭', what: '튈수록 세진다(+15%씩)' }, { id: 'boom', name: '종착 폭발', what: '마지막 적에서 터진다' }]],
+  turret: [[{ id: 'two', name: '쌍둥이', what: '둘을 세운다' }, { id: 'rapid', name: '속사', what: '50% 빨리 쏜다' }], [{ id: 'boom', name: '자폭', what: '사라질 때 크게 터진다' }, { id: 'chill', name: '냉기 탄', what: '맞은 적이 느려진다' }]],
+  trap: [[{ id: 'more', name: '덫 무더기', what: '두 개 더' }, { id: 'wide', name: '큰 덫', what: '반경 +50%' }], [{ id: 'chain', name: '연쇄', what: '하나가 터지면 가까운 덫도 함께' }, { id: 'pull', name: '끌어들이기', what: '터지기 전에 둘레를 끌어들인다' }]],
+  zone: [[{ id: 'follow', name: '따라오기', what: '나를 따라다닌다' }, { id: 'wide', name: '넓게', what: '반경 +50%' }], [{ id: 'boom', name: '끝 폭발', what: '끝날 때 터진다' }, { id: 'heal', name: '생명의 장', what: '안에 있으면 체력이 찬다' }]],
+  aura: [[{ id: 'wide', name: '넓은 오라', what: '반경 +50%' }, { id: 'long', name: '긴 오라', what: '지속 +50%' }], [{ id: 'boom', name: '마무리 폭발', what: '끝날 때 크게 터진다' }, { id: 'mana', name: '마나 오라', what: '틱마다 마나 +1' }]],
+  buff: [[{ id: 'long', name: '오래가는', what: '지속 +50%' }, { id: 'strong', name: '강렬한', what: '효과 +50%' }], [{ id: 'shock', name: '충격파', what: '쓸 때 둘레를 날려 버린다' }, { id: 'cd', name: '숨 고르기', what: '재사용 −30%' }]],
+};
 export const skillOf = (id: string) => SKILLS.find((s) => s.id === id);
 export const skillsOf = (c: CharId) => SKILLS.filter((s) => s.char === c);
 
-interface Save { ranks: Record<string, number>; slots: Partial<Record<CharId, (string | null)[]>> }
+interface Save { ranks: Record<string, number>; slots: Partial<Record<CharId, (string | null)[]>>; awake?: Record<string, [number | null, number | null]> }
 const KEY = 'carnet-skills-v1';
 const dirOf = (deg: number): [number, number] => [Math.sin((deg * Math.PI) / 180), Math.cos((deg * Math.PI) / 180)];
 const bearing = (dx: number, dy: number) => ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360;
@@ -176,7 +196,7 @@ const angDiff = (a: number, b: number) => ((b - a + 540) % 360) - 180;
 const glow = (color: number, opacity = 0.85) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
 
 export interface ArsenalCtx {
-  api: MoveApi & { slow(f: FoeLike, secs: number): void };
+  api: MoveApi & { slow(f: FoeLike, secs: number): void; vuln(f: FoeLike, secs: number): void };
   who(): CharId;
   ar(): number;
   /** 싸울 수 있나(창·지도·대화가 아닌 때) */
@@ -192,16 +212,18 @@ export class Arsenal {
   private readonly c: ArsenalCtx;
   readonly ranks: Record<string, number> = {};
   private slots: Partial<Record<CharId, (string | null)[]>> = {};
+  /** 각성 고른 것: [Lv5 쪽, Lv10 쪽] (0 · 1 · 없음) */
+  readonly awake: Record<string, [number | null, number | null]> = {};
   mp = 50;
   private cds = new Map<string, number>();
   /** 켜진 강화: 끝나는 시각(초) */
   private buffs: { d: SkillDef; lv: number; t: number }[] = [];
-  private shots: { x: number; y: number; z: number; dx: number; dy: number; left: number; speed: number; d: SkillDef; lv: number; obj: THREE.Object3D; hit: Set<FoeLike>; pierce: boolean; boom: number }[] = [];
+  private shots: { x: number; y: number; z: number; dx: number; dy: number; left: number; speed: number; d: SkillDef; lv: number; obj: THREE.Object3D; hit: Set<FoeLike>; pierce: boolean; boom: number; range?: number; back?: boolean; shard?: boolean; mul?: number; slow?: boolean }[] = [];
   private timed: { t: number; fn: () => void }[] = [];
   private orbits: { d: SkillDef; lv: number; t: number; secs: number; objs: THREE.Object3D[]; last: Map<FoeLike, number>; r: number }[] = [];
-  private turrets: { d: SkillDef; lv: number; x: number; y: number; z: number; t: number; secs: number; fire: number; obj: THREE.Object3D }[] = [];
-  private traps: { d: SkillDef; lv: number; x: number; y: number; z: number; t: number; obj: THREE.Object3D }[] = [];
-  private zones: { d: SkillDef; lv: number; x: number; y: number; z: number; t: number; tick: number; obj: THREE.Object3D; self: boolean }[] = [];
+  private turrets: { d: SkillDef; lv: number; x: number; y: number; z: number; t: number; secs: number; fire: number; obj: THREE.Object3D; every: number; range: number; n: number }[] = [];
+  private traps: { d: SkillDef; lv: number; x: number; y: number; z: number; t: number; obj: THREE.Object3D; r: number }[] = [];
+  private zones: { d: SkillDef; lv: number; x: number; y: number; z: number; t: number; tick: number; obj: THREE.Object3D; self: boolean; r: number; mul: number }[] = [];
   private dots = new Map<FoeLike, { kind: 'burn' | 'poison'; t: number; tick: number; dmg: number }>();
   private clock = 0;
   /** 쓴 횟수(첫걸음) */
@@ -214,7 +236,7 @@ export class Arsenal {
     this.c = c;
     try {
       const d = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Save | null;
-      if (d) { for (const [k, v] of Object.entries(d.ranks ?? {})) if (skillOf(k)) this.ranks[k] = Math.min(MAX_LV, v); this.slots = d.slots ?? {}; }
+      if (d) { for (const [k, v] of Object.entries(d.ranks ?? {})) if (skillOf(k)) this.ranks[k] = Math.min(MAX_LV, v); this.slots = d.slots ?? {}; Object.assign(this.awake, d.awake ?? {}); }
     } catch { /* 처음부터 */ }
     this.el = document.createElement('div');
     this.el.className = 'skbar';
@@ -225,7 +247,7 @@ export class Arsenal {
     document.body.appendChild(this.mpEl);
     this.paintBar();
   }
-  private save() { try { localStorage.setItem(KEY, JSON.stringify({ ranks: this.ranks, slots: this.slots })); } catch { /* 무시 */ } this.onChange?.(); this.paintBar(); }
+  private save() { try { localStorage.setItem(KEY, JSON.stringify({ ranks: this.ranks, slots: this.slots, awake: this.awake })); } catch { /* 무시 */ } this.onChange?.(); this.paintBar(); }
 
   // ───────── 포인트 · 배우기 ─────────
   lv(id: string) { return this.ranks[id] ?? 0; }
@@ -252,6 +274,43 @@ export class Arsenal {
     this.c.learned?.(d, first);
     return true;
   }
+  /** 각성 고르기(tier 0 = Lv5, 1 = Lv10) — 레벨이 닿았으면 언제든 바꾼다 */
+  choose(id: string, tier: 0 | 1, pick: 0 | 1) {
+    const d = skillOf(id);
+    if (!d?.eff || this.lv(id) < (tier ? 10 : 5)) return false;
+    const a = this.awake[id] ?? [null, null];
+    a[tier] = pick;
+    this.awake[id] = a;
+    this.save();
+    return true;
+  }
+  /** 이 기술에 이 각성이 켜졌나 */
+  aw(d: SkillDef, key: string) {
+    if (!d.eff) return false;
+    const a = this.awake[d.id], opts = AWAKE[d.eff.k];
+    return !!a && ((a[0] !== null && this.lv(d.id) >= 5 && opts[0][a[0]].id === key) || (a[1] !== null && this.lv(d.id) >= 10 && opts[1][a[1]].id === key));
+  }
+  /** 각성이 바꾼 모양 */
+  effOf(d: SkillDef): Eff {
+    const e = { ...d.eff! } as Eff & Record<string, number | boolean | string | undefined>;
+    const on = (k: string) => this.aw(d, k);
+    switch (e.k) {
+      case 'bolt': if (on('split')) { e.n = (e.n ?? 1) + 2; e.spread = Math.max(e.spread ?? 0, 24); } if (on('big')) { e.boom = (e.boom ?? 0) + 1.5; e.pierce = true; } break;
+      case 'nova': if (on('wide')) e.r *= 1.5; break;
+      case 'cone': if (on('again')) e.hits = (e.hits ?? 1) + 1; if (on('wide')) e.deg += 60; break;
+      case 'line': if (on('long')) e.len *= 1.5; break;
+      case 'leap': if (on('wide')) e.r *= 1.6; break;
+      case 'rain': if (on('more')) e.n = Math.round(e.n * 1.5); if (on('big')) e.r *= 1.4; break;
+      case 'orbit': if (on('more')) e.n += 2; if (on('long')) e.secs *= 1.5; break;
+      case 'chain': if (on('more')) e.jumps += 3; break;
+      case 'turret': if (on('rapid')) e.every *= 0.66; break;
+      case 'trap': if (on('more')) e.n = (e.n ?? 1) + 2; if (on('wide')) e.r *= 1.5; break;
+      case 'zone': if (on('wide')) e.r *= 1.5; break;
+      case 'aura': if (on('wide')) e.r *= 1.5; if (on('long')) e.secs *= 1.5; break;
+      case 'buff': if (on('long')) e.secs *= 1.5; break;
+    }
+    return e;
+  }
   slotsOf(ch: CharId): (string | null)[] { const s = this.slots[ch] ?? [null, null, null, null]; while (s.length < 4) s.push(null); return s.slice(0, 4); }
   bind(ch: CharId, i: number, id: string | null) {
     if (id && !skillOf(id)?.eff) return; // 익히는 기술은 칸에 올리지 않는다
@@ -265,12 +324,13 @@ export class Arsenal {
   /** 피해 배율: 레벨마다 +15%, 같은 갈래의 다른 기술 레벨마다 +6%(시너지) */
   power(d: SkillDef, lv = this.lv(d.id)) {
     const syn = skillsOf(d.char).filter((s) => s.tree === d.tree && s.id !== d.id).reduce((a, s) => a + this.lv(s.id), 0);
-    return (d.dmg ?? 0) * (1 + 0.15 * (lv - 1)) * (1 + 0.06 * syn);
+    const aw = (this.aw(d, 'split') ? 0.75 : 1) * (this.aw(d, 'crit') ? 1.3 : 1);
+    return (d.dmg ?? 0) * (1 + 0.15 * (lv - 1)) * (1 + 0.06 * syn) * aw;
   }
   synergy(d: SkillDef) { return skillsOf(d.char).filter((s) => s.tree === d.tree && s.id !== d.id).reduce((a, s) => a + this.lv(s.id), 0) * 6; }
   cost(d: SkillDef, lv = this.lv(d.id)) { return Math.round((d.cost ?? 0) * (1 + 0.04 * (lv - 1))); }
   /** 강화 값(레벨마다 +8%) */
-  buffVal(d: SkillDef, lv: number, k: keyof Boost) { return (d.buff?.[k] ?? 0) * (1 + 0.08 * (lv - 1)); }
+  buffVal(d: SkillDef, lv: number, k: keyof Boost) { return (d.buff?.[k] ?? 0) * (1 + 0.08 * (lv - 1)) * (this.aw(d, 'strong') ? 1.5 : 1); }
   /** 지금 캐릭터의 익히는 기술 + 켜진 강화 */
   boost(): Required<Boost> {
     const o: Required<Boost> = { atk: 0, crit: 0, critDmg: 0, hp: 0, def: 0, aspd: 0, regen: 0, steal: 0, heal: 0 };
@@ -292,7 +352,7 @@ export class Arsenal {
     const big = d.tier === 3;
     if (!this.c.act(big)) return false;
     this.mp -= cost;
-    this.cds.set(id, this.clock + (d.cd ?? 1));
+    this.cds.set(id, this.clock + (d.cd ?? 1) * (this.aw(d, 'cd') ? 0.7 : 1));
     this.casts++;
     const b = this.c.api.hero.body;
     this.c.api.float(b.x, b.y, b.z + 2.9, `${d.emoji} ${d.name}`, 'skname');
@@ -312,12 +372,20 @@ export class Arsenal {
     return best;
   }
   private aimAt(max: number) { const t = this.nearest(max); if (t) this.b.facing = bearing(t.x - this.b.x, t.y - this.b.y); return t; }
+  /** 기술의 원소: 불태움 → 불 · 느려짐 → 얼음 · 중독 → 독 · 여행자의 번개(사슬 · 대폭풍) → 번개 · 그 밖엔 캐릭터 원소 */
+  elemOf(d: SkillDef): Elem {
+    if (d.status === 'burn') return 'fire';
+    if (d.status === 'slow') return 'ice';
+    if (d.status === 'poison') return 'toxic';
+    if (d.char === 'traveler' && (d.eff?.k === 'chain' || (d.eff?.k === 'rain' && d.eff.tall))) return 'bolt';
+    return CHAR_ELEM[d.char];
+  }
   private color(d: SkillDef) { return d.status === 'burn' ? 0xff8a4a : d.status === 'poison' ? 0x7be36a : d.status === 'slow' ? 0x9fdcff : COLOR[d.char]; }
   /** 한 대 + 상태 */
   private hit(f: FoeLike, d: SkillDef, lv: number, mul = 1, from?: [number, number]) {
     if (f.state === 'dead') return;
     const A = this.c.api, p = this.power(d, lv) * mul;
-    A.hit(f, A.atk() * p, 'skill');
+    A.hit(f, A.atk() * p, 'skill', this.elemOf(d));
     const [ox, oy] = from ?? [this.b.x, this.b.y];
     switch (d.status) {
       case 'burn': case 'poison': this.dots.set(f, { kind: d.status, t: d.status === 'burn' ? 3 : 5, tick: 0.5, dmg: A.atk() * p * (d.status === 'burn' ? 0.2 : 0.18) }); break;
@@ -334,6 +402,8 @@ export class Arsenal {
     for (const f of this.alive()) if (Math.hypot(f.x - x, f.y - y) - (this.c.api.big(f) ? 2.4 : 0.4) <= r && Math.abs(f.z + f.lift - this.b.z) < 5) { this.hit(f, d, lv, mul, [x, y]); n++; }
     return n;
   }
+  /** 원 안의 적 */
+  private inside(x: number, y: number, r: number) { return this.alive().filter((f) => Math.hypot(f.x - x, f.y - y) - (this.c.api.big(f) ? 2.4 : 0.4) <= r && Math.abs(f.z + f.lift - this.b.z) < 5); }
   private ground(x: number, y: number) { return this.c.api.W().ground(x, y, this.b.z + 3, 8); }
   private mark(obj: THREE.Object3D) { this.c.api.group.add(obj); }
   private drop(obj: THREE.Object3D) {
@@ -365,7 +435,8 @@ export class Arsenal {
   }
 
   private fire(d: SkillDef, lv: number) {
-    const A = this.c.api, b = this.b, e = d.eff!, col = this.color(d);
+    const A = this.c.api, b = this.b, e = this.effOf(d), col = this.color(d);
+    const aw = (k: string) => this.aw(d, k);
     const snd = () => { if (d.status === 'burn') sfx.fire(); else if (d.status === 'slow') sfx.splash(); else if (d.char === 'quentin') sfx.bell(d.tier); else sfx.skillBlast(); };
     switch (e.k) {
       case 'bolt': {
@@ -377,7 +448,7 @@ export class Arsenal {
           const obj = this.orb(col, e.size ?? 0.22);
           obj.position.set(b.x + dx * 0.8, b.y + dy * 0.8, b.z + 1.2);
           this.mark(obj);
-          this.shots.push({ x: obj.position.x, y: obj.position.y, z: obj.position.z, dx, dy, left: e.range ?? 16, speed: e.speed ?? 24, d, lv, obj, hit: new Set(), pierce: !!e.pierce, boom: e.boom ?? 0 });
+          this.shots.push({ x: obj.position.x, y: obj.position.y, z: obj.position.z, dx, dy, left: e.range ?? 16, range: e.range ?? 16, speed: e.speed ?? 24, d, lv, obj, hit: new Set(), pierce: !!e.pierce, boom: e.boom ?? 0 });
         }
         sfx.throwFrame();
         break;
@@ -385,9 +456,14 @@ export class Arsenal {
       case 'nova': {
         const t = e.at === 'target' ? this.aimAt(14) : null;
         const [x, y] = t ? [t.x, t.y] : [b.x, b.y];
-        A.ring(x, y, this.ground(x, y) + 0.3, col, e.r);
-        if (e.at === 'target') this.pillar(x, y, col, 8, 0.5, 1.2);
-        this.circle(x, y, e.r, d, lv); snd(); A.shake(e.r > 6 ? 0.3 : 0.15);
+        const go = () => {
+          A.ring(x, y, this.ground(x, y) + 0.3, col, e.r);
+          if (e.at === 'target') this.pillar(x, y, col, 8, 0.5, 1.2);
+          for (const f of this.inside(x, y, e.r)) { this.hit(f, d, lv, 1, [x, y]); if (aw('weaken')) A.vuln(f, 6); }
+          snd(); A.shake(e.r > 6 ? 0.3 : 0.15);
+        };
+        if (aw('implode')) { for (const f of this.inside(x, y, e.r * 1.6)) A.pull(f, x, y, 0.85); A.ring(x, y, this.ground(x, y) + 0.3, col, e.r * 1.6); this.after(0.25, go); } else go();
+        if (aw('twice')) this.after(0.5, go);
         break;
       }
       case 'cone': {
@@ -399,7 +475,7 @@ export class Arsenal {
           m.position.set(b.x, b.y, b.z + 1); m.rotation.x = h % 2 ? -0.25 : 0.25;
           A.fx(m, 0.22, (o, t) => { o.scale.setScalar(1 + t); ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.7 * (1 - t / 0.22); });
           this.mark(m);
-          for (const f of this.alive()) { const dx = f.x - b.x, dy = f.y - b.y, dd = Math.hypot(dx, dy), size = A.big(f) ? 2.4 : 0.5; if (dd - size > e.r || Math.abs(f.z - b.z) > 4) continue; if (dd > size && Math.abs(angDiff(b.facing, bearing(dx, dy))) > e.deg / 2) continue; this.hit(f, d, lv, 1 / Math.sqrt(hits)); }
+          for (const f of this.alive()) { const dx = f.x - b.x, dy = f.y - b.y, dd = Math.hypot(dx, dy), size = A.big(f) ? 2.4 : 0.5; if (dd - size > e.r || Math.abs(f.z - b.z) > 4) continue; if (dd > size && Math.abs(angDiff(b.facing, bearing(dx, dy))) > e.deg / 2) continue; this.hit(f, d, lv, 1 / Math.sqrt(hits)); if (aw('mana')) this.mp = Math.min(this.maxMp, this.mp + 2); }
           sfx.whoosh(h % 3);
         });
         break;
@@ -413,7 +489,12 @@ export class Arsenal {
         m.position.set(x0, y0, b.z + 0.8); m.rotation.z = (-b.facing * Math.PI) / 180;
         A.fx(m, 0.3, (o, t) => { ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.75 * (1 - t / 0.3); o.scale.x = 1 - t / 0.3; });
         this.mark(m);
-        for (const f of this.alive()) { const rx = f.x - x0, ry = f.y - y0, along = rx * fx + ry * fy, side = Math.abs(rx * fy - ry * fx), size = A.big(f) ? 2.4 : 0.5; if (along < -0.8 || along > len + size || side > e.w + size || Math.abs(f.z - b.z) > 4) continue; this.hit(f, d, lv, 1, [x0, y0]); }
+        const sweep = (sx: number, sy: number, ux: number, uy: number, mul: number) => { for (const f of this.alive()) { const rx = f.x - sx, ry = f.y - sy, along = rx * ux + ry * uy, side = Math.abs(rx * uy - ry * ux), size = A.big(f) ? 2.4 : 0.5; if (along < -0.8 || along > len + size || side > e.w + size || Math.abs(f.z - b.z) > 4) continue; this.hit(f, d, lv, mul, [sx, sy]); } };
+        sweep(x0, y0, fx, fy, 1);
+        const x1 = x0 + fx * len, y1 = y0 + fy * len;
+        if (aw('trail')) for (let k = 1; k <= 3; k++) { const px = x0 + fx * len * (k / 4), py = y0 + fy * len * (k / 4); const zm = this.disc(px, py, 1.4, col, 0.4); this.zones.push({ d, lv, x: px, y: py, z: zm.position.z, t: 3, tick: 0, obj: zm, self: false, r: 1.4, mul: 0.25 }); }
+        if (aw('return')) this.after(0.4, () => { sweep(x1, y1, -fx, -fy, 0.8); A.ring(x1, y1, b.z + 0.5, col, 1.5); sfx.whoosh(2); });
+        if (aw('boom')) this.after(0.1, () => { A.ring(x1, y1, this.ground(x1, y1) + 0.3, col, 3); A.burst(x1, y1, b.z + 1, col); for (const f of this.inside(x1, y1, 3)) this.hit(f, d, lv, 1.2, [x1, y1]); sfx.fire(); });
         snd(); A.shake(0.18);
         break;
       }
@@ -421,8 +502,10 @@ export class Arsenal {
         const t = this.aimAt(e.range);
         const [fx, fy] = dirOf(b.facing);
         const [tx, ty] = t ? [t.x - fx * 0.8, t.y - fy * 0.8] : [b.x + fx * e.range * 0.6, b.y + fy * e.range * 0.6];
-        this.dash(tx, ty); A.iframes(0.5); sfx.blink();
-        this.after(0.08, () => { A.ring(b.x, b.y, b.z + 0.2, col, e.r); this.circle(b.x, b.y, e.r, d, lv); sfx.land(); A.shake(0.25); });
+        this.dash(tx, ty); A.iframes(aw('guard') ? 1.5 : 0.5); sfx.blink();
+        const land = () => { A.ring(b.x, b.y, b.z + 0.2, col, e.r); this.circle(b.x, b.y, e.r, d, lv); sfx.land(); A.shake(0.25); if (aw('quake')) for (const k of [1, 2]) this.after(k * 0.25, () => { A.ring(b.x, b.y, b.z + 0.2, col, e.r + k * 2); this.circle(b.x, b.y, e.r + k * 2, d, lv, 0.6); }); };
+        this.after(0.08, land);
+        if (aw('double')) this.after(0.55, () => { const n = this.nearest(e.range); if (n) { this.dash(n.x, n.y); sfx.blink(); this.after(0.08, land); } });
         break;
       }
       case 'rain': {
@@ -432,14 +515,16 @@ export class Arsenal {
           const [x, y] = f ? [f.x + (Math.random() - 0.5), f.y + (Math.random() - 0.5)] : [b.x + (Math.random() - 0.5) * e.area, b.y + (Math.random() - 0.5) * e.area];
           this.pillar(x, y, col, e.tall ? 40 : 14, 0.3, e.tall ? 0.45 : 0.8);
           A.ring(x, y, this.ground(x, y) + 0.2, col, e.r);
-          this.circle(x, y, e.r, d, lv);
+          for (const f of this.inside(x, y, e.r)) { this.hit(f, d, lv, 1, [x, y]); if (aw('slowall')) A.slow(f, 2.5); }
           if (e.tall) sfx.meteor(); else sfx.splash();
         });
+        if (aw('finale')) this.after(0.3 + e.n * e.every, () => { this.pillar(b.x, b.y, col, 50, 0.6, 2); A.ring(b.x, b.y, b.z + 0.2, col, e.r * 2.2); for (const f of this.inside(b.x, b.y, e.r * 2.2)) this.hit(f, d, lv, 3, [b.x, b.y]); A.shake(0.4); sfx.kill(true); });
         break;
       }
       case 'orbit': {
         const objs = Array.from({ length: e.n }, () => { const o = this.orb(col, 0.3); this.mark(o); return o; });
         this.orbits.push({ d, lv, t: 0, secs: e.secs, objs, last: new Map(), r: e.r });
+        void aw;
         snd();
         break;
       }
@@ -454,9 +539,12 @@ export class Arsenal {
           m.position.set(x0, y0, b.z + 1.1); m.rotation.z = -Math.atan2(f.x - x0, f.y - y0);
           A.fx(m, 0.25, (o, t) => { ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.9 * (1 - t / 0.25); });
           this.mark(m);
-          this.hit(f, d, lv, Math.pow(0.9, j), from);
+          this.hit(f, d, lv, Math.pow(aw('grow') ? 1.15 : 0.9, j), from);
+          if (j === 0 && aw('fork')) { const g2 = this.nearest(e.range, [f.x, f.y], new Set([...seen])); if (g2) { seen.add(g2); this.hit(g2, d, lv, 0.9, [f.x, f.y]); A.ring(g2.x, g2.y, b.z + 1, col, 1); } }
           from = [f.x, f.y];
+          const last = f;
           f = this.nearest(e.range, from, seen);
+          if (!f && aw('boom')) { A.ring(last.x, last.y, b.z + 0.5, col, 3); A.burst(last.x, last.y, b.z + 1, col); for (const q of this.inside(last.x, last.y, 3)) this.hit(q, d, lv, 1.5, [last.x, last.y]); }
         }
         sfx.flash();
         break;
@@ -469,7 +557,8 @@ export class Arsenal {
         const head = this.orb(col, 0.25); head.position.z = 1.3; g.add(head);
         g.position.set(x, y, z);
         this.mark(g);
-        this.turrets.push({ d, lv, x, y, z, t: 0, secs: e.secs, fire: 0.3, obj: g });
+        this.turrets.push({ d, lv, x, y, z, t: 0, secs: e.secs, fire: 0.3, obj: g, every: e.every, range: e.range, n: e.n ?? 1 });
+        if (aw('two')) { const [gx, gy] = dirOf(b.facing - 140); const x2 = b.x + gx * 1.6, y2 = b.y + gy * 1.6, z2 = this.ground(x2, y2); const g2 = g.clone(); g2.position.set(x2, y2, z2); this.mark(g2); this.turrets.push({ d, lv, x: x2, y: y2, z: z2, t: 0, secs: e.secs, fire: 0.5, obj: g2, every: e.every, range: e.range, n: e.n ?? 1 }); }
         sfx.shield();
         break;
       }
@@ -478,7 +567,7 @@ export class Arsenal {
         for (let i = 0; i < n; i++) {
           const x = b.x + fx * (2.5 + i * 2) + (i - (n - 1) / 2) * fy * 1.5, y = b.y + fy * (2.5 + i * 2) - (i - (n - 1) / 2) * fx * 1.5;
           const m = this.disc(x, y, 0.8, col, 0.6);
-          this.traps.push({ d, lv, x, y, z: m.position.z, t: e.secs, obj: m });
+          this.traps.push({ d, lv, x, y, z: m.position.z, t: e.secs, obj: m, r: e.r });
         }
         sfx.grab();
         break;
@@ -488,13 +577,13 @@ export class Arsenal {
         const [fx, fy] = dirOf(b.facing);
         const [x, y] = t ? [t.x, t.y] : e.at === 'target' ? [b.x + fx * 5, b.y + fy * 5] : [b.x, b.y];
         const m = this.disc(x, y, e.r, col, 0.4);
-        this.zones.push({ d, lv, x, y, z: m.position.z, t: e.secs, tick: 0, obj: m, self: false });
+        this.zones.push({ d, lv, x, y, z: m.position.z, t: e.secs, tick: 0, obj: m, self: aw('follow'), r: e.r, mul: 1 });
         snd();
         break;
       }
       case 'aura': {
         const m = this.disc(b.x, b.y, Math.max(1, e.r), col, 0.22);
-        this.zones.push({ d, lv, x: b.x, y: b.y, z: m.position.z, t: e.secs, tick: 0, obj: m, self: true });
+        this.zones.push({ d, lv, x: b.x, y: b.y, z: m.position.z, t: e.secs, tick: 0, obj: m, self: true, r: e.r, mul: 1 });
         snd();
         break;
       }
@@ -502,6 +591,7 @@ export class Arsenal {
         if (d.buff?.heal) { A.heal(this.buffVal(d, lv, 'heal')); A.float(b.x, b.y, b.z + 2.4, `+${Math.round(this.buffVal(d, lv, 'heal') * 100)}%`, 'heal'); }
         if (e.secs > 0.2) { this.buffs = this.buffs.filter((q) => q.d !== d); this.buffs.push({ d, lv, t: this.clock + e.secs }); }
         A.ring(b.x, b.y, b.z + 0.2, col, 2.2); A.ring(b.x, b.y, b.z + 1.6, col, 1.6);
+        if (aw('shock')) { A.ring(b.x, b.y, b.z + 0.4, col, 5); for (const f of this.inside(b.x, b.y, 5)) { A.hit(f, A.atk() * 1.5, 'skill', this.elemOf(d)); A.push(f, f.x - b.x, f.y - b.y, 9); } A.shake(0.25); }
         sfx.questStart();
         break;
       }
@@ -531,13 +621,16 @@ export class Arsenal {
         if (s.hit.has(f)) continue;
         if (Math.hypot(f.x - s.x, f.y - s.y) < (A.big(f) ? 2.6 : 1) && Math.abs(f.z + f.lift + 0.8 - s.z) < (A.big(f) ? 4 : 2)) {
           s.hit.add(f);
-          if (s.boom) { A.ring(s.x, s.y, s.z - 0.8, this.color(s.d), s.boom); A.burst(s.x, s.y, s.z, this.color(s.d)); this.circle(s.x, s.y, s.boom, s.d, s.lv); sfx.fire(); end = true; break; }
-          this.hit(f, s.d, s.lv);
+          if (s.boom) { A.ring(s.x, s.y, s.z - 0.8, this.color(s.d), s.boom); A.burst(s.x, s.y, s.z, this.color(s.d)); this.circle(s.x, s.y, s.boom, s.d, s.lv, s.mul ?? 1); sfx.fire(); if (!s.pierce) { end = true; break; } continue; }
+          this.hit(f, s.d, s.lv, s.mul ?? 1);
+          if (s.slow) A.slow(f, 2.5);
+          if (!s.shard && this.aw(s.d, 'shards')) for (let k = 0; k < 3; k++) { const [ux, uy] = dirOf(Math.random() * 360); const o = this.orb(this.color(s.d), 0.12); o.position.set(s.x, s.y, s.z); this.mark(o); this.shots.push({ x: s.x, y: s.y, z: s.z, dx: ux, dy: uy, left: 6, speed: 20, d: s.d, lv: s.lv, obj: o, hit: new Set([f]), pierce: false, boom: 0, shard: true, mul: 0.4 }); }
           if (!s.pierce) { end = true; break; }
         }
       }
       }
       s.obj.position.set(s.x, s.y, s.z);
+      if (end && s.left <= 0 && !s.back && !s.shard && this.aw(s.d, 'return')) { s.back = true; s.dx = -s.dx; s.dy = -s.dy; s.left = s.range ?? 16; s.hit.clear(); end = false; }
       if (end) { this.drop(s.obj); this.shots.splice(this.shots.indexOf(s), 1); }
     }
     // 궤도
@@ -545,32 +638,36 @@ export class Arsenal {
       o.t += dt;
       o.objs.forEach((obj, i) => { const a = o.t * 4 + (i / o.objs.length) * Math.PI * 2; obj.position.set(b.x + Math.cos(a) * o.r, b.y + Math.sin(a) * o.r, b.z + 1.1); });
       for (const obj of o.objs) for (const f of this.alive()) {
-        if (Math.hypot(f.x - obj.position.x, f.y - obj.position.y) < (A.big(f) ? 2.4 : 1) && (o.last.get(f) ?? -9) < this.clock - 0.4) { o.last.set(f, this.clock); this.hit(f, o.d, o.lv, 1, [b.x, b.y]); }
+        if (Math.hypot(f.x - obj.position.x, f.y - obj.position.y) < (A.big(f) ? 2.4 : 1) && (o.last.get(f) ?? -9) < this.clock - 0.4) { o.last.set(f, this.clock); this.hit(f, o.d, o.lv, 1, [b.x, b.y]); if (this.aw(o.d, 'mana')) this.mp = Math.min(this.maxMp, this.mp + 1); }
       }
-      if (o.t > o.secs) { for (const obj of o.objs) this.drop(obj); this.orbits.splice(this.orbits.indexOf(o), 1); }
+      if (o.t > o.secs) {
+        if (this.aw(o.d, 'burst')) for (const obj of o.objs) { const [ux, uy] = [obj.position.x - b.x, obj.position.y - b.y]; const L = Math.hypot(ux, uy) || 1; const q = this.orb(this.color(o.d), 0.26); q.position.copy(obj.position); this.mark(q); this.shots.push({ x: q.position.x, y: q.position.y, z: q.position.z, dx: ux / L, dy: uy / L, left: 12, speed: 22, d: o.d, lv: o.lv, obj: q, hit: new Set(), pierce: true, boom: 0, mul: 1.2 }); }
+        for (const obj of o.objs) this.drop(obj); this.orbits.splice(this.orbits.indexOf(o), 1);
+      }
     }
     // 포탑
     for (const T of this.turrets.slice()) {
       T.t += dt; T.fire -= dt;
       T.obj.children[1].position.z = 1.3 + Math.sin(T.t * 4) * 0.1;
       if (T.fire <= 0) {
-        T.fire = (T.d.eff as { every: number }).every;
-        const e = T.d.eff as { range: number; n?: number };
-        const f = this.nearest(e.range, [T.x, T.y]);
-        if (f) for (let i = 0; i < (e.n ?? 1); i++) {
-          const a = bearing(f.x - T.x, f.y - T.y) + (i - ((e.n ?? 1) - 1) / 2) * 8, [dx, dy] = dirOf(a);
+        T.fire = T.every;
+        const f = this.nearest(T.range, [T.x, T.y]);
+        if (f) for (let i = 0; i < T.n; i++) {
+          const a = bearing(f.x - T.x, f.y - T.y) + (i - (T.n - 1) / 2) * 8, [dx, dy] = dirOf(a);
           const obj = this.orb(this.color(T.d), 0.16); obj.position.set(T.x, T.y, T.z + 1.3); this.mark(obj);
-          this.shots.push({ x: T.x, y: T.y, z: T.z + 1.3, dx, dy, left: e.range + 2, speed: 26, d: T.d, lv: T.lv, obj, hit: new Set(), pierce: false, boom: 0 });
+          this.shots.push({ x: T.x, y: T.y, z: T.z + 1.3, dx, dy, left: T.range + 2, speed: 26, d: T.d, lv: T.lv, obj, hit: new Set(), pierce: false, boom: 0, shard: true, slow: this.aw(T.d, 'chill') });
         }
       }
-      if (T.t > T.secs) { this.drop(T.obj); this.turrets.splice(this.turrets.indexOf(T), 1); }
+      if (T.t > T.secs) { if (this.aw(T.d, 'boom')) { A.ring(T.x, T.y, T.z + 0.3, this.color(T.d), 4); A.burst(T.x, T.y, T.z + 1, this.color(T.d)); this.circle(T.x, T.y, 4, T.d, T.lv, 2); sfx.kill(true); } this.drop(T.obj); this.turrets.splice(this.turrets.indexOf(T), 1); }
     }
     // 덫
     for (const t of this.traps.slice()) {
       t.t -= dt;
-      const r = (t.d.eff as { r: number }).r;
-      const tripped = this.alive().some((f) => Math.hypot(f.x - t.x, f.y - t.y) < 1.4);
+      const r = t.r;
+      const tripped = t.t > 900 || this.alive().some((f) => Math.hypot(f.x - t.x, f.y - t.y) < 1.4);
       if (tripped || t.t <= 0) {
+        if (tripped && this.aw(t.d, 'pull')) for (const f of this.inside(t.x, t.y, r * 1.6)) A.pull(f, t.x, t.y, 0.8);
+        if (tripped && this.aw(t.d, 'chain')) for (const q of this.traps) if (q !== t && Math.hypot(q.x - t.x, q.y - t.y) < 6 && q.t < 900) q.t = 999;
         if (tripped) { A.ring(t.x, t.y, t.z + 0.2, this.color(t.d), r); A.burst(t.x, t.y, t.z + 0.8, this.color(t.d)); this.circle(t.x, t.y, r, t.d, t.lv); sfx.fire(); A.shake(0.15); }
         this.drop(t.obj); this.traps.splice(this.traps.indexOf(t), 1);
       }
@@ -582,17 +679,19 @@ export class Arsenal {
       (z.obj as THREE.Mesh).rotation.z += dt;
       if (z.tick <= 0) {
         z.tick = 0.5;
-        const r = (z.d.eff as { r: number }).r;
-        if (z.d.dmg) this.circle(z.x, z.y, r, z.d, z.lv, 1);
+        const r = z.r;
+        if (z.d.dmg) this.circle(z.x, z.y, r, z.d, z.lv, z.mul);
         else if (z.d.heal) A.heal(z.d.heal * (1 + 0.08 * (z.lv - 1)));
+        if (this.aw(z.d, 'heal') && Math.hypot(b.x - z.x, b.y - z.y) < r) A.heal(0.02);
+        if (this.aw(z.d, 'mana')) this.mp = Math.min(this.maxMp, this.mp + 1);
       }
-      if (z.t <= 0) { this.drop(z.obj); this.zones.splice(this.zones.indexOf(z), 1); }
+      if (z.t <= 0) { if (z.mul === 1 && this.aw(z.d, 'boom')) { const R = z.r * 1.2 + (z.d.eff?.k === 'aura' ? 2 : 0); A.ring(z.x, z.y, z.z + 0.3, this.color(z.d), R); A.burst(z.x, z.y, z.z + 1, this.color(z.d)); for (const f of this.inside(z.x, z.y, R)) this.hit(f, z.d, z.lv, z.d.eff?.k === 'aura' ? 2.5 : 2, [z.x, z.y]); sfx.kill(true); A.shake(0.3); } this.drop(z.obj); this.zones.splice(this.zones.indexOf(z), 1); }
     }
     // 불태움 · 독
     for (const [f, s] of this.dots) {
       if (f.state === 'dead') { this.dots.delete(f); continue; }
       s.t -= dt; s.tick -= dt;
-      if (s.tick <= 0) { s.tick = 0.5; A.hit(f, s.dmg, 'burst'); }
+      if (s.tick <= 0) { s.tick = 0.5; A.hit(f, s.dmg, 'burst', null); }
       if (s.t <= 0) this.dots.delete(f);
     }
     this.paintTick -= dt;

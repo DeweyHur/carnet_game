@@ -21,7 +21,8 @@ export interface MoveApi {
   group: THREE.Group;
   foes(): FoeLike[];
   big(f: FoeLike): boolean;
-  hit(f: FoeLike, raw: number, how: How): void;
+  /** elem: 원소(없으면 캐릭터의 원소, null이면 원소 없음) */
+  hit(f: FoeLike, raw: number, how: How, elem?: import('./elements').Elem | null): void;
   atk(): number;
   ring(x: number, y: number, z: number, color: number, r: number): void;
   burst(x: number, y: number, z: number, color: number): void;

@@ -11,6 +11,7 @@ import * as sfx from './sound';
 import { weaponOf, type WeaponStats } from './gear';
 import { NO_MODS, type GrowthMods } from './growth';
 import { Moves, type MoveApi, type FoeLike } from './moves';
+import { AFFIX, AFFIX_POOL, AURA, CHAR_ELEM, ELEM, react, type Affix, type Elem, type Reaction } from './elements';
 import type { CharId } from './party';
 
 const FIGHT_ACTS = new Set<string>(['atk1', 'atk2', 'atk3', 'atk4', 'charge', 'skill', 'burst']);
@@ -70,6 +71,8 @@ interface Foe {
   dash?: [number, number]; slam?: THREE.Mesh; wander: number; bar: HTMLElement | null; seen: number;
   /** 밤 습격: 끝까지 쫓아온다 */ hunter?: boolean;
   /** 기절(남은 초) */ stunT?: number;
+  /** 원소 오라 · 남은 초 · 약해짐(받는 피해 +30%) */ aura?: Elem; auraT?: number; vulnT?: number;
+  /** 정예 접두어 · 방패 원소 · 갈라져 나온 작은 것 */ affixes?: Affix[]; ward?: Elem; mini?: boolean;
   /** 느려짐(남은 초) */ slowT?: number;
   /** 맞아서 밀려나는 속도 · 움찔 · 쓰러질 때 도는 쪽 */ kbx?: number; kby?: number; hurtT?: number; spin?: number;
   /** 정예(크고 세다) */ elite?: boolean;
@@ -116,7 +119,7 @@ export class Combat {
   /** 쓰러진 횟수 */
   downs = 0;
   /** 맞힌 회오리 베기 · 강공격 · 반격 수(첫걸음 연습) */
-  readonly tally = { atk4: 0, charge: 0, counter: 0 };
+  readonly tally = { atk4: 0, charge: 0, counter: 0, reactions: 0 };
   // 화면
   private readonly ui: HTMLElement;
   private readonly hpBar: HTMLElement;
@@ -167,9 +170,10 @@ export class Combat {
     this.recalc(true);
     this.api = {
       slow: (f: FoeLike, secs: number) => { const q = f as Foe; if (!big(q)) q.slowT = Math.max(q.slowT ?? 0, secs); },
+      vuln: (f: FoeLike, secs: number) => { const q = f as Foe; q.vulnT = Math.max(q.vulnT ?? 0, secs); },
       hero: c.hero, W: () => this.W, group: this.group,
       foes: () => this.foes, big: (f) => big(f as Foe),
-      hit: (f, raw, how) => { if ((f as Foe).state !== 'dead') this.damage(f as Foe, raw, how); },
+      hit: (f, raw, how, elem) => { if ((f as Foe).state !== 'dead') this.damage(f as Foe, raw, how, elem); },
       atk: () => this.atk,
       ring: (x, y, z, col, r) => this.ring(x, y, z, col, r),
       burst: (x, y, z, col) => this.burstWind(x, y, z, col),
@@ -186,7 +190,7 @@ export class Combat {
     this.moves = new Moves(this.api);
   }
   /** 기술(skills.ts)이 쓰는 좁은 창 */
-  readonly api: MoveApi & { slow(f: FoeLike, secs: number): void };
+  readonly api: MoveApi & { slow(f: FoeLike, secs: number): void; vuln(f: FoeLike, secs: number): void };
   /** 캐릭터마다 다른 보통 공격 · E · Q */
   private readonly moves: Moves;
   private get who(): CharId { return this.c.who?.() ?? 'traveler'; }
@@ -219,7 +223,7 @@ export class Combat {
     const f = this.spawn(kind, x, y, z, null);
     f.hunter = true; f.elite = elite; f.lv = lv;
     f.maxHp = f.hp = Math.round(STATS[kind].hp * (1 + 0.28 * (lv - 1)) * (elite ? 3 : 1));
-    if (elite) f.obj.scale.setScalar(1.4);
+    if (elite) { f.obj.scale.setScalar(1.4); this.makeElite(f, lv >= 8 ? 2 : 1); }
     f.state = 'chase'; f.t = Math.random() * 0.5; f.cd = 1 + Math.random() * 1.5;
     return f;
   }
@@ -244,7 +248,7 @@ export class Combat {
       const fx = x + Math.cos(a) * d, fy = y + Math.sin(a) * d;
       const fz = this.W.ground(fx, fy, z + 2, 2.5);
       const f = this.spawn(k, fx, fy, fz, camp);
-      if (i < elites) { f.elite = true; f.obj.scale.setScalar(1.4); f.maxHp = f.hp = f.hp * 3; }
+      if (i < elites) { f.elite = true; f.obj.scale.setScalar(1.4); f.maxHp = f.hp = f.hp * 3; this.makeElite(f, 1 + (Math.random() < 0.4 ? 1 : 0)); }
       camp.foes.push(f);
     });
     this.camps.set(key, camp);
@@ -362,6 +366,9 @@ export class Combat {
     this.stepKing();
     for (const foe of this.foes.slice()) this.stepFoe(foe, dt);
     this.stepTornado(dt);
+    this.crystalT = Math.max(0, this.crystalT - dt);
+    if (this.burnT > 0 && !this.downing) { this.burnT -= dt; this.hp -= this.maxHp * 0.03 * dt; if (this.hp <= 0) void this.down(); }
+    for (const e of this.later.slice()) { e.t -= dt; if (e.t <= 0) { this.later.splice(this.later.indexOf(e), 1); e.fn(); } }
     this.moves.update(dt);
     this.stepFx(dt);
     this.paintHud();
@@ -628,8 +635,19 @@ export class Combat {
     this.energy = Math.min(this.energyMax, this.energy + n * 3);
   }
 
-  private damage(f: Foe, raw: number, how: 'hit' | 'heavy' | 'skill' | 'burst') {
+  private damage(f: Foe, raw: number, how: 'hit' | 'heavy' | 'skill' | 'burst', elem?: Elem | null, rxOk = true) {
     const w = this.wep;
+    // 원소: 남은 오라와 다르면 반응, 아니면 새 오라를 남긴다
+    const inc: Elem | null = elem === undefined ? CHAR_ELEM[this.who] ?? null : elem;
+    let rx: Reaction | null = null;
+    const before = f.aura && (f.auraT ?? 0) > 0 ? f.aura : undefined;
+    if (inc && rxOk) {
+      if (before && before !== inc) rx = react(before, inc);
+      if (rx) f.aura = undefined;
+      else if (AURA.has(inc)) { f.aura = inc; f.auraT = 5; }
+    }
+    const armor = f.affixes?.includes('armored') ? 0.5 : 1;
+    const warded = !!f.ward && inc === f.ward;
     const counter = this.counterArmed && how !== 'burst';
     const g = this.gm;
     const crit = counter || Math.random() < w.crit + g.crit + (this.moves.paintT > 0 ? 0.3 : 0);
@@ -638,7 +656,7 @@ export class Combat {
     const talent = how === 'skill' ? g.skill : how === 'burst' ? g.burst : g.normal;
     // 스킬로 띄운 적은 공중 추가타 +25% · 이어 맞힌 수만큼 +5%씩(최대 +30%) · 반격 1.5배
     const juggle = f.lift > 0.2 && !big(f) && how !== 'skill' ? 1.25 : 1;
-    const dmg = Math.round(raw * talent * mark * (0.9 + Math.random() * 0.2) * (crit ? w.critDmg + g.critDmg : 1) * juggle * this.hitMul * (counter ? 1.5 : 1));
+    const dmg = Math.round(raw * (rx?.mul ?? 1) * armor * (warded ? 0.2 : 1) * ((f.vulnT ?? 0) > 0 ? 1.3 : 1) * talent * mark * (0.9 + Math.random() * 0.2) * (crit ? w.critDmg + g.critDmg : 1) * juggle * this.hitMul * (counter ? 1.5 : 1));
     this.countHit();
     if (counter) this.tally.counter++;
     this.juice(f, how, crit);
@@ -648,8 +666,65 @@ export class Combat {
     f.seen = 4;
     if (f.state === 'idle' || f.state === 'return') this.aggro(f);
     this.float(f.x, f.y, f.z + (big(f) ? 5.5 : 1.6), `${dmg}${crit ? '!' : ''}`, crit ? 'crit' : how === 'skill' || how === 'burst' ? 'wind' : 'dmg');
+    if (warded) this.float(f.x, f.y, f.z + 2.3, `${ELEM[f.ward!].emoji} 방패 — 다른 원소로!`, 'rxn');
+    if (rx && before) this.reaction(f, rx, raw, before);
     if (f.hp <= 0) this.kill(f, how);
   }
+
+  // ───────── 원소 반응 ─────────
+  /** 결정화(대지): 받는 피해 −25% */
+  private crystalT = 0;
+  /** 불붙은 몸(불타는 정예에게 맞음) */
+  private burnT = 0;
+  private reaction(f: Foe, rx: Reaction, raw: number, aura: Elem) {
+    const z = f.z + (big(f) ? 6.2 : 2.4);
+    const el = document.createElement('div');
+    this.float(f.x, f.y, z, rx.name, 'rxn');
+    const last = this.layer.lastElementChild as HTMLElement | null;
+    if (last) last.style.color = `#${rx.color.toString(16).padStart(6, '0')}`;
+    void el;
+    sfx.flash();
+    this.ring(f.x, f.y, f.z + 0.8, rx.color, 2.6);
+    this.burstWind(f.x, f.y, f.z + 1, rx.color);
+    this.stop(0.08, 0.05); this.hero.cam.shake(0.16);
+    this.tally.reactions++;
+    const others = (r: number) => this.foes.filter((q) => q !== f && q.state !== 'dead' && Math.hypot(q.x - f.x, q.y - f.y) < r && Math.abs(q.z - f.z) < 5);
+    switch (rx.effect) {
+      case 'freeze': this.api.stun(f, 2.5); break;
+      case 'stun': this.api.stun(f, 1.2); break;
+      case 'vuln': f.vulnT = 6; break;
+      case 'arc': for (const q of others(4.5)) { this.damage(q, raw * 0.5, 'burst', 'bolt', false); this.zap(f, q, rx.color); } break;
+      case 'blast': this.ring(f.x, f.y, f.z + 0.3, rx.color, 3.4); for (const q of others(3.4)) { this.damage(q, raw * 0.8, 'burst', null, false); this.api.push(q, q.x - f.x, q.y - f.y, 9); } break;
+      case 'spread': for (const q of others(5.5)) { q.aura = aura; q.auraT = 5; this.damage(q, raw * 0.6, 'burst', null, false); this.zap(f, q, rx.color); } break;
+      case 'crystal': this.crystalT = 6; this.float(this.hero.body.x, this.hero.body.y, this.hero.body.z + 2.6, '🛡 결정 방패', 'heal'); break;
+      default: break;
+    }
+    // 반응은 단단한 갑옷을 깬다
+    if (f.affixes?.includes('armored')) { f.affixes = f.affixes.filter((a) => a !== 'armored'); this.float(f.x, f.y, z + 0.6, '💥 갑옷이 부서졌다!', 'crit'); f.bar?.remove(); f.bar = null; }
+  }
+  /** 반응이 튀는 선 */
+  private zap(a: Foe, b: Foe, color: number) {
+    const L = Math.hypot(b.x - a.x, b.y - a.y) || 0.1;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.1, L, 0.1).translate(0, L / 2, 0), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
+    m.position.set(a.x, a.y, a.z + 1); m.rotation.z = -Math.atan2(b.x - a.x, b.y - a.y);
+    this.group.add(m);
+    this.fx.push({ obj: m, t: 0, life: 0.25, step: (o, t) => { ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.9 * (1 - t / 0.25); } });
+  }
+  // ───────── 정예 접두어 ─────────
+  private makeElite(f: Foe, n: number) {
+    const pool = AFFIX_POOL.slice();
+    f.affixes = [];
+    for (let i = 0; i < n && pool.length; i++) f.affixes.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    if (f.affixes.includes('ward')) { const es: Elem[] = ['fire', 'water', 'ice', 'bolt', 'toxic', 'light', 'moon', 'wind', 'earth', 'sound']; f.ward = es[Math.floor(Math.random() * es.length)]; }
+  }
+  /** 정예의 이름(접두어 · 방패) */
+  private eliteName(f: Foe) {
+    const a = (f.affixes ?? []).filter((x) => x !== 'ward').map((x) => AFFIX[x].name);
+    if (f.ward) a.push(`${ELEM[f.ward].emoji}${ELEM[f.ward].name}의 방패`);
+    return a.join(' · ');
+  }
+  /** 폭발하는 정예: 1초 뒤 터진다 */
+  private later: { t: number; fn: () => void }[] = [];
 
   // ───────── 타격감: 히트스톱 · 흔들림 · 소리 · 불꽃 · 밀림 · 끊기 ─────────
   private stopT = 0; private stopScale = 1; private sndAt = 0;
@@ -741,6 +816,17 @@ export class Combat {
     this.stop(big(f) ? 0.35 : 0.1, big(f) ? 0.15 : 0.05);
     this.hero.cam.shake(big(f) ? 0.35 : 0.16);
     // 무리의 마지막 하나 · 습격 물결의 마지막 하나 = 느린 화면
+    if (f.affixes?.includes('splitting')) for (let i = 0; i < 2; i++) {
+      const q = this.spawn(f.kind, f.x + (i ? 1 : -1), f.y, f.z, null);
+      q.mini = true; q.hunter = f.hunter; q.lv = f.lv; q.maxHp = q.hp = Math.round(f.maxHp / 3 * 0.4); q.obj.scale.setScalar(0.7); q.state = 'chase';
+    }
+    if (f.affixes?.includes('volatile')) {
+      const x = f.x, y = f.y, z = f.z;
+      const m = new THREE.Mesh(new THREE.CircleGeometry(3, 32), new THREE.MeshBasicMaterial({ color: 0xff3b2f, transparent: true, opacity: 0.35, depthWrite: false }));
+      m.position.set(x, y, this.W.ground(x, y, z + 1, 2) + 0.06); this.group.add(m);
+      this.fx.push({ obj: m, t: 0, life: 1, step: (o, t) => { ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.2 + 0.5 * t; } });
+      this.later.push({ t: 1, fn: () => { this.ring(x, y, z + 0.4, 0xff5a2f, 3); this.burstWind(x, y, z + 1, 0xff8a4a); sfx.kill(true); this.hero.cam.shake(0.3); const b = this.hero.body; if (Math.hypot(b.x - x, b.y - y) < 3) this.hurt(this.maxHp * 0.25, null); } });
+    }
     const lastOfCamp = !!f.camp && f.camp.foes.every((q) => q.state === 'dead');
     const lastHunter = !!f.hunter && this.huntersAlive() === 0;
     if (lastOfCamp || lastHunter) { this.stop(0.5, 0.22); this.flash(); }
@@ -835,7 +921,7 @@ export class Combat {
       const ex = tx - f.x, ey = ty - f.y, L = Math.hypot(ex, ey);
       if (L < 0.05) return;
       f.facing = bearing(ex, ey);
-      const s = Math.min(L, sp * (f.slowT && f.slowT > 0 ? 0.4 : 1) * dt);
+      const s = Math.min(L, sp * (f.slowT && f.slowT > 0 ? 0.4 : 1) * (f.affixes?.includes('fast') ? 1.5 : 1) * dt);
       const p = { x: f.x + (ex / L) * s, y: f.y + (ey / L) * s };
       if (!S.fly) w.collide(p, f.z, 0.45, 1.2, 0.6);
       f.x = p.x; f.y = p.y;
@@ -903,6 +989,8 @@ export class Combat {
     else if (f.kind === 'rat' || f.kind === 'ratking') { const arm = body.userData.arm as THREE.Object3D; arm.rotation.x = f.state === 'windup' ? -1.4 * wind : f.state === 'recover' ? 1.2 : Math.sin(f.t * 8) * 0.2; body.rotation.x = f.state === 'chase' ? 0.15 : 0; body.position.z = f.state === 'chase' ? Math.abs(Math.sin(f.t * 10)) * 0.08 : 0; }
     else { const wings = f.obj.userData.wings as THREE.Object3D[]; const fl = Math.sin(f.t * (f.state === 'dash' ? 20 : 8)) * 0.6; wings[0].rotation.y = fl; wings[1].rotation.y = -fl; body.rotation.x = f.state === 'windup' ? -0.5 * wind : f.state === 'dash' ? 0.7 : 0; }
     if (f.slowT && f.slowT > 0) f.slowT -= dt;
+    if (f.auraT && f.auraT > 0) { f.auraT -= dt; if (f.auraT <= 0) f.aura = undefined; }
+    if (f.vulnT && f.vulnT > 0) f.vulnT -= dt;
     if (f.hurtT && f.hurtT > 0) { f.hurtT -= dt; const k = Math.max(0, f.hurtT / 0.22); body.rotation.x -= 0.55 * k * (big(f) ? 0.3 : 1); body.position.z += 0.12 * k; }
     for (const m of f.mats) m.emissive.setHex(f.flash > 0 ? 0xffffff : wind > 0.6 ? 0x661100 : f.slowT && f.slowT > 0 ? 0x183a5a : f.elite ? 0x3a1450 : 0x000000);
     if (f.flash > 0) f.flash -= dt;
@@ -934,7 +1022,9 @@ export class Combat {
   private hurt(dmg: number, from: Foe | null) {
     const b = this.hero.body;
     if (this.iframes > 0 || b.mode === 'roll' || this.downing) { if (b.mode === 'roll' && from) this.float(b.x, b.y, b.z + 2.2, '회피!', 'heal'); return; }
-    const d = Math.max(1, Math.round(dmg * (1 - this.gm.def) * (this.moves.shieldT > 0 ? 0.4 : 1)));
+    const d = Math.max(1, Math.round(dmg * (1 - this.gm.def) * (this.moves.shieldT > 0 ? 0.4 : 1) * (this.crystalT > 0 ? 0.75 : 1)));
+    if (from?.affixes?.includes('burning')) { this.burnT = 3; this.float(b.x, b.y, b.z + 2.6, '🔥 불이 붙었다 — 구르거나 물로!', 'hurt'); }
+    if (from?.affixes?.includes('vampiric')) from.hp = Math.min(from.maxHp, from.hp + from.maxHp * 0.1);
     this.hp -= d;
     // 두 번째 숨(스킬 트리): 90초에 한 번, 쓰러질 뻔하면 버틴다
     if (this.hp <= 0 && this.gm.second && this.clock - this.secondAt > 90) { this.secondAt = this.clock; this.hp = Math.round(this.maxHp * 0.3); this.iframes = 1.5; this.float(b.x, b.y, b.z + 2.6, '🔥 두 번째 숨!', 'heal'); }
@@ -1139,7 +1229,8 @@ export class Combat {
     for (const f of this.foes) {
       const show = f.state !== 'dead' && !big(f) && (f.seen > 0 || f.state === 'chase' || f.state === 'windup' || f.state === 'dash' || f.state === 'recover') && f.obj.visible;
       if (!show) { if (f.bar) { f.bar.remove(); f.bar = null; } continue; }
-      if (!f.bar) { f.bar = document.createElement('div'); f.bar.className = 'cbt-bar'; f.bar.innerHTML = `<small>Lv.${f.lv}</small><span><i></i></span>`; this.layer.appendChild(f.bar); }
+      if (!f.bar) { f.bar = document.createElement('div'); f.bar.className = `cbt-bar${f.elite ? ' elite' : ''}`; f.bar.innerHTML = `${f.elite ? `<em class="en">★ ${this.eliteName(f)}</em>` : ''}<small>Lv.${f.lv}</small><span><i></i></span><b class="au"></b>`; this.layer.appendChild(f.bar); }
+      const au = f.bar.querySelector('.au') as HTMLElement; const want = f.aura && (f.auraT ?? 0) > 0 ? ELEM[f.aura].emoji : ''; if (au.textContent !== want) au.textContent = want;
       if (this.hero.view.project(f.x, f.y, f.z + f.lift + (f.kind === 'gargoyle' ? 1.6 : 1.5), this.pt)) {
         f.bar.style.transform = `translate(${this.pt.x}px, ${this.pt.y}px) translate(-50%, -100%)`;
         (f.bar.querySelector('i') as HTMLElement).style.width = `${(f.hp / f.maxHp) * 100}%`;
