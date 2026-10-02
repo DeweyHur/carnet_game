@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hitchhiker's Space Quiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&family=VT323&display=swap">
+<style>
+/* Layout: one handheld "Guide" device centred on a drifting starfield; screen on top, big DON'T PANIC key below. Single dark look by design. */
+:root {
+  --void: #0a0b1e;        /* deep space */
+  --casing: #23255a;      /* the Guide's plastic shell */
+  --casing-edge: #3a3d86;
+  --screen: #0f1233;      /* the glowing panel */
+  --glow: #ffd27a;        /* warm phosphor text */
+  --ink: #eef0ff;         /* body text */
+  --muted: #a9acd6;
+  --panic: #ff5b4a;       /* big friendly letters */
+  --panic-deep: #b8302a;
+  --ok: #5fdcc4;
+  --bad: #ff8a7a;
+  --f-display: "Fredoka", "Trebuchet MS", "Arial Rounded MT Bold", sans-serif;
+  --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-screen: "VT323", ui-monospace, "Courier New", monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0; background: var(--void); color: var(--ink);
+  font: 400 1rem/1.5 var(--f-body);
+  padding-inline: 16px; padding-block: 24px 40px;
+}
+#stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.device {
+  position: relative; z-index: 1; max-width: 720px; margin: 0 auto;
+  background: linear-gradient(160deg, var(--casing-edge), var(--casing) 40%);
+  border-radius: 28px; padding: 18px 18px 22px;
+  box-shadow: 0 0 0 2px #14153a, 0 24px 60px rgba(0,0,0,.55), inset 0 2px 0 rgba(255,255,255,.12);
+  display: grid; gap: 16px;
+}
+.brand { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; padding-inline: 6px; }
+.brand h1 { margin: 0; font: 600 clamp(1.05rem, 3.6vw, 1.35rem)/1.15 var(--f-display); letter-spacing: .02em; color: var(--ink); text-wrap: balance; }
+.brand .sub { font: 1.1rem/1 var(--f-screen); color: var(--muted); letter-spacing: .04em; }
+.screen {
+  background: radial-gradient(120% 90% at 50% 0%, #1a1e52, var(--screen) 70%);
+  border-radius: 16px; padding: 20px clamp(14px, 4vw, 26px) 22px;
+  box-shadow: inset 0 0 0 2px #090a22, inset 0 0 40px rgba(255,210,122,.07);
+  min-height: 380px; position: relative; overflow: hidden;
+}
+.screen::after { /* faint scanlines */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 3px);
+}
+.readout { font: 1.15rem/1.2 var(--f-screen); color: var(--glow); letter-spacing: .05em; text-transform: uppercase; }
+.lede { font-size: 1.05rem; color: var(--ink); max-width: 60ch; margin: 6px 0 18px; }
+.lede em { color: var(--glow); font-style: normal; }
+
+/* topic picker */
+.topics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.topic {
+  all: unset; cursor: pointer; display: grid; gap: 4px; padding: 14px 14px 13px;
+  border-radius: 14px; background: rgba(255,255,255,.04); border: 1.5px solid rgba(255,210,122,.22);
+  transition: border-color .15s, background .15s, transform .15s;
+}
+.topic:hover { border-color: var(--glow); background: rgba(255,210,122,.08); transform: translateY(-1px); }
+.topic:focus-visible { outline: 3px solid var(--glow); outline-offset: 2px; }
+.topic .code { font: 1.05rem/1 var(--f-screen); color: var(--glow); letter-spacing: .06em; }
+.topic .name { font: 600 1.2rem/1.2 var(--f-display); color: var(--ink); }
+.topic .blurb { font-size: .9rem; color: var(--muted); line-height: 1.4; }
+.topic.everything { grid-column: 1 / -1; border-style: dashed; }
+.topic.everything .name::after { content: " · 42"; color: var(--glow); }
+
+/* question view */
+.qhead { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+.pips { display: flex; gap: 5px; flex-wrap: wrap; }
+.pip { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,.12); }
+.pip.ok { background: var(--ok); } .pip.bad { background: var(--bad); } .pip.now { box-shadow: 0 0 0 2px var(--glow); }
+.question { font: 600 clamp(1.25rem, 4.4vw, 1.6rem)/1.25 var(--f-display); margin: 10px 0 16px; text-wrap: balance; color: var(--ink); }
+.options { display: grid; gap: 10px; }
+.opt {
+  all: unset; cursor: pointer; display: flex; gap: 12px; align-items: center;
+  padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,.05);
+  border: 1.5px solid rgba(255,255,255,.1); font-size: 1.02rem; line-height: 1.35;
+  transition: background .15s, border-color .15s, opacity .25s;
+}
+.opt .key { font: 1.2rem/1 var(--f-screen); color: var(--glow); min-width: 1ch; }
+.opt:hover:not([disabled]) { border-color: var(--glow); background: rgba(255,210,122,.07); }
+.opt:focus-visible { outline: 3px solid var(--glow); outline-offset: 2px; }
+.opt[disabled] { cursor: default; }
+.opt.gone { opacity: .22; text-decoration: line-through; }
+.opt.right { border-color: var(--ok); background: rgba(95,220,196,.13); }
+.opt.wrong { border-color: var(--bad); background: rgba(255,138,122,.12); }
+.entry {
+  margin-top: 16px; padding: 12px 14px; border-left: 3px solid var(--glow);
+  background: rgba(255,210,122,.06); border-radius: 0 10px 10px 0;
+}
+.entry .readout { font-size: 1.05rem; margin-bottom: 4px; }
+.entry p { margin: 0; color: var(--ink); }
+.entry .quip { margin-top: 6px; color: var(--muted); font-style: italic; font-size: .95rem; }
+.row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 14px; }
+.btn {
+  all: unset; cursor: pointer; font: 600 1rem/1 var(--f-display); letter-spacing: .02em;
+  padding: 12px 18px; border-radius: 999px; background: var(--glow); color: #2a1c00;
+}
+.btn.ghost { background: transparent; color: var(--glow); box-shadow: inset 0 0 0 1.5px var(--glow); }
+.btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+/* results */
+.score { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 6px 0 4px; }
+.score .big { font: 700 clamp(3.5rem, 14vw, 5.5rem)/1 var(--f-display); color: var(--glow); font-variant-numeric: tabular-nums; }
+.score .of { font: 1.5rem/1 var(--f-screen); color: var(--muted); }
+.rank { font: 600 1.45rem/1.2 var(--f-display); margin: 6px 0 4px; color: var(--ink); }
+.review { margin: 16px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.review li { display: grid; grid-template-columns: 1.2rem minmax(0,1fr); gap: 8px; font-size: .92rem; color: var(--muted); }
+.review li b { color: var(--ink); font-weight: 700; }
+.review .mk { font: 1.2rem/1.1 var(--f-screen); }
+.review .mk.ok { color: var(--ok); } .review .mk.bad { color: var(--bad); }
+.copied { font: 1.05rem/1 var(--f-screen); color: var(--ok); align-self: center; }
+
+/* control deck */
+.deck { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 14px; align-items: center; padding-inline: 4px; }
+.towels { font: 1.15rem/1.25 var(--f-screen); color: var(--muted); letter-spacing: .04em; }
+.towels b { color: var(--glow); font-weight: 400; }
+.status { font: .95rem/1.4 var(--f-body); color: var(--ink); min-height: 2.8em; }
+.panic {
+  all: unset; cursor: pointer; text-align: center; user-select: none;
+  font: 700 clamp(1.35rem, 5vw, 1.9rem)/1 var(--f-display); letter-spacing: .04em; color: #fff4e8;
+  background: var(--panic); padding: 18px 26px 16px; border-radius: 22px;
+  box-shadow: 0 7px 0 var(--panic-deep), 0 12px 24px rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.3);
+  transition: transform .08s, box-shadow .08s;
+}
+.panic small { display: block; font: 1rem/1 var(--f-screen); letter-spacing: .08em; margin-top: 6px; color: #ffe0d6; }
+.panic:active { transform: translateY(6px); box-shadow: 0 1px 0 var(--panic-deep), 0 4px 10px rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.3); }
+.panic:focus-visible { outline: 3px solid var(--glow); outline-offset: 4px; }
+.panic.wobble { animation: wobble .5s; }
+@keyframes wobble { 25% { transform: rotate(-3deg); } 75% { transform: rotate(3deg); } }
+.foot { text-align: center; font: 1rem/1.3 var(--f-screen); color: var(--muted); letter-spacing: .04em; padding-inline: 6px; }
+
+@media (max-width: 560px) {
+  .topics { grid-template-columns: minmax(0,1fr); }
+  .deck { grid-template-columns: minmax(0,1fr); }
+  .panic { width: 100%; box-sizing: border-box; }
+  .device { padding: 14px 12px 18px; border-radius: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="stars" aria-hidden="true"></canvas>
+<main class="device">
+  <div class="brand">
+    <h1>The Hitchhiker's Space Quiz</h1>
+    <span class="sub">Sub-Etha edition · 400 facts</span>
+  </div>
+  <section class="screen" id="screen" aria-live="polite"></section>
+  <div class="deck">
+    <div>
+      <div class="towels" id="towels"></div>
+      <div class="status" id="status"></div>
+    </div>
+    <button class="panic" id="panic" type="button" aria-describedby="status">DON'T PANIC<small id="panicHint">PRESS FOR A SURPRISE</small></button>
+  </div>
+  <div class="foot">A fan-made tribute. Facts from four quiz-practice sheets checked against NASA, ESA, JAXA and others.</div>
+</main>
+
+<script>
+(() => {
+// [question, correct, wrong, wrong, wrong, Guide entry]
+const BANK = {
+  flight: { code: "ENTRY 1 · ROCKETS", name: "Spaceflight History", blurb: "Rockets, cosmonauts, moonwalkers and the odd dog. Bring snacks.", q: [
+    ["Who launched the first successful liquid-propellant rocket, in 1926?", "Robert H. Goddard", "Konstantin Tsiolkovsky", "Wernher von Braun", "Hermann Oberth", "Robert H. Goddard launched the first successful liquid-propellant rocket on 16 March 1926."],
+    ["How high did Goddard's pioneering liquid-fuel rocket rise?", "12.5 metres", "125 metres", "1.25 kilometres", "12.5 kilometres", "The flight lasted about 2.5 seconds and rose 12.5 metres. Everyone has to start somewhere."],
+    ["The German A-4 rocket is better known as what?", "The V-2", "The R-7", "The Redstone", "The Saturn I", "The A-4, better known as the V-2, was the first long-range guided ballistic missile."],
+    ["In which year did Sputnik 1 become the first artificial satellite?", "1957", "1955", "1959", "1961", "The Soviet Union launched Sputnik 1 on 4 October 1957, aboard an R-7 rocket."],
+    ["Who was the first animal to orbit Earth?", "Laika", "Belka", "Ham", "Félicette", "Sputnik 2 carried the dog Laika in November 1957, making her the first animal to orbit Earth."],
+    ["Explorer 1's instruments helped discover what?", "The Van Allen radiation belts", "The solar wind", "The ozone hole", "The Kuiper Belt", "Explorer 1, the first US satellite (31 January 1958), helped discover the Van Allen belts."],
+    ["Which spacecraft returned the first photos of the Moon's far side?", "Luna 3", "Luna 9", "Ranger 7", "Surveyor 1", "Luna 3 photographed the Moon's far side in 1959."],
+    ["What was the first successful weather satellite?", "TIROS-1", "Explorer 1", "Vanguard 1", "Telstar", "TIROS-1, launched by the United States in 1960, was the first successful weather satellite."],
+    ["Yuri Gagarin made the first human spaceflight aboard which craft?", "Vostok 1", "Voskhod 2", "Soyuz 1", "Mercury-Atlas 6", "Gagarin orbited Earth once aboard Vostok 1 on 12 April 1961."],
+    ["Who was the first woman in space?", "Valentina Tereshkova", "Sally Ride", "Svetlana Savitskaya", "Eileen Collins", "Valentina Tereshkova flew aboard Vostok 6 in June 1963."],
+    ["Who performed the first ever spacewalk?", "Alexei Leonov", "Ed White", "Yuri Gagarin", "Gherman Titov", "Alexei Leonov stepped outside Voskhod 2 in March 1965. Ed White followed for the US that June."],
+    ["The Gemini spacecraft takes its name from the Latin word for what?", "Twins", "Messengers", "Explorers", "Bridges", "Gemini carried two people, hence 'twins'."],
+    ["Which mission first carried humans into orbit around the Moon?", "Apollo 8", "Apollo 10", "Apollo 11", "Apollo 7", "Apollo 8 orbited the Moon in December 1968."],
+    ["Who stayed in lunar orbit while Armstrong and Aldrin walked on the Moon?", "Michael Collins", "Jim Lovell", "Eugene Cernan", "John Young", "Michael Collins remained in the command module Columbia. Someone had to mind the car."],
+    ["How many people have walked on the Moon?", "12", "6", "18", "24", "Twelve people walked on the Moon, all on Apollo missions between 1969 and 1972."],
+    ["Who was the last person to walk on the Moon?", "Eugene Cernan", "Neil Armstrong", "Alan Bean", "John Young", "Eugene Cernan, commander of Apollo 17 in December 1972."],
+    ["What was the world's first space station?", "Salyut 1", "Skylab", "Mir", "Tiangong-1", "The Soviet Union launched Salyut 1 in 1971. Skylab followed for the US in 1973."],
+    ["How many missions did the Space Shuttle fleet fly?", "135", "100", "87", "166", "The Shuttle flew 135 missions from 1981 to 2011, ending with Atlantis on STS-135."],
+    ["What was the first module of the International Space Station?", "Zarya", "Unity", "Destiny", "Zvezda", "Russia's Zarya launched in November 1998; Endeavour brought Unity to meet it that December."],
+    ["Which is the only spacecraft to have visited Uranus and Neptune?", "Voyager 2", "Voyager 1", "Pioneer 11", "New Horizons", "Voyager 2 is the only visitor so far to both ice giants."],
+    ["Which lander was the first to touch down on a comet nucleus?", "Philae", "Huygens", "Giotto", "Deep Impact", "ESA's Rosetta deployed Philae after becoming the first spacecraft to orbit a comet, in 2014."],
+    ["What made the first powered, controlled flight on another world?", "Ingenuity", "Sojourner", "Perseverance", "Zhurong", "Perseverance landed on Mars in 2021 carrying the helicopter Ingenuity."],
+    ["Which mission made the first soft landing on the Moon's far side?", "Chang'e 4", "Chandrayaan-3", "Luna 9", "SLIM", "China's Chang'e 4 landed on the far side in 2019."],
+    ["Which mission returned samples from asteroid Ryugu?", "Hayabusa2", "OSIRIS-REx", "Hayabusa", "Rosetta", "JAXA's Hayabusa2 brought Ryugu samples home in 2020. OSIRIS-REx did Bennu in 2023."],
+    ["What was the first rover to operate on Mars?", "Sojourner", "Spirit", "Curiosity", "Opportunity", "Mars Pathfinder's Sojourner rolled out in 1997."]
+  ]},
+  culture: { code: "ENTRY 2 · CULTURE", name: "Space Culture", blurb: "Books, films, radio, records and robots. Mostly fictional, entirely important.", q: [
+    ["In Jules Verne's From the Earth to the Moon, how are travellers launched?", "A giant cannon", "A hot-air balloon", "A chariot pulled by swans", "A liquid-fuel rocket", "Verne's 1865 novel fires its travellers toward the Moon from Florida using a giant cannon."],
+    ["What is the antigravity material in H. G. Wells's The First Men in the Moon?", "Cavorite", "Unobtainium", "Flubber", "Kryptonite", "Wells named it Cavorite, after its inventor Mr Cavor."],
+    ["Which was the first magazine devoted only to science fiction?", "Amazing Stories", "Astounding", "Weird Tales", "Galaxy", "Hugo Gernsback launched Amazing Stories in 1926."],
+    ["What is the fictional science at the heart of Asimov's Foundation?", "Psychohistory", "Robopsychology", "Sociodynamics", "Xenolinguistics", "Psychohistory predicts the behaviour of vast populations."],
+    ["Frank Herbert's Dune is set largely on which desert planet?", "Arrakis", "Tatooine", "Jakku", "Caladan", "Dune (1965) shared the 1966 Hugo and won the first Nebula Award for Best Novel."],
+    ["The Hitchhiker's Guide to the Galaxy began life as what?", "A BBC radio comedy", "A TV sitcom", "A newspaper comic", "A stage musical", "Douglas Adams's Guide started on BBC radio before becoming a bestselling novel."],
+    ["What is the planet-sized computer in Douglas Adams's work called?", "Deep Thought", "HAL 9000", "Project Gutenberg", "Multivac", "It is Deep Thought. Project Gutenberg is named after printing pioneer Johannes Gutenberg."],
+    ["James S. A. Corey, author of The Expanse, is the pen name of whom?", "Daniel Abraham and Ty Franck", "Arkady and Boris Strugatsky", "Larry Niven and Jerry Pournelle", "Brian Herbert and Kevin J. Anderson", "The first Expanse novel is Leviathan Wakes."],
+    ["Who directed A Trip to the Moon (1902)?", "Georges Méliès", "Fritz Lang", "Louis Lumière", "Segundo de Chomón", "Its rocket in the Moon's eye became one of early cinema's most famous images."],
+    ["Which film helped popularize the countdown before a rocket launch?", "Woman in the Moon", "Metropolis", "Destination Moon", "Things to Come", "Fritz Lang's 1929 Woman in the Moon. Ten, nine, eight..."],
+    ["Robby the Robot first appeared in which film?", "Forbidden Planet", "Lost in Space", "The Day the Earth Stood Still", "Silent Running", "Robby debuted in Forbidden Planet (1956), a film that borrows from The Tempest."],
+    ["What is the computer aboard Discovery One in 2001: A Space Odyssey?", "HAL 9000", "MU-TH-UR 6000", "Skynet", "Deep Thought", "HAL 9000. The AFI ranks 2001 first among American science-fiction films."],
+    ["Who composed the electronic score for Blade Runner?", "Vangelis", "John Williams", "Hans Zimmer", "Jerry Goldsmith", "Vangelis scored Blade Runner, which was inspired by Philip K. Dick's Do Androids Dream of Electric Sheep?"],
+    ["Which astronaut did Tom Hanks play in Apollo 13?", "Jim Lovell", "Fred Haise", "Jack Swigert", "Ken Mattingly", "Ron Howard's Apollo 13 dramatizes the aborted 1970 lunar mission."],
+    ["Which physicist was scientific consultant on Interstellar?", "Kip Thorne", "Carl Sagan", "Neil deGrasse Tyson", "Stephen Hawking", "Kip Thorne was also an executive producer on Christopher Nolan's 2014 film."],
+    ["What does the outside of Doctor Who's TARDIS usually look like?", "A blue police box", "A red telephone box", "A London bus", "A pillar box", "Doctor Who first aired on the BBC in 1963."],
+    ["Who played Spock in the original Star Trek?", "Leonard Nimoy", "William Shatner", "DeForest Kelley", "Patrick Stewart", "Leonard Nimoy played the half-human, half-Vulcan science officer."],
+    ["Which two worlds are left out of Holst's suite The Planets?", "Earth and Pluto", "Mercury and Pluto", "Earth and Neptune", "Uranus and Pluto", "The Planets has seven movements, omitting Earth and Pluto."],
+    ["What is the name of the astronaut in Bowie's \"Space Oddity\"?", "Major Tom", "Ziggy Stardust", "Commander Shepard", "Captain Fantastic", "Bowie released \"Space Oddity\" in July 1969, shortly before Apollo 11 launched."],
+    ["Who recorded \"Space Oddity\" aboard the ISS in 2013?", "Chris Hadfield", "Scott Kelly", "Tim Peake", "Samantha Cristoforetti", "Chris Hadfield's cover was recorded in orbit."],
+    ["Who designed the arcade game Space Invaders?", "Tomohiro Nishikado", "Shigeru Miyamoto", "Toru Iwatani", "Hideo Kojima", "Space Invaders was released in Japan in 1978."],
+    ["Star Trek fans campaigned for NASA's first Shuttle orbiter to be named what?", "Enterprise", "Columbia", "Discovery", "Falcon", "The fans won. Star Trek's cast and creator attended Enterprise's rollout in 1976."],
+    ["The Hugo Awards are named after whom?", "Hugo Gernsback", "Victor Hugo", "Hugo Weaving", "Hugo Grotius", "Gernsback was the science-fiction publisher who founded Amazing Stories."],
+    ["Who directed and narrated the famous 1938 radio War of the Worlds?", "Orson Welles", "H. G. Wells", "Rod Serling", "Alfred Hitchcock", "Orson Welles adapted Wells's 1898 Martian invasion novel for radio."],
+    ["Which Star Trek actor helped NASA recruit women and minority astronauts?", "Nichelle Nichols", "George Takei", "Whoopi Goldberg", "Majel Barrett", "Nichelle Nichols, who played Uhura, helped NASA recruit in the 1970s."]
+  ]},
+  stars: { code: "ENTRY 3 · UNIVERSE", name: "Stars & Universe", blurb: "Space is big. Really big. These questions are a bit smaller.", q: [
+    ["How old is the universe?", "About 13.8 billion years", "About 4.6 billion years", "About 10.2 billion years", "About 20.5 billion years", "The universe is about 13.8 billion years old."],
+    ["A light-year is a unit of what?", "Distance", "Time", "Brightness", "Speed", "About 9.46 trillion kilometres. It only sounds like a long wait."],
+    ["About how many light-years make one parsec?", "3.26", "1", "9.46", "32.6", "\"Parsec\" comes from \"parallax of one arcsecond\"."],
+    ["What is the nearest star to the Sun?", "Proxima Centauri", "Sirius", "Barnard's Star", "Betelgeuse", "Proxima Centauri is just over four light-years away, and hosts the nearest known exoplanet."],
+    ["What is the brightest star in Earth's night sky?", "Sirius", "Polaris", "Vega", "Betelgeuse", "Sirius takes the title."],
+    ["How far away is the Andromeda Galaxy?", "About 2.5 million light-years", "About 25,000 light-years", "About 250 million light-years", "About 2.5 billion light-years", "Andromeda is the nearest large galaxy to the Milky Way."],
+    ["Which part of the electromagnetic spectrum has the longest wavelengths?", "Radio waves", "Gamma rays", "X-rays", "Ultraviolet", "Radio waves are longest; gamma rays are shortest and most energetic."],
+    ["A difference of five magnitudes equals a brightness ratio of what?", "Exactly 100", "Exactly 5", "Exactly 10", "Exactly 2.5", "And the scale runs backwards: smaller numbers mean brighter."],
+    ["Absolute magnitude is how bright an object would look from what distance?", "10 parsecs", "1 astronomical unit", "1 light-year", "100 parsecs", "Placing everything at 10 parsecs makes stars fair to compare."],
+    ["What is the spectral sequence from hottest to coolest?", "O B A F G K M", "M K G F A B O", "A B F G K M O", "B A F O G K M", "O, B, A, F, G, K, M. Blue and white stars are hotter than orange and red ones."],
+    ["What mainly determines a star's lifetime and final fate?", "Its initial mass", "Its age", "Its distance from the galactic centre", "Its rotation speed", "Massive stars burn through their fuel faster and live shorter lives."],
+    ["What does a planetary nebula have to do with planets?", "Nothing at all", "It is where planets form", "It is debris from destroyed planets", "It only forms around gas giants", "Despite the name, it is the shed outer layers of a dying low- or intermediate-mass star."],
+    ["Why can an iron core in a massive star collapse?", "Fusing iron releases no energy", "Iron is radioactive", "Iron is magnetic", "Iron freezes the core", "With no energy from fusion, gravity wins. The result is a core-collapse supernova."],
+    ["About how wide is a neutron star?", "About 20 kilometres", "About 2,000 kilometres", "About 200,000 kilometres", "About 2 kilometres", "It can pack more mass than the Sun into that small sphere."],
+    ["What is the mass of Sagittarius A*, the black hole at the Milky Way's centre?", "About 4 million Suns", "About 4 thousand Suns", "About 4 billion Suns", "About 40 Suns", "It is a supermassive black hole, though modest as they go."],
+    ["Who made the first direct detection of gravitational waves?", "LIGO, in 2015", "Hubble, in 1995", "Planck, in 2013", "The Event Horizon Telescope, in 2019", "LIGO caught ripples in spacetime from merging stellar-mass black holes."],
+    ["When did the universe become transparent to light?", "About 380,000 years after the Big Bang", "About 3 minutes after the Big Bang", "About 1 billion years after the Big Bang", "Last Tuesday", "Electrons joined nuclei to form neutral atoms, freeing the light we now see as the cosmic microwave background."],
+    ["What is the temperature of the cosmic microwave background today?", "About 2.7 kelvin", "Exactly 0 kelvin", "About 27 kelvin", "About 273 kelvin", "It is the oldest light astronomers can observe directly. Pack a towel."],
+    ["Roughly what share of the universe is dark energy?", "About 68%", "About 5%", "About 27%", "About 95%", "Ordinary matter is about 5%, dark matter about 27%, dark energy about 68%."],
+    ["What does the transit method look for?", "A small periodic dip in starlight", "A star's wobble", "A direct photo of the planet", "Radio signals", "The planet crosses its star and dims it slightly, on schedule."],
+    ["The first confirmed exoplanets orbited what kind of object?", "A pulsar", "A white dwarf", "A red giant", "A brown dwarf", "They orbited pulsar PSR B1257+12."],
+    ["What is a hot Jupiter?", "A gas giant orbiting very close to its star", "Jupiter during a solar flare", "A star that failed to ignite", "A planet made of lava", "Jupiter-sized, very close in, and very warm."],
+    ["Kepler's third law links orbital period squared to what?", "The semi-major axis cubed", "The planet's mass squared", "The star's temperature", "The orbit's eccentricity", "For bodies orbiting the same dominant mass, T² is proportional to a³."],
+    ["According to Wien's law, hotter objects emit most strongly at what wavelengths?", "Shorter", "Longer", "The same", "Radio only", "That's why hot stars look blue and cooler ones red."],
+    ["Stefan–Boltzmann: energy flux rises with temperature to which power?", "The fourth", "The second", "The third", "The first", "Double the temperature and the flux rises sixteen-fold."]
+  ]},
+  solar: { code: "ENTRY 4 · HOME", name: "Solar System", blurb: "Our own small, unregarded yellow sun and the rocks and gas around it.", q: [
+    ["How old is the solar system?", "About 4.6 billion years", "About 13.8 billion years", "About 1.2 billion years", "About 46 million years", "It formed about 4.6 billion years ago from a cloud of gas and dust."],
+    ["How many officially recognized dwarf planets are there?", "5", "1", "3", "9", "Ceres, Pluto, Haumea, Makemake and Eris."],
+    ["Which is the smallest planet?", "Mercury", "Mars", "Venus", "Pluto", "Mercury is only slightly larger than Earth's Moon. Pluto is a dwarf planet."],
+    ["Which is the hottest planet?", "Venus", "Mercury", "Jupiter", "Mars", "Venus averages about 467 °C, hot enough to melt lead, despite Mercury being closer to the Sun."],
+    ["On Venus, where would the Sun rise?", "In the west", "In the east", "In the north", "It never rises", "Venus rotates backwards. Its day is also longer than its year."],
+    ["What type of star is the Sun?", "A G2 V yellow dwarf", "An O5 blue giant", "An M3 red dwarf", "A K1 III orange giant", "The Sun is a G2 V main-sequence star, about 4.5 billion years old."],
+    ["Roughly how many Earths could fit inside the Sun by volume?", "1.3 million", "1,300", "13,000", "1.3 billion", "And more than 330,000 Earths would be needed to match its mass."],
+    ["How hot is the Sun's core?", "About 15 million °C", "About 5,500 °C", "About 1 million °C", "About 150 million °C", "The visible surface, the photosphere, is a comparatively mild 5,500 °C."],
+    ["What makes Mars look red?", "Oxidized iron, or rust", "Red algae", "Sulfur deposits", "Copper ore", "Mars is, in effect, rusty."],
+    ["What are the names of Mars's two moons?", "Phobos and Deimos", "Io and Europa", "Titan and Rhea", "Triton and Nereid", "They are lumpy because they lack the mass to pull themselves round."],
+    ["Where is the largest volcano in the solar system?", "Olympus Mons, Mars", "Mauna Loa, Earth", "Maxwell Montes, Venus", "Loki Patera, Io", "Mars also has Valles Marineris, a canyon system about 3,870 km long."],
+    ["Which planet has the shortest day?", "Jupiter", "Saturn", "Earth", "Mercury", "Jupiter spins once in about 9.9 hours."],
+    ["What is the largest moon in the solar system?", "Ganymede", "Titan", "Callisto", "Earth's Moon", "Jupiter's Ganymede is larger than Mercury and makes its own magnetic field."],
+    ["Which planet is less dense than water?", "Saturn", "Jupiter", "Uranus", "Neptune", "Saturn is the only planet with an average density lower than liquid water."],
+    ["Titan's lakes and seas are made of what?", "Liquid methane and ethane", "Liquid water", "Sulfuric acid", "Liquid nitrogen", "Titan, Saturn's largest moon, is bigger than Mercury."],
+    ["Which was the first planet discovered with a telescope?", "Uranus", "Neptune", "Saturn", "Pluto", "William Herschel found Uranus in 1781."],
+    ["What is Uranus's axial tilt?", "About 98 degrees", "About 23.5 degrees", "About 45 degrees", "About 3 degrees", "Uranus rolls around the Sun on its side."],
+    ["Uranus's moons are mostly named after characters by which writers?", "Shakespeare and Alexander Pope", "Homer and Virgil", "Dickens and Austen", "Tolkien and Lewis", "Hence moons such as Miranda, Titania and Oberon."],
+    ["Which is the windiest planet?", "Neptune", "Jupiter", "Saturn", "Venus", "Neptune's winds exceed 2,000 kilometres per hour."],
+    ["What is Neptune's largest moon?", "Triton", "Titania", "Charon", "Oberon", "Triton orbits backwards, which suggests Neptune captured it."],
+    ["Neptune was found in 1846 using a position predicted by whom?", "Urbain Le Verrier", "William Herschel", "Clyde Tombaugh", "Galileo Galilei", "Johann Gottfried Galle spotted it using Le Verrier's prediction: the first planet found by mathematics."],
+    ["In which year was Pluto reclassified as a dwarf planet?", "2006", "1930", "1996", "2015", "Pluto was reclassified in 2006. It has handled this with dignity."],
+    ["Which is the only dwarf planet in the inner solar system?", "Ceres", "Pluto", "Eris", "Haumea", "Ceres is also the largest object in the main asteroid belt."],
+    ["Which way do a comet's tails point?", "Away from the Sun", "Toward the Sun", "Always behind the comet", "Toward Earth", "Sunlight and the solar wind push the tails away from the Sun."],
+    ["Roughly where is the main region of the Kuiper Belt?", "30 to 50 AU from the Sun", "1 to 5 AU from the Sun", "2 to 3.5 AU from the Sun", "5,000 to 100,000 AU from the Sun", "One AU is about 150 million km, the average Earth–Sun distance."]
+  ]}
+};
+const ORDER = ["flight", "culture", "stars", "solar"];
+const ROUND = 10, TOWELS = 3;
+
+const RIGHT = ["Correct. The Guide nods approvingly.", "Spot on. You clearly know where your towel is.", "Right. Somewhere, a Vogon is mildly annoyed.", "Correct. Your brain is the size of a small planet.", "Right again. Have a Pan Galactic Gargle Blaster (responsibly)."];
+const WRONG = ["Wrong, but don't panic.", "Not quite. The Guide has been wrong before too.", "Incorrect. Probably the Infinite Improbability Drive's fault.", "Nope. Mostly harmless, though.", "Wrong. Time is an illusion; this answer doubly so."];
+const CALM = ["Breathe. You have a towel.", "Everything is going to be fine. Probably.", "The Guide says: relax, and read the question again.", "Panic is not on the syllabus.", "Have a cup of tea. Not the drink from the Nutri-Matic."];
+
+const $ = id => document.getElementById(id);
+const screen = $("screen"), statusEl = $("status"), towelsEl = $("towels"), panicBtn = $("panic"), hint = $("panicHint");
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+let S = null; // round state
+
+function home() {
+  S = null;
+  towelsEl.innerHTML = "Choose an entry, hitchhiker.";
+  statusEl.textContent = "Ten questions per entry. Three towels to help you on the way.";
+  hint.textContent = "PRESS FOR A SURPRISE";
+  screen.innerHTML = `
+    <div class="readout">&gt; Welcome to the Guide</div>
+    <p class="lede">The galaxy is a confusing place. This quiz is less so. Pick an entry below, answer ten questions, and press the big friendly button if things get <em>tense</em>.</p>
+    <div class="topics">
+      ${ORDER.map(k => `<button class="topic" type="button" data-topic="${k}">
+        <span class="code">${BANK[k].code}</span>
+        <span class="name">${BANK[k].name}</span>
+        <span class="blurb">${BANK[k].blurb}</span></button>`).join("")}
+      <button class="topic everything" type="button" data-topic="all">
+        <span class="code">ENTRY 42 · ALL OF IT</span>
+        <span class="name">Life, the Universe and Everything</span>
+        <span class="blurb">A random mix from all four entries. For the confident and the reckless.</span></button>
+    </div>`;
+  screen.querySelectorAll(".topic").forEach(b => b.onclick = () => start(b.dataset.topic));
+}
+
+function start(topic) {
+  const pool = topic === "all"
+    ? ORDER.flatMap(k => BANK[k].q.map(q => ({ q, k })))
+    : BANK[topic].q.map(q => ({ q, k: topic }));
+  const qs = shuffle(pool).slice(0, ROUND).map(({ q, k }) => ({
+    text: q[0], right: q[1], opts: shuffle(q.slice(1, 5)), fact: q[5], k
+  }));
+  S = { topic, qs, i: 0, picks: [], towels: TOWELS, used: false, answered: false };
+  ask();
+}
+
+function setTowels() {
+  towelsEl.innerHTML = `Towels left: <b>${"▮".repeat(S.towels)}${"▯".repeat(TOWELS - S.towels)}</b> · Score <b>${S.picks.filter(Boolean).length}/${S.i + (S.answered ? 1 : 0)}</b>`;
+}
+
+function ask() {
+  const q = S.qs[S.i];
+  S.answered = false; S.used = false;
+  hint.textContent = S.towels ? "USE A TOWEL · REMOVES 2" : "NO TOWELS LEFT";
+  statusEl.textContent = "Press 1–4 or tap an answer.";
+  setTowels();
+  const name = S.topic === "all" ? "Life, the Universe and Everything" : BANK[S.topic].name;
+  screen.innerHTML = `
+    <div class="qhead">
+      <div class="readout">&gt; ${esc(name)} · ${S.i + 1} of ${ROUND}</div>
+      <div class="pips">${S.qs.map((_, j) => `<span class="pip ${j < S.i ? (S.picks[j] ? "ok" : "bad") : ""} ${j === S.i ? "now" : ""}"></span>`).join("")}</div>
+    </div>
+    <h2 class="question">${esc(q.text)}</h2>
+    <div class="options">${q.opts.map((o, j) => `<button class="opt" type="button" id="opt${j}" data-o="${esc(o)}"><span class="key">${j + 1}</span><span>${esc(o)}</span></button>`).join("")}</div>
+    <div id="after"></div>`;
+  screen.querySelectorAll(".opt").forEach(b => b.onclick = () => answer(b));
+  screen.querySelector(".opt").focus({ preventScroll: true });
+}
+
+function answer(btn) {
+  if (S.answered || btn.disabled) return;
+  const q = S.qs[S.i], ok = btn.dataset.o === q.right;
+  S.answered = true; S.picks.push(ok);
+  screen.querySelectorAll(".opt").forEach(b => {
+    b.disabled = true;
+    if (b.dataset.o === q.right) b.classList.add("right");
+  });
+  if (!ok) btn.classList.add("wrong");
+  const last = S.i === ROUND - 1;
+  $("after").innerHTML = `
+    <div class="entry">
+      <div class="readout">${ok ? "✓ " : "✗ "}Guide entry</div>
+      <p>${esc(q.fact)}</p>
+      <p class="quip">${ok ? pick(RIGHT) : pick(WRONG)}</p>
+    </div>
+    <div class="row"><button class="btn" type="button" id="next">${last ? "See my rating" : "Next question"}</button></div>`;
+  $("next").onclick = () => { if (last) results(); else { S.i++; ask(); } };
+  $("next").focus({ preventScroll: true });
+  statusEl.textContent = ok ? "Correct." : `The answer was: ${q.right}.`;
+  hint.textContent = "PRESS TO STAY CALM";
+  setTowels();
+}
+
+function rating(n) {
+  if (n === ROUND) return ["Hoopy frood", "A perfect score. You really know where your towel is."];
+  if (n >= 8) return ["Galactic know-it-all", "The Guide is impressed, which happens roughly once a millennium."];
+  if (n >= 5) return ["Mostly harmless", "A solid showing. The Guide would update your entry to two words."];
+  if (n >= 2) return ["Harmless", "One word. But the galaxy is big and there is time to improve."];
+  return ["Lost in hyperspace", "The Guide recommends a cup of tea and another go."];
+}
+
+function results() {
+  const n = S.picks.filter(Boolean).length;
+  const pts = Math.round(n * 4.2);
+  const [title, line] = rating(n);
+  S.done = true;
+  const name = S.topic === "all" ? "Life, the Universe and Everything" : BANK[S.topic].name;
+  hint.textContent = "PRESS FOR A SURPRISE";
+  statusEl.textContent = pts === 42 ? "42. That's the Answer. Now what was the question?" : "Pick another entry, or try this one again for new questions.";
+  towelsEl.innerHTML = `Round complete · Towels used: <b>${TOWELS - S.towels}</b>`;
+  screen.innerHTML = `
+    <div class="readout">&gt; Rating for ${esc(name)}</div>
+    <div class="score"><span class="big">${pts}</span><span class="of">/ 42 GUIDE POINTS · ${n} of ${ROUND} right</span></div>
+    <div class="rank">${title}</div>
+    <p class="lede" style="margin-bottom:0">${line}</p>
+    <ul class="review">${S.qs.map((q, j) => `<li><span class="mk ${S.picks[j] ? "ok" : "bad"}">${S.picks[j] ? "✓" : "✗"}</span><span>${esc(q.text)} <b>${esc(q.right)}</b></span></li>`).join("")}</ul>
+    <div class="row">
+      <span class="copied" id="copied" hidden>Copied to clipboard</span>
+      <button class="btn ghost" type="button" id="share">Copy my score</button>
+      <button class="btn ghost" type="button" id="menu">Choose another entry</button>
+      <button class="btn" type="button" id="again">Play again</button>
+    </div>`;
+  $("again").onclick = () => start(S.topic);
+  $("menu").onclick = home;
+  $("share").onclick = () => {
+    const text = `I scored ${pts}/42 Guide points (${n}/${ROUND}) on "${name}" in The Hitchhiker's Space Quiz. Rating: ${title}. Don't panic.`;
+    const done = () => { $("copied").hidden = false; };
+    try {
+      navigator.clipboard.writeText(text).then(done, () => { statusEl.textContent = text; });
+    } catch (e) { statusEl.textContent = text; }
+  };
+  $("again").focus({ preventScroll: true });
+}
+
+panicBtn.onclick = () => {
+  panicBtn.classList.remove("wobble"); void panicBtn.offsetWidth; panicBtn.classList.add("wobble");
+  if (!S || S.done) {
+    // on the menu or results screen: a random entry, because why not
+    start(pick([...ORDER, "all"]));
+    statusEl.textContent = "The Infinite Improbability Drive picked this entry for you.";
+    return;
+  }
+  if (S.answered) { statusEl.textContent = pick(CALM); return; }
+  if (S.used) { statusEl.textContent = "One towel per question. " + pick(CALM); return; }
+  if (!S.towels) { statusEl.textContent = "Out of towels. " + pick(CALM); return; }
+  const q = S.qs[S.i];
+  const wrongs = shuffle([...screen.querySelectorAll(".opt")].filter(b => b.dataset.o !== q.right)).slice(0, 2);
+  wrongs.forEach(b => { b.disabled = true; b.classList.add("gone"); });
+  S.towels--; S.used = true;
+  hint.textContent = S.towels ? `${S.towels} TOWEL${S.towels > 1 ? "S" : ""} LEFT` : "NO TOWELS LEFT";
+  statusEl.textContent = "Towel deployed. Two wrong answers have wandered off.";
+  setTowels();
+};
+
+document.addEventListener("keydown", e => {
+  if (!S || e.metaKey || e.ctrlKey || e.altKey) return;
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= 4 && !S.answered) { const b = $("opt" + (n - 1)); if (b) answer(b); }
+});
+
+// starfield
+const cv = $("stars"), cx = cv.getContext("2d");
+const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let stars = [];
+function size() {
+  const d = Math.min(devicePixelRatio || 1, 2);
+  cv.width = innerWidth * d; cv.height = innerHeight * d;
+  cx.setTransform(d, 0, 0, d, 0, 0);
+  stars = Array.from({ length: Math.round(innerWidth * innerHeight / 3500) }, () => ({
+    x: Math.random() * innerWidth, y: Math.random() * innerHeight, r: Math.random() * 1.3 + .2, s: Math.random() * .25 + .03, t: Math.random() * 6.28
+  }));
+}
+function draw() {
+  cx.clearRect(0, 0, innerWidth, innerHeight);
+  for (const s of stars) {
+    if (!still) { s.x -= s.s; if (s.x < 0) s.x = innerWidth; s.t += .02; }
+    cx.globalAlpha = .45 + Math.sin(s.t) * .3;
+    cx.fillStyle = s.r > 1.2 ? "#ffd27a" : "#dfe3ff";
+    cx.beginPath(); cx.arc(s.x, s.y, s.r, 0, 6.283); cx.fill();
+  }
+  if (!still) requestAnimationFrame(draw);
+}
+addEventListener("resize", () => { size(); if (still) draw(); });
+size(); draw();
+
+home();
+})();
+</script>
+</body>
+</html>
